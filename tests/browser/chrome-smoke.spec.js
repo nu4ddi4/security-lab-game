@@ -37,7 +37,8 @@ test('Windows Chrome: packaged first frame, collision, door, WASD, INTERACT, mis
  const initial=await diagnostics(page);expect(initial.firstFrameReady).toBe(true);expect(initial.drawCalls).toBeGreaterThan(0);expect(initial.colliders).toBe(89);expect(initial.cityBuildings).toBeGreaterThan(0);
  const cdp=await page.context().newCDPSession(page);
  await cdp.send('Browser.grantPermissions',{permissions:['keyboardLock'],origin:new URL(page.url()).origin});
- await page.locator('#scene-start').click();await expect.poll(async()=>(await diagnostics(page)).pointerLocked).toBe(true);
+ // WARP can delay the diagnostics response past the default 5 s even after lock succeeds.
+ await page.locator('#scene-start').click();await expect.poll(async()=>(await diagnostics(page)).pointerLocked,{timeout:15000}).toBe(true);
  await expect.poll(async()=>(await diagnostics(page)).keyboardCaptured,{timeout:15000}).toBe(true);
  expect((await diagnostics(page)).fullscreen).toBe(true);
  await page.keyboard.down('ControlLeft');
@@ -65,7 +66,7 @@ test('Windows Chrome: packaged first frame, collision, door, WASD, INTERACT, mis
  const beforeTool=(await diagnostics(page)).position;await page.keyboard.press('KeyF');
  await expect(page.locator('#tool-source')).toContainText('현장 조사는 E');await expect(page.locator('#clues')).toContainText('아직 확보한 단서가 없습니다.');
  await page.locator('#tool-close').click();await expect(page.locator('#scene-message')).toContainText('E로 현장 근거');
- await page.locator('#scene-start').click();await expect.poll(async()=>(await diagnostics(page)).pointerLocked).toBe(true);
+ await page.locator('#scene-start').click();await expect.poll(async()=>(await diagnostics(page)).pointerLocked,{timeout:15000}).toBe(true);
  expect((await diagnostics(page)).position).toEqual(beforeTool);await page.keyboard.press('KeyE');
  await expect(page.locator('#device-observation')).toBeVisible();
  await expect(page.locator('#device-observation-next')).toContainText('F');await expect(page.locator('#onboarding-hint')).toBeHidden();
