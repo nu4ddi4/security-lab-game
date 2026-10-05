@@ -17,12 +17,12 @@ const types = {
 const requiredFiles = [
   'index.html', 'src/bootstrap.js', 'src/app.js', 'src/engine.js',
   'src/missions.js', 'src/storage.js', 'src/loading.css', 'src/style.css',
-  'src/labbridge.js', 'src/scene-entry.js',
+  'src/labbridge.js', 'src/scene-entry.js', 'src/devices.js',
 ];
 const optionalFiles = [
   'assets/credits.txt',
   'src/collision.js', 'src/player3d.js', 'src/interaction3d.js',
-  'src/scene3d.js', 'src/batch3d.js', 'src/scene3d.css',
+  'src/scene3d.js', 'src/batch3d.js', 'src/scene3d.css', 'src/world-status.js',
   'src/city3d.js', 'src/visibility3d.js', 'src/upscale3d.js',
   'assets/environment/city-sunset.png',
   'assets/models/security_lab.glb',
@@ -94,7 +94,7 @@ const server = createServer((req, res) => {
     let relative = pathname === '/' ? 'index.html' : pathname.startsWith('/') ? pathname.slice(1) : '';
     if (relative.startsWith('__scene__/')) {
       const retry = /^__scene__\/[a-z0-9]{1,16}-[0-9]{1,6}\/(.+)$/.exec(relative);
-      if (!retry || !optionalFiles.includes(retry[1])) throw new Error('Not a 3D retry asset');
+      if (!retry || !optionalFiles.includes(retry[1]) && retry[1] !== 'src/devices.js') throw new Error('Not a 3D retry asset');
       relative = retry[1];
     }
     const body = assets.get(relative);

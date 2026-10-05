@@ -126,7 +126,7 @@ class ServerTest(unittest.TestCase):
 
     def test_scene_retry_namespace_preserves_assets_and_cannot_expose_core_or_private_files(self):
         prefix = '/__scene__/test123-1/'
-        for name, content_type in module.OPTIONAL_FILES.items():
+        for name, content_type in {**module.OPTIONAL_FILES, 'src/devices.js': module.REQUIRED_FILES['src/devices.js']}.items():
             with self.subTest(name=name):
                 status, headers, body = self.request('GET', prefix + name)
                 self.assertEqual((status, body), (200, self.server.assets[name]))
@@ -357,7 +357,7 @@ class NodeServerTest(unittest.TestCase):
                 status, headers, body = request_port(port, 'HEAD', '/assets/models/security_lab.glb')
                 self.assertEqual((status, body), (200, b''))
                 self.assertEqual(int(headers['Content-Length']), len(self.assets['assets/models/security_lab.glb']))
-                for name in ['src/scene3d.js', 'vendor/three/build/three.core.js', 'src/scene3d.css']:
+                for name in ['src/scene3d.js', 'vendor/three/build/three.core.js', 'src/scene3d.css', 'src/devices.js']:
                     status, headers, body = request_port(port, 'GET', '/__scene__/test123-1/' + name)
                     self.assertEqual((status, body), (200, self.assets[name]))
                 for path in ['/__scene__/test123-1/src/app.js', '/__scene__/bad_/src/scene3d.js', '/__scene__/test123-1/README.md']:

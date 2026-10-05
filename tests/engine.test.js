@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState, progress, runCommand, answerFeedback, applyAnswer, applyPort, applyLogin, canRestoreFiles, restoreFile, nextMission, resetMission, score, sha256, accepted, loginSimulation, nextAction, validateMissionDefinitions } from '../src/engine.js';
 import { MISSIONS, ORIGINAL_FILES, MISSION_INDEX } from '../src/missions.js';
+import {inspectDevice,worldDevices,stage} from '../src/engine.js';
 import { loadGame, saveGame, SAVE_KEY, createSaveSession, CURRENT_SAVE_KEY, BACKUP_KEY, exportGame, importGame } from '../src/storage.js';
 
 async function tutorial(state) {
@@ -469,4 +470,58 @@ test('완료한 미션의 피드백은 재작업 대신 완료 결과를 안내�
     assert.equal(feedback.status, 'supported'); assert.match(feedback.text, /미션을 완료했습니다/);
     assert.deepEqual(state, before);
   }
+});
+
+test('現場 조사 점수는 필수 근거에 비례하며 정답 설정만으로 상태를 노출하지 않음',async()=>{
+ const s=initialState();await tutorial(s);applyAnswer(s,1);applyPort(s,8080,false);
+ assert.equal(score(s),0);assert.equal(stage(s),'준비');
+ await runCommand(s,'scan club-server');assert.equal(score(s),15);assert.equal(stage(s),'조사');
+ await runCommand(s,'inspect club-server 8080');assert.equal(score(s),80);
+});
+test('3D 서비스: 서버 단서 → 방화벽 → 현장 재확인, 터미널 재조회는 대체 불가',async()=>{
+ const s=initialState();await tutorial(s);const r=await inspectDevice(s,'INTERACT_ServerRack');
+ assert.match(r.text,/443 OPEN/);assert.match(r.text,/8080 OPEN/);assert.deepEqual(progress(s).spatial.inspected,['INTERACT_ServerRack']);
+ applyAnswer(s,1);applyPort(s,8080,false);assert.match(worldDevices(s).INTERACT_ServerRack.text,/재확인/);
+ await runCommand(s,'scan club-server');await runCommand(s,'verify');assert.equal(progress(s).verified,false);
+ assert.equal(nextAction(s).device,'INTERACT_ServerRack');
+ const after=await inspectDevice(s,'INTERACT_ServerRack');assert.match(after.text,/8080 FILTERED/);assert.equal(after.tone,'normal');
+ await runCommand(s,'verify');assert.equal(progress(s).verified,true);
+ applyPort(s,443,false);assert.equal(progress(s).spatial.rechecked,false);await inspectDevice(s,'INTERACT_ServerRack');await runCommand(s,'verify');assert.equal(progress(s).verified,false);
+});
+test('3D 로그인: 정책 수정과 정상/반복 실패 현장 재검증을 분리',async()=>{
+ const s=initialState();await tutorial(s);await services(s);await inspectDevice(s,'INTERACT_AdminPC');
+ applyAnswer(s,2);applyLogin(s,{minLength:15,blockCommon:true,limitAttempts:true});
+ await runCommand(s,'verify');assert.equal(progress(s).verified,false);
+ await inspectDevice(s,'INTERACT_ServerRack');assert.equal(progress(s).spatial.rechecked,false);
+ const r=await inspectDevice(s,'INTERACT_AdminPC');assert.match(r.text,/4회: 제한됨/);assert.match(worldDevices(s).INTERACT_AdminPC.text,/정상 로그인 성공/);
+ await runCommand(s,'verify');assert.equal(progress(s).verified,true);
+});
+test('3D 무결성: 보관함 기준과 분석 PC 해시, 복구 후 PC에서 재계산',async()=>{
+ const s=initialState();await tutorial(s);await services(s);await login(s);
+ await inspectDevice(s,'INTERACT_AdminPC');assert.equal(nextAction(s).device,'INTERACT_FileCabinet');
+ await inspectDevice(s,'INTERACT_FileCabinet');applyAnswer(s,1);restoreFile(s,'budget.csv');
+ await runCommand(s,'hash files');await runCommand(s,'verify');assert.equal(progress(s).verified,false);
+ await inspectDevice(s,'INTERACT_FileCabinet');assert.equal(progress(s).spatial.rechecked,false);
+ await inspectDevice(s,'INTERACT_AdminPC');await runCommand(s,'verify');assert.equal(progress(s).verified,true);
+});
+test('3D 저장은 재방문 조건을 보존하고 기존 완료 저장·내보내기와 공존',async()=>{
+ const s=initialState();await tutorial(s);await inspectDevice(s,'INTERACT_ServerRack');applyAnswer(s,1);applyPort(s,8080,false);
+ const store=memoryStorage();saveGame(s,store);const loaded=await loadGame(store);assert.equal(loaded.recovered,false);
+ assert.equal(progress(loaded.state).spatial.rechecked,false);await runCommand(loaded.state,'scan club-server');await runCommand(loaded.state,'verify');assert.equal(progress(loaded.state).verified,false);
+ await inspectDevice(loaded.state,'INTERACT_ServerRack');await runCommand(loaded.state,'verify');saveGame(loaded.state,store);
+ const completed=await loadGame(store);assert.equal(completed.recovered,false);assert.equal(progress(completed.state).verified,true);
+ const old=initialState();await tutorial(old);await services(old);await login(old);await integrity(old);saveGame(old,store);
+ assert.equal((await loadGame(store)).state.missions.every(p=>p.verified),true);
+ const raw=JSON.parse(store.getItem(SAVE_KEY));raw.missions[0].spatial={inspected:['INTERACT_ServerRack'],rechecked:true};store.setItem(SAVE_KEY,JSON.stringify(raw));assert.equal((await loadGame(store)).recovered,true);
+});
+
+test('복원 시 자동 해시 계산은 물리 장비 재확인을 대신하지 않음',async()=>{
+ const s=initialState();await tutorial(s);await services(s);await login(s);await inspectDevice(s,'INTERACT_FileCabinet');await inspectDevice(s,'INTERACT_AdminPC');applyAnswer(s,1);restoreFile(s,'budget.csv');await runCommand(s,'hash files');
+ const store=memoryStorage();saveGame(s,store);const loaded=await loadGame(store);assert.equal(loaded.recovered,false);assert.equal(progress(loaded.state).spatial.rechecked,false);
+ await runCommand(loaded.state,'verify');assert.equal(progress(loaded.state).verified,false);await inspectDevice(loaded.state,'INTERACT_AdminPC');await runCommand(loaded.state,'verify');assert.equal(progress(loaded.state).verified,true);
+ resetMission(loaded.state);assert.equal(progress(loaded.state).spatial,undefined);
+});
+test('임의 장비 ID와 무관한 장비 조회는 단서와 현장 조건을 변경하지 않음',async()=>{
+ const s=initialState();await tutorial(s);const before=JSON.stringify(s);await assert.rejects(inspectDevice(s,'https://example.com'));assert.equal(JSON.stringify(s),before);
+ await inspectDevice(s,'INTERACT_FileCabinet');assert.equal(JSON.stringify(s),before);
 });

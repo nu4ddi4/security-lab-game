@@ -4,6 +4,12 @@
 
 ## 자산과 기능
 
+아래 크기/triangle 최적화 비교는 v0.5.0 당시 기록이다. 현재 v0.6.0은
+Interior 06의 41,775,284-byte runtime GLB를 그대로 사용한다. 현장 상태판은
+최대 4 calls/8 triangles와 512×256 CanvasTexture 4개만 추가하며 새 pass나
+조명을 만들지 않는다. 상태 변경 시 temporal history를 초기화한다.
+동작/저장/검증은 [SPATIAL_MISSIONS.md](SPATIAL_MISSIONS.md)를 참고한다.
+
 `assets/authoring/Security_Lab_Corporate_04.blend`는 변경하지 않았다. SHA-256: `1f84b263405e2e9821b79962395dfa0d60bbde1f4ae0b92453b872b4487f6b68`.
 
 게임용 GLB는 184,581,344 → 67,867,452 bytes, 근거리 전체 장면은 6,968,337 → 2,188,440 triangles다. 실제 병목이었던 서버랙·포트·케이블을 먼저 분석했다. Meshoptimizer가 1.2mm 기하 오차 안에서 근거리 표현을 만들고 4mm / 12mm 오차의 중·원거리 인덱스를 제공한다. triangle 목표 수를 지정하지 않는다. 재내보내기는 원본 고품질 GLB를 입력으로 `scripts/runtime-lod.mjs`, 이어서 `scripts/pack_corporate_lab.py`를 실행한다. 현재 기본 기능 도구와 재질·노드 구조를 유지한다.

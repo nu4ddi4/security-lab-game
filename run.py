@@ -22,6 +22,7 @@ REQUIRED_FILES = {
     'src/app.js': 'text/javascript; charset=utf-8',
     'src/bootstrap.js': 'text/javascript; charset=utf-8',
     'src/engine.js': 'text/javascript; charset=utf-8',
+    'src/devices.js': 'text/javascript; charset=utf-8',
     'src/missions.js': 'text/javascript; charset=utf-8',
     'src/storage.js': 'text/javascript; charset=utf-8',
     'src/loading.css': 'text/css; charset=utf-8',
@@ -35,6 +36,7 @@ OPTIONAL_FILES = {
     'src/player3d.js': 'text/javascript; charset=utf-8',
     'src/interaction3d.js': 'text/javascript; charset=utf-8',
     'src/scene3d.js': 'text/javascript; charset=utf-8',
+    'src/world-status.js': 'text/javascript; charset=utf-8',
     'src/batch3d.js': 'text/javascript; charset=utf-8',
     'src/city3d.js': 'text/javascript; charset=utf-8',
     'src/visibility3d.js': 'text/javascript; charset=utf-8',
@@ -159,7 +161,7 @@ class GameHandler(BaseHTTPRequestHandler):
             relative = 'index.html'
         if relative.startswith('__scene__/'):
             retry = re.fullmatch(r'__scene__/[a-z0-9]{1,16}-[0-9]{1,6}/(.+)', relative)
-            if not retry or retry.group(1) not in OPTIONAL_FILES:
+            if not retry or retry.group(1) not in OPTIONAL_FILES and retry.group(1) != 'src/devices.js':
                 self.respond(404, b'Not found')
                 return
             relative = retry.group(1)

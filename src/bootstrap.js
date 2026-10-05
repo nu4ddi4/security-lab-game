@@ -58,7 +58,7 @@
   }
 
   async function diagnoseGame(error) {
-    const files = ['src/app.js', 'src/engine.js', 'src/missions.js', 'src/storage.js', 'src/labbridge.js', 'src/scene-entry.js'];
+    const files = ['src/app.js', 'src/engine.js', 'src/missions.js', 'src/storage.js', 'src/labbridge.js', 'src/scene-entry.js','src/devices.js'];
     const controller = new AbortController();
     const completed = new Map();
     let finishDeadline;

@@ -1,6 +1,6 @@
 # Windows 3D 실습실 통합 계획
 
-작성일: 2026-10-04 · 상태: 계획안
+작성일: 2026-10-04 · 상태: v0.4.0 통합 당시의 과거 계획. 현재 현장 미션 동작은 [SPATIAL_MISSIONS.md](SPATIAL_MISSIONS.md), 지원 환경은 [CHROME_RUNTIME.md](CHROME_RUNTIME.md)를 따른다.
 
 - 대상: [PR #15](https://github.com/nu4ddi4/security-lab-game/pull/15), `14d4305`.
 - 기준: Windows 배포판 v0.3.0, main `f3a57b4`. PR의 작업 기준은 v0.2.8 시점의 `b012e7a`다.

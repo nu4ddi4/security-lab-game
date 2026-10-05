@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { Matrix4, Quaternion, Vector3, Group, Mesh, BoxGeometry, MeshStandardMaterial, MeshPhysicalMaterial, Raycaster, MeshBasicMaterial, DoubleSide, Box3 } from '../vendor/three/build/three.module.js';
+import { Matrix4, Quaternion, Vector3, Group, Mesh, BoxGeometry, MeshStandardMaterial, MeshPhysicalMaterial, Raycaster, MeshBasicMaterial, DoubleSide, Box3,PerspectiveCamera,PlaneGeometry } from '../vendor/three/build/three.module.js';
+import {Interaction} from '../src/interaction3d.js';
 import { MeshoptDecoder } from '../vendor/three/examples/jsm/libs/meshopt_decoder.module.js';
 import { batchStatic, isSoftwareRenderer } from '../src/batch3d.js';
 import {refineGlass,backdropGeometry,cityGeometry,windowEnvelope,CITY_SUN} from '../src/city3d.js';
@@ -265,4 +266,15 @@ test('runtime library graph is local; simulation state schema remains untouched'
   const source=readFileSync(new URL('../src/scene3d.js',import.meta.url),'utf8');
   assert.ok(source.includes("fetch('assets/models/security_lab.glb'"));
   assert.ok(!source.includes('runCommand('));
+});
+
+test('runtime device displays obey wall occlusion, reach, hidden state and original anchor routing',()=>{
+ const model=new Group(),camera=new PerspectiveCamera(60,1,.05,50);camera.position.set(0,1.6,2);
+ const anchor=new Group();anchor.name='INTERACT_AdminPC';anchor.userData.interaction='admin';model.add(anchor);
+ const blocker=new Mesh(new BoxGeometry(2,3,.1),new MeshBasicMaterial());blocker.position.set(0,1.5,1);model.add(blocker);model.updateMatrixWorld(true);
+ const found=[],opened=[],interaction=new Interaction(model,camera,{camera,body:{feetY:0,height:1.8}},(...x)=>opened.push(x),id=>found.push(id));
+ const panel=new Mesh(new PlaneGeometry(.58,.29),new MeshBasicMaterial());panel.position.y=1.6;model.add(panel);interaction.addTarget(panel,anchor);model.updateMatrixWorld(true);
+ assert.equal(interaction.findTarget(),null,'a wall blocks the display');blocker.visible=false;
+ assert.equal(interaction.findTarget(),anchor);interaction.interact();assert.deepEqual(found,['INTERACT_AdminPC']);interaction.tool();assert.equal(opened[0][0],'admin');
+ panel.visible=false;assert.equal(interaction.findTarget(),null);panel.visible=true;camera.position.z=3;assert.equal(interaction.findTarget(),null,'display does not extend reach');
 });

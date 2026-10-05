@@ -99,6 +99,7 @@ export function initSceneView() {
   if (initialized) return;
   initialized = true;
   $('view-switch').addEventListener('click', () => { if (mode === '3d') show2D(); else void show3D(); });
+  document.addEventListener('scene3d-go',()=>void show3D());
   $('world-2d').addEventListener('click', () => show2D());
   $('scene-fallback').addEventListener('click', () => show2D());
   document.addEventListener('scene3d-retry', () => {
