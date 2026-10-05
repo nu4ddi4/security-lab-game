@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState, progress, runCommand, answerFeedback, applyAnswer, applyPort, applyLogin, canRestoreFiles, restoreFile, nextMission, resetMission, score, sha256, accepted, loginSimulation, nextAction, validateMissionDefinitions } from '../src/engine.js';
 import { MISSIONS, ORIGINAL_FILES, MISSION_INDEX } from '../src/missions.js';
-import {inspectDevice,worldDevices,stage,continueWithout3D} from '../src/engine.js';
+import {inspectDevice,worldDevices,stage,continueWithout3D,worldAction} from '../src/engine.js';
 import { loadGame, saveGame, SAVE_KEY, createSaveSession, CURRENT_SAVE_KEY, BACKUP_KEY, exportGame, importGame } from '../src/storage.js';
 
 async function tutorial(state) {
@@ -484,7 +484,7 @@ test('3D 서비스: 서버 단서 → 방화벽 → 현장 재확인, 터미널 
  applyAnswer(s,1);applyPort(s,8080,false);assert.match(worldDevices(s).INTERACT_ServerRack.text,/재확인/);
  await runCommand(s,'scan club-server');await runCommand(s,'verify');assert.equal(progress(s).verified,false);
  assert.equal(nextAction(s).device,'INTERACT_ServerRack');
- const after=await inspectDevice(s,'INTERACT_ServerRack');assert.match(after.text,/8080 FILTERED/);assert.equal(after.tone,'normal');
+ const after=await inspectDevice(s,'INTERACT_ServerRack');assert.match(after.text,/8080 OPEN → FILTERED/);assert.equal(after.tone,'normal');
  await runCommand(s,'verify');assert.equal(progress(s).verified,true);
  applyPort(s,443,false);assert.equal(progress(s).spatial.rechecked,false);await inspectDevice(s,'INTERACT_ServerRack');await runCommand(s,'verify');assert.equal(progress(s).verified,false);
 });
@@ -493,7 +493,7 @@ test('3D 로그인: 정책 수정과 정상/반복 실패 현장 재검증을 �
  applyAnswer(s,2);applyLogin(s,{minLength:15,blockCommon:true,limitAttempts:true});
  await runCommand(s,'verify');assert.equal(progress(s).verified,false);
  await inspectDevice(s,'INTERACT_ServerRack');assert.equal(progress(s).spatial.rechecked,false);
- const r=await inspectDevice(s,'INTERACT_AdminPC');assert.match(r.text,/4회: 제한됨/);assert.match(worldDevices(s).INTERACT_AdminPC.text,/정상 로그인 성공/);
+ const r=await inspectDevice(s,'INTERACT_AdminPC');assert.match(r.text,/반복 실패 · 무제한 → 제한됨/);assert.match(worldDevices(s).INTERACT_AdminPC.text,/정상 로그인 성공/);
  await runCommand(s,'verify');assert.equal(progress(s).verified,true);
 });
 test('3D 무결성: 보관함 기준과 분석 PC 해시, 복구 후 PC에서 재계산',async()=>{
@@ -536,4 +536,29 @@ test('3D failure fallback preserves investigation and defense, permits existing 
  assert.deepEqual(s.ports,ports);assert.equal(continueWithout3D(s),false);
  await runCommand(s,'scan club-server');await runCommand(s,'verify');assert.equal(progress(s).verified,true);
  const completed=structuredClone(s);assert.equal(continueWithout3D(s),false);assert.deepEqual(s,completed);
+});
+
+
+test('spatial UX guides each required source, policy tool and factual recheck before judging correctness', async()=>{
+ const s=initialState();assert.equal(worldAction(s).device,'INTERACT_AdminPC');
+ await inspectDevice(s,'INTERACT_AdminPC');assert.equal(worldAction(s).mode,'tool');await runCommand(s,'verify');assert.equal(progress(s).verified,false);
+ applyAnswer(s,0);await runCommand(s,'verify');nextMission(s);
+ await inspectDevice(s,'INTERACT_ServerRack');assert.equal(worldAction(s).device,'INTERACT_Router');
+ applyPort(s,443,false);applyPort(s,8080,false);
+ assert.equal(worldAction(s).mode,'recheck');assert.equal(stage(s),'장비 재확인 필요');assert.match(worldAction(s).text,/이전 관찰이 만료/);
+ assert.equal(worldDevices(s).INTERACT_ServerRack.tone,'pending');assert.doesNotMatch(worldDevices(s).INTERACT_ServerRack.text,/443 FILTERED/);
+ const r=await inspectDevice(s,'INTERACT_ServerRack');assert.match(r.text,/자료 열람 불가/);assert.match(r.text,/관리 접근 차단/);assert.equal(r.tone,'warning');
+ assert.equal(worldAction(s).device,'INTERACT_Router');assert.equal(worldDevices(s).INTERACT_Router.objective,true);assert.equal(worldDevices(s).INTERACT_ServerRack.objective,false);
+ await runCommand(s,'verify');assert.equal(progress(s).verified,false);
+});
+
+test('concise field findings preserve login changes, separate baseline and hashes, and leave unrelated devices untouched',async()=>{
+ const s=initialState();await tutorial(s);await services(s);
+ const r=await inspectDevice(s,'INTERACT_AdminPC');assert.equal(r.findings.length,3);assert.match(r.text,/5\/5개 허용/);
+ const before=structuredClone(s);const wrong=await inspectDevice(s,'INTERACT_FileCabinet');assert.equal(wrong.recorded,false);assert.equal(wrong.status,'현재 사건 조사 대상 아님');assert.match(wrong.next,/관제/);assert.deepEqual(s,before);
+ applyLogin(s,{minLength:15,blockCommon:true,limitAttempts:true});const after=await inspectDevice(s,'INTERACT_AdminPC');assert.match(after.text,/무제한 → 제한됨/);assert.match(after.text,/0\/5개 허용/);
+ applyAnswer(s,2);await runCommand(s,'verify');nextMission(s);
+ assert.equal(worldAction(s).device,'INTERACT_FileCabinet');await inspectDevice(s,'INTERACT_FileCabinet');assert.equal(worldAction(s).device,'INTERACT_AdminPC');
+ const hash=await inspectDevice(s,'INTERACT_AdminPC');assert.equal(hash.findings.length,3);assert.match(hash.text,/budget.csv · 승인 기준과 불일치/);
+ restoreFile(s,'budget.csv');const restored=await inspectDevice(s,'INTERACT_AdminPC');assert.match(restored.text,/불일치 → 승인 기준과 일치/);
 });

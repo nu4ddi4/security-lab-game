@@ -37,7 +37,8 @@ test('Windows Chrome: packaged first frame, collision, door, WASD, INTERACT, mis
  const initial=await diagnostics(page);expect(initial.firstFrameReady).toBe(true);expect(initial.drawCalls).toBeGreaterThan(0);expect(initial.colliders).toBe(89);expect(initial.cityBuildings).toBeGreaterThan(0);
  const cdp=await page.context().newCDPSession(page);
  await cdp.send('Browser.grantPermissions',{permissions:['keyboardLock'],origin:new URL(page.url()).origin});
- await page.locator('#scene-start').click();await expect.poll(async()=>(await diagnostics(page)).pointerLocked).toBe(true);
+ // WARP can delay the diagnostics response past the default 5 s even after lock succeeds.
+ await page.locator('#scene-start').click();await expect.poll(async()=>(await diagnostics(page)).pointerLocked,{timeout:15000}).toBe(true);
  await expect.poll(async()=>(await diagnostics(page)).keyboardCaptured,{timeout:15000}).toBe(true);
  expect((await diagnostics(page)).fullscreen).toBe(true);
  await page.keyboard.down('ControlLeft');
@@ -60,11 +61,18 @@ test('Windows Chrome: packaged first frame, collision, door, WASD, INTERACT, mis
  await expect.poll(async()=>(await diagnostics(page)).doors[0].angle,{timeout:15000}).toBeCloseTo(100*Math.PI/180,2);
  expect((await diagnostics(page)).doors[0].pivot[0]).toBeCloseTo(-.64,2);
  await walk(page,'KeyW',{axis:'z',lt:6.5});await walkTo(page,-3.4,3.2);await aim(page,-5.2,1.25,2.85);
- await expect.poll(async()=>(await diagnostics(page)).target,{timeout:15000}).toBe('INTERACT_AdminPC');await page.keyboard.press('KeyE');
+ await expect.poll(async()=>(await diagnostics(page)).target,{timeout:15000}).toBe('INTERACT_AdminPC');
+ await expect(page.locator('#interaction-prompt')).toContainText('E · 조사 승인서 확인 / F · 조사 노트');
+ const beforeTool=(await diagnostics(page)).position;await page.keyboard.press('KeyF');
+ await expect(page.locator('#tool-source')).toContainText('현장 조사는 E');await expect(page.locator('#clues')).toContainText('아직 확보한 단서가 없습니다.');
+ await page.locator('#tool-close').click();await expect(page.locator('#scene-message')).toContainText('E로 현장 근거');
+ await page.locator('#scene-start').click();await expect.poll(async()=>(await diagnostics(page)).pointerLocked,{timeout:15000}).toBe(true);
+ expect((await diagnostics(page)).position).toEqual(beforeTool);await page.keyboard.press('KeyE');
  await expect(page.locator('#device-observation')).toBeVisible();
+ await expect(page.locator('#device-observation-next')).toContainText('F');await expect(page.locator('#onboarding-hint')).toBeHidden();
  await expect(page.locator('#device-observation-text')).toContainText('조사 승인서');
  expect((await diagnostics(page)).pointerLocked).toBe(true);expect((await diagnostics(page)).statusPanels).toBe(4);
- await expect(page.locator('#hud-stage')).toContainText('단서 2개');await page.keyboard.press('KeyF');
+ await expect(page.locator('#hud-stage')).toContainText('근거 2/2');await page.keyboard.press('KeyF');
  await expect(page.locator('#panel-terminal')).toBeVisible();expect((await diagnostics(page)).pointerLocked).toBe(false);expect((await diagnostics(page)).keyboardCaptured).toBe(false);
  for(const command of ['help','inspect approval']){await page.locator('#command').fill(command);await page.locator('#command').press('Enter');await expect(page.locator('#command')).toBeEnabled();}
  await page.locator('#answer-0').check();await page.locator('#verify').click();await expect(page.locator('#next')).toBeVisible();await page.locator('#next').click();

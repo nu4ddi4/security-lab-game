@@ -5,6 +5,7 @@ import { RoomEnvironment } from '../vendor/three/examples/jsm/environments/RoomE
 import { Player } from './player3d.js';
 import { Interaction } from './interaction3d.js';
 import { observeMission, requestTool,requestInspection,observeDevice } from '/src/labbridge.js';
+import {DEVICES} from './devices.js';
 import {createWorldStatus} from './world-status.js';
 import { batchStatic, isSoftwareRenderer } from './batch3d.js';
 import { createCity, refineGlass, restoreCityEnvironment, CITY_SUN } from './city3d.js';
@@ -23,6 +24,8 @@ let city, visibility, upscaler, preset='quality', optimization=true, debug=false
 let loadStarted=0, loadTimeMs=0, glbLoadMs=0, renderTimeMs=0, averageFrameMs=0;
 let keyboardCaptured=false,keyboardCapturePromise;
 let worldStatus,deviceObservation=null;
+let onboardingSeen=false,onboardingUntil=0,wayfindingAt=0;
+const guidePosition=new THREE.Vector3(),guideDirection=new THREE.Vector3();
 function releaseKeyboard() {navigator.keyboard?.unlock?.();keyboardCaptured=false;}
 function captureKeyboard() {
   if(keyboardCaptured||keyboardCapturePromise||!document.fullscreenElement||!player?.controls.isLocked||!navigator.keyboard?.lock)return;
@@ -63,6 +66,7 @@ function stopInput() {
   $('crosshair').hidden = true;
   $('interaction-prompt').hidden = true;
   $('device-observation').hidden=true;
+  $('onboarding-hint').hidden=true;
   previousTime = 0;
 }
 function resetToolModal() {
@@ -125,7 +129,7 @@ export function setMode(value) {
 }
 function pauseMessage() {
   if (!ready || !healthyContext()) return;
-  message('실습실을 탐색하세요.', '장비 가까이에서 E를 누르면 조사 도구가 열립니다. 단서를 모으고, 방어한 뒤, 정상 기능을 재검증하세요.');
+  message('실습실을 탐색하세요.', 'WASD로 이동하고 마우스로 둘러보세요. 장비를 바라보고 E로 현장 근거를 조사합니다. F는 판단·설정을 위한 상세 도구입니다.');
   $('scene-progress').hidden = true;
   $('scene-start').hidden = false;
   $('scene-retry').hidden = true;
@@ -291,7 +295,7 @@ async function installModel(gltf) {
   scene.add(model);
   renderer.shadowMap.needsUpdate=true;
   player = new Player(camera, $('lab-canvas'), boxes, spawn);
-  interaction = new Interaction(model, camera, player, openTool,id=>{if(!busy())requestInspection(id);},()=>mission?.id??'tutorial');
+  interaction = new Interaction(model, camera, player, openTool,id=>{if(!busy())requestInspection(id);},()=>mission?.id??'tutorial',()=>mission??{});
   visibility?.dispose();visibility=await prepareVisibility(gltf);
   worldStatus=createWorldStatus(model);worldStatus.update(mission?.devices);
   for(const target of worldStatus.targets)interaction.addTarget(target.mesh,target.anchor);
@@ -299,6 +303,8 @@ async function installModel(gltf) {
     if (!ready || !healthyContext() || toolsOpen || mode !== '3d') { player.controls.unlock(); return; }
     $('scene-cover').hidden = true;
     $('crosshair').hidden = false;
+    if(!onboardingSeen){onboardingSeen=true;onboardingUntil=performance.now()+9000;}
+    $('onboarding-hint').hidden=performance.now()>=onboardingUntil;
     previousTime = performance.now();
     // Three dispatches its lock event before setting controls.isLocked.
     queueMicrotask(captureKeyboard);
@@ -307,6 +313,7 @@ async function installModel(gltf) {
     releaseKeyboard();
     $('crosshair').hidden = true;
     $('interaction-prompt').hidden = true;
+    $('onboarding-hint').hidden=true;
     if (mode === '3d' && !toolsOpen) { $('scene-cover').hidden = false; pauseMessage(); }
   });
 }
@@ -427,7 +434,8 @@ function openTool(kind, label = '조사 노트') {
   $('lab-tools').setAttribute('aria-modal', 'true');
   $('lab-tools').setAttribute('aria-label', label);
   $('lab-tools').setAttribute('aria-busy', String(busy()));
-  $('tool-source').textContent = label;
+  const target=interaction?.target?.name,zone=DEVICES[target]?.zone;
+  $('tool-source').textContent = `${zone?zone+' / ':''}${label} · 상세 도구 (F) — 현장 조사는 E`;
   $('lab-world').inert = true;
   $('view-switch').disabled = true;
   $('tool-close').disabled = busy();
@@ -450,6 +458,16 @@ function closeTool() {
   pauseMessage();
   if (opener instanceof HTMLElement && opener !== document.body && opener.getClientRects().length && !opener.closest('[inert]')) opener.focus();
   else $('scene-start').focus();
+}
+function updateWayfinding(time) {
+  if(time<wayfindingAt)return;wayfindingAt=time+250;
+  const target=worldStatus?.targets.find(target=>target.anchor.name===mission?.objectiveDevice);
+  if(!target){$('hud-location').textContent='';return;}
+  target.mesh.getWorldPosition(guidePosition);camera.getWorldDirection(guideDirection);
+  const dx=guidePosition.x-camera.position.x,dz=guidePosition.z-camera.position.z;
+  const angle=Math.atan2(Math.sin(Math.atan2(dx,-dz)-Math.atan2(guideDirection.x,-guideDirection.z)),Math.cos(Math.atan2(dx,-dz)-Math.atan2(guideDirection.x,-guideDirection.z)));
+  const direction=Math.abs(angle)<Math.PI/6?'앞쪽':Math.abs(angle)>Math.PI*5/6?'뒤쪽':angle<0?'왼쪽':'오른쪽';
+  $('hud-location').textContent=`${DEVICES[mission.objectiveDevice].zone} · ${direction} · 직선 ${Math.round(Math.hypot(dx,dz))}m`;
 }
 function lock() {
   if (!ready || !healthyContext() || toolsOpen || mode !== '3d' || nativeDialogOpen()) return;
@@ -478,6 +496,8 @@ function animate(time) {
     interaction.update(dt / steps);
     player.update(dt / steps, interaction.boxes);
   }
+  if(player.controls.isLocked)updateWayfinding(time);
+  $('onboarding-hint').hidden=!player.controls.isLocked||time>=onboardingUntil;
   const prompt = player.controls.isLocked ? interaction.prompt() : '';
   $('interaction-prompt').textContent = prompt;
   $('interaction-prompt').hidden = !prompt;
@@ -536,7 +556,11 @@ export function init3D() {
       $('hud-title').textContent = status.title;
       $('hud-objective').textContent = status.objective;
       $('hud-action').textContent=status.worldAction;
-      $('hud-stage').textContent = `${status.stage} · 단서 ${status.clues}개 · ${status.score}/100`;
+      wayfindingAt=0;
+      if(!status.objectiveDevice)$('hud-location').textContent='';
+      if(camera&&worldStatus)updateWayfinding(performance.now());
+      $('hud-stage').dataset.tone=status.actionMode==='recheck'?'pending':status.actionMode==='complete'?'normal':'neutral';
+      $('hud-stage').textContent = `${status.stage} · 조사 노트 근거 ${status.evidenceFound}/${status.evidenceTotal}`;
       $('hud-mission').textContent = (status.missionId || status.id) === 'tutorial' ? 'CASE 001 / 조사 준비' : `CASE 001 / MISSION ${String(status.active).padStart(2, '0')}`;
       $('tool-close').disabled = toolsOpen && busy();
       if (toolsOpen) $('lab-tools').setAttribute('aria-busy', String(busy()));
@@ -545,7 +569,11 @@ export function init3D() {
     observeDevice(result=>{
       deviceObservation=result;
       $('device-observation-title').textContent=result.label;
-      $('device-observation-text').textContent=result.text;
+      $('device-observation-status').textContent=result.status??'조사 안내';
+      $('device-observation-text').textContent=result.findings?.join('\n')??result.text;
+      $('device-observation-next').textContent=result.next?'다음 · '+result.next:'';
+      $('device-observation-record').textContent=result.recorded?'현장 단서 → 조사 노트에 기록됨':'현장 단서 추가 없음';
+      onboardingUntil=0;$('onboarding-hint').hidden=true;
       $('device-observation').dataset.tone=result.tone;
     });
     $('scene-start').addEventListener('click', lock);
@@ -605,7 +633,7 @@ export function init3D() {
       if(event.code==='F3'&&mode==='3d'){event.preventDefault();debug=!debug;$('graphics-debug').hidden=!debug;}
       if (mode !== '3d' || nativeDialogOpen()) return;
       if (event.code === 'KeyE' && !event.repeat && ready && player?.controls.isLocked && !toolsOpen) { event.preventDefault(); interaction.interact(); }
-      if (event.code === 'KeyF' && !event.repeat && ready && player?.controls.isLocked && !toolsOpen&&!busy()) {event.preventDefault();interaction.tool();}
+      if (event.code === 'KeyF' && !event.repeat && ready && player?.controls.isLocked && !toolsOpen&&!busy()) {event.preventDefault();onboardingUntil=0;$('onboarding-hint').hidden=true;interaction.tool();}
       if (event.code === 'Escape' && player?.controls.isLocked && !toolsOpen) { event.preventDefault(); player.controls.unlock(); }
       if (event.code === 'Escape' && toolsOpen) { event.preventDefault(); closeTool(); }
       if (event.code === 'Tab' && toolsOpen) {

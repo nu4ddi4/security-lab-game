@@ -26,10 +26,12 @@ export function createWorldStatus(model) {
         if(panel.key===key)continue;panel.key=key;changed=true;
         const c=panel.canvas.getContext('2d'),color={normal:'#78bda4',warning:'#d5a37b',pending:'#e0c376',neutral:'#b4c2c7'}[status.tone];
         c.fillStyle='#18272e';c.fillRect(0,0,512,256);c.fillStyle=color;c.fillRect(0,0,7,256);
-        c.font='bold 30px "Malgun Gothic", sans-serif';c.fillStyle='#edf1ed';c.fillText(status.label,24,50,465);
-        c.font='24px "Malgun Gothic", sans-serif';c.fillStyle=color;
-        status.text.split('\n').slice(0,3).forEach((line,i)=>c.fillText(line,24,103+i*37,465));
-        c.font='18px sans-serif';c.fillStyle='#93a5ac';c.fillText('LOCAL SIMULATION · E 조사 / F 도구',24,237);
+        if(status.objective){c.strokeStyle='#9fbeb3';c.lineWidth=4;c.strokeRect(11,8,492,240);}
+        c.font='bold 30px "Malgun Gothic", sans-serif';c.fillStyle='#edf1ed';c.fillText(status.label,24,48,465);
+        c.font='bold 19px "Malgun Gothic", sans-serif';c.fillStyle='#c5d8d1';c.fillText(status.objective?'다음 · '+status.action:status.zone??'LOCAL SIMULATION',24,78,465);
+        c.font='23px "Malgun Gothic", sans-serif';c.fillStyle=color;
+        status.text.split('\n').slice(0,3).forEach((line,i)=>c.fillText(line,24,119+i*34,465));
+        c.font='18px sans-serif';c.fillStyle='#93a5ac';c.fillText('E 현장 조사  /  F 상세 도구',24,235);
         panel.texture.needsUpdate=true;
       }
       return changed;

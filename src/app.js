@@ -2,8 +2,7 @@ import { MISSIONS, ORIGINAL_FILES } from './missions.js';
 import { initialState, missionId, nextAction, progress, stage, score, runCommand, answerFeedback, accepted, loginSimulation, applyAnswer, applyPort, applyLogin, canRestoreFiles, restoreFile, nextMission, resetMission } from './engine.js';
 import { createSaveSession, CURRENT_SAVE_KEY, SAVE_KEY, BACKUP_KEY, exportGame, importGame, MAX_IMPORT_BYTES } from './storage.js';
 import { publishMission, onToolRequest, onInspectionRequest, publishObservation } from './labbridge.js';
-import {inspectDevice,worldDevices,continueWithout3D} from './engine.js';
-import {DEVICES,requiredDevices} from './devices.js';
+import {inspectDevice,worldDevices,worldAction,continueWithout3D} from './engine.js';
 import { initSceneView } from './scene-entry.js';
 
 const $ = id => document.getElementById(id);
@@ -166,7 +165,7 @@ function render() {
   const action = nextAction(state);
   $('next-action').textContent = action.text;
   $('follow-action').textContent = action.label; $('follow-action').disabled = busy;
-  const m = MISSIONS[state.active], p = progress(state);
+  const m = MISSIONS[state.active], p = progress(state), spatialAction=worldAction(state);
   $('mission-nav').replaceChildren(...MISSIONS.map((mission, i) => {
     const item = el('li', undefined, `mission-step ${i === state.active ? 'active' : ''} ${state.missions[i].verified ? 'complete' : ''}`);
     item.append(el('span', state.missions[i].verified ? '✓' : String(i).padStart(2, '0')), el('strong', mission.title), el('small', state.missions[i].verified ? '검증 완료' : i === state.active ? '진행 중' : '대기'));
@@ -203,10 +202,12 @@ function render() {
   $('hint').disabled = busy || p.hint === m.hints.length;
   $('reset-mission').disabled = busy;
   $('reset-all').disabled = busy;
+  $('recheck-notice').hidden=spatialAction.mode!=='recheck';
+  $('recheck-notice').textContent=spatialAction.mode==='recheck'?'설정 변경으로 이전 관찰이 만료됐습니다. F로 도구를 열어도 현장 재확인은 완료되지 않습니다.':'';
   renderSettings(); renderFiles(); renderComparison(); renderResults();
   publishMission({ id: missionId(state), missionId: missionId(state), active: state.active, title: m.title,
-    objective: m.objective, nextAction: action.text,
-    worldAction:!p.verified&&!p.spatial?`현장 조사: ${DEVICES[requiredDevices(m.id)[0]].label}에서 E를 누르세요.`:action.text,
+    objective: m.id==='tutorial'?'관제 PC에서 조사 권한을 확인하고 허용된 범위를 선택하세요.':m.objective, nextAction: action.text,
+    worldAction:spatialAction.text, objectiveDevice:spatialAction.device, actionMode:spatialAction.mode, evidenceTotal:m.evidence.length, evidenceFound:m.evidence.filter(key=>p.clues.includes(key)).length,
     stage: stage(state), score: score(state), clues: p.clues.length, busy, devices:worldDevices(state) });
   const commands = m.quickCommands;
   $('quick-commands').replaceChildren(...commands.map(command => {
@@ -221,7 +222,7 @@ function render() {
 function renderSettings() {
   const container = $('settings'); container.replaceChildren();
   if (missionId(state) === 'services') {
-    container.append(el('h3', '가상 방화벽 정책'), el('p', '자료 서비스(443)를 유지하면서 불필요한 관리 접근만 제한하세요. 설정 변경 후 다시 scan하고 재검증하세요.', 'muted'));
+    container.append(el('h3', '가상 방화벽 정책'), el('p', progress(state).spatial?'조사한 서비스 용도에 맞게 접근 정책을 검토하세요. 변경 후 자료 서버에서 E로 실제 상태를 다시 확인합니다.':'자료 서비스(443)를 유지하면서 불필요한 관리 접근만 제한하세요. 설정 변경 후 다시 scan하고 재검증하세요.', 'muted'));
     for (const port of [443, 8080]) {
       const row = el('div', undefined, 'setting-row');
       const label = el('label', `${port} / ${port === 443 ? 'HTTPS 자료 서비스 · 필수' : '이전 관리 서비스 · 사용 안 함'}`);
@@ -253,13 +254,13 @@ function renderSettings() {
     const restoredBeforeInvestigation = state.files['budget.csv'] === ORIGINAL_FILES['budget.csv'] && !progress(state).clues.includes('mismatch');
     const guidance = el('p', restoredBeforeInvestigation
       ? '변경 확인 전에 복구된 저장입니다. 「현재 미션 초기화」로 이 미션을 다시 시작하고 기준과 변경을 조사하세요. 앞 미션의 진행은 유지됩니다.'
-      : ready ? '변경을 확인했습니다. 파일을 선택해 원본으로 복구한 다음 hash files로 다시 비교하세요.'
+      : ready ? progress(state).spatial?'변경을 확인했습니다. 파일을 선택해 승인 원본으로 복구하고 분석 PC에서 E로 해시를 다시 비교하세요.':'변경을 확인했습니다. 파일을 선택해 원본으로 복구한 다음 hash files로 다시 비교하세요.'
       : '먼저 inspect baseline으로 기준 출처를 확인하고 hash files로 변경된 파일을 찾으세요.', restoredBeforeInvestigation ? 'warning' : 'muted');
     guidance.id = 'restore-guidance'; guidance.setAttribute('role', 'status');
     container.append(el('h3', '신뢰 가능한 원본으로 복구'), guidance);
     for (const name of Object.keys(ORIGINAL_FILES)) {
       const button = el('button', name + ' 선택 및 복구'); button.id = 'restore-' + name; button.disabled = busy || !ready; button.dataset.restore = name;
-      button.addEventListener('click', () => { restoreFile(state, name); log(name + '를 승인된 원본으로 복구했습니다. hash files로 다시 비교하세요.'); persist(); render(); });
+      button.addEventListener('click', () => { restoreFile(state, name); log(name + (progress(state).spatial?'를 승인된 원본으로 복구했습니다. 이전 관찰은 만료됐습니다. 분석 PC에서 E로 새 해시를 확인하세요.':'를 승인된 원본으로 복구했습니다. hash files로 다시 비교하세요.')); persist(); render(); });
       container.append(button);
     }
     if (progress(state).selectedFile) container.append(el('p', '선택한 파일: ' + progress(state).selectedFile));
@@ -278,6 +279,7 @@ function renderFiles() {
   $('files').replaceChildren();
   if (missionId(state) !== 'integrity') { $('files').append(el('p', '자료 무결성 미션에서 내장 파일의 SHA-256을 비교합니다.', 'muted')); return; }
   if (!progress(state).hashes.length) { $('files').append(el('p', '아직 계산 결과가 없습니다. 터미널에서 hash files를 실행하세요.')); return; }
+  if(progress(state).spatial)$('files').append(el('p','바이트와 해시를 비교한 뒤 방어 설정 탭에서 원본으로 복구합니다. 복구 후 분석 PC에서 E로 해시를 다시 확인하세요.','muted'));
   for (const row of progress(state).hashes) {
     const card = el('article', undefined, 'file-card');
     card.append(el('h3', row.name), el('p', row.matches ? '✓ 일치' : '△ 변경 감지', row.matches ? 'success' : 'warning'), el('p', '현재 SHA-256', 'muted'), el('code', row.actual), el('p', '신뢰 기준 SHA-256', 'muted'), el('code', row.expected));
