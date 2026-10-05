@@ -42,6 +42,9 @@ function loadStyles(signal, prefix = '') {
   });
 }
 export function show2D({ save = true } = {}) {
+  // A normal view change keeps the spatial gate. Only an actual 3D failure
+  // followed by choosing 2D enables the existing non-spatial verification path.
+  if($('lab-world').dataset.state==='error')document.dispatchEvent(new Event('scene3d-degraded'));
   attempt++; transaction?.abort(); sceneModule?.setMode('2d');
   display('2d');
   if (save) { remember('2d'); address('2d'); }

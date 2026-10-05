@@ -257,6 +257,12 @@ export async function inspectDevice(state,device) {
   return {device,label:DEVICES[device].label,text:heading+'\n'+results.join('\n\n'),tone:id==='tutorial'||id==='integrity'&&device==='INTERACT_FileCabinet'?'neutral':ok?'normal':'warning'};
 }
 
+export function continueWithout3D(state) {
+  const p=progress(state);if(!p.spatial||p.verified)return false;
+  delete p.spatial;p.checks=[];
+  return true;
+}
+
 export function worldDevices(state) {
   const id=missionId(state),p=progress(state);
   return Object.fromEntries(Object.keys(DEVICES).map(device=>{

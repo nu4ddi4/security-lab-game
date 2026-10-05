@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState, progress, runCommand, answerFeedback, applyAnswer, applyPort, applyLogin, canRestoreFiles, restoreFile, nextMission, resetMission, score, sha256, accepted, loginSimulation, nextAction, validateMissionDefinitions } from '../src/engine.js';
 import { MISSIONS, ORIGINAL_FILES, MISSION_INDEX } from '../src/missions.js';
-import {inspectDevice,worldDevices,stage} from '../src/engine.js';
+import {inspectDevice,worldDevices,stage,continueWithout3D} from '../src/engine.js';
 import { loadGame, saveGame, SAVE_KEY, createSaveSession, CURRENT_SAVE_KEY, BACKUP_KEY, exportGame, importGame } from '../src/storage.js';
 
 async function tutorial(state) {
@@ -524,4 +524,16 @@ test('복원 시 자동 해시 계산은 물리 장비 재확인을 대신하지
 test('임의 장비 ID와 무관한 장비 조회는 단서와 현장 조건을 변경하지 않음',async()=>{
  const s=initialState();await tutorial(s);const before=JSON.stringify(s);await assert.rejects(inspectDevice(s,'https://example.com'));assert.equal(JSON.stringify(s),before);
  await inspectDevice(s,'INTERACT_FileCabinet');assert.equal(JSON.stringify(s),before);
+});
+
+
+test('3D failure fallback preserves investigation and defense, permits existing 2D verification', async () => {
+ const s=initialState();await tutorial(s);
+ await inspectDevice(s,'INTERACT_ServerRack');applyAnswer(s,1);applyPort(s,8080,false);
+ const before=structuredClone(progress(s));const ports=structuredClone(s.ports);
+ assert.equal(continueWithout3D(s),true);assert.equal(progress(s).spatial,undefined);
+ for(const key of ['clues','answer','observations'])assert.deepEqual(progress(s)[key],before[key]);
+ assert.deepEqual(s.ports,ports);assert.equal(continueWithout3D(s),false);
+ await runCommand(s,'scan club-server');await runCommand(s,'verify');assert.equal(progress(s).verified,true);
+ const completed=structuredClone(s);assert.equal(continueWithout3D(s),false);assert.deepEqual(s,completed);
 });

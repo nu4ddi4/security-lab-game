@@ -2,7 +2,7 @@ import { MISSIONS, ORIGINAL_FILES } from './missions.js';
 import { initialState, missionId, nextAction, progress, stage, score, runCommand, answerFeedback, accepted, loginSimulation, applyAnswer, applyPort, applyLogin, canRestoreFiles, restoreFile, nextMission, resetMission } from './engine.js';
 import { createSaveSession, CURRENT_SAVE_KEY, SAVE_KEY, BACKUP_KEY, exportGame, importGame, MAX_IMPORT_BYTES } from './storage.js';
 import { publishMission, onToolRequest, onInspectionRequest, publishObservation } from './labbridge.js';
-import {inspectDevice,worldDevices} from './engine.js';
+import {inspectDevice,worldDevices,continueWithout3D} from './engine.js';
 import {DEVICES,requiredDevices} from './devices.js';
 import { initSceneView } from './scene-entry.js';
 
@@ -143,6 +143,11 @@ function switchTab(name) {
   }
 }
 onToolRequest(name => { if (name !== 'brief') switchTab(name); });
+document.addEventListener('scene3d-degraded',()=>{
+  if(!continueWithout3D(state))return;
+  log('3D 오류로 2D 도구에서 이어갑니다. 현장 재방문 조건을 해제했고 단서·설정은 보존했습니다. 기존 명령으로 방어와 정상 기능을 재검증하세요.');
+  void persist();render();
+});
 onInspectionRequest(async device=>{
   if(busy)return;
   busy=true;render();

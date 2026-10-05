@@ -4,7 +4,7 @@ test.use({headless:true, ...(process.platform==='win32' && process.env.CI ? {
   launchOptions: {args:['--disable-gpu'], ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
     ? {executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH} : {})},
 } : {})});
-import { initialState, progress, runCommand, applyAnswer, applyPort, applyLogin, restoreFile, nextMission } from '../../src/engine.js';
+import { initialState, progress, runCommand, applyAnswer, applyPort, applyLogin, restoreFile, nextMission, inspectDevice } from '../../src/engine.js';
 import { saveGame, SAVE_KEY, CURRENT_SAVE_KEY, BACKUP_KEY, exportGame } from '../../src/storage.js';
 import { ORIGINAL_FILES } from '../../src/missions.js';
 
@@ -815,4 +815,17 @@ test('오답 피드백은 조사 전 근거를 요청하고 선택별 오해를 
       await expect(page.locator('#results')).toBeHidden();
     }
   }
+});
+
+
+test('only an error-state 2D fallback removes spatial gate and preserves clues and settings', async ({page}) => {
+ const state=await missionState(1);await inspectDevice(state,'INTERACT_ServerRack');applyAnswer(state,1);applyPort(state,8080,false);
+ await seedGame(page,state);await page.locator('#hint').click();await expect(page.locator('#save-status')).not.toHaveText('저장 중…');
+ await page.evaluate(async()=>{document.getElementById('lab-world').dataset.state='ready';(await import('/src/scene-entry.js')).show2D();});
+ expect(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).game.missions[1].spatial,CURRENT_SAVE_KEY)).toBeTruthy();
+ await page.evaluate(async()=>{document.getElementById('lab-world').dataset.state='error';(await import('/src/scene-entry.js')).show2D();});
+ await expect(page.locator('#terminal')).toContainText('단서·설정은 보존');
+ await expect.poll(()=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)).game.missions[1].spatial??null,CURRENT_SAVE_KEY)).toBeNull();
+ await command(page,'scan club-server');await command(page,'verify');await expect(page.locator('#stage')).toHaveText('검증 완료');
+ await reloadGame(page);await expect(page.locator('#stage')).toHaveText('검증 완료');
 });
