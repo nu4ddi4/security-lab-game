@@ -1,5 +1,6 @@
 import { initialState, runCommand } from './engine.js';
 import { MISSIONS, ORIGINAL_FILES, MISSION_INDEX, LEGACY_MISSION_IDS } from './missions.js';
+import {requiredDevices,revisitDevice} from './devices.js';
 
 export const SAVE_KEY = 'security-lab-game:v1';
 export const CURRENT_SAVE_KEY = 'security-lab-game:v2';
@@ -26,7 +27,7 @@ export function encodeGame(state, { legacy = false } = {}) {
     version: 2, active: MISSIONS[state.active].id, ports: state.ports, login: state.login,
     restored: state.files['budget.csv'] === ORIGINAL_FILES['budget.csv'],
     hashComputed: state.missions[INTEGRITY].hashes.length === FILE_COUNT || state.missions[INTEGRITY].hashPending,
-    missions: state.missions.map(({ clues, answer, hint, verified, selectedFile, observations }, i) => ({ id: MISSIONS[i].id, clues, answer, hint, verified, selectedFile, observations })),
+    missions: state.missions.map(({ clues, answer, hint, verified, selectedFile, observations, spatial }, i) => ({ id: MISSIONS[i].id, clues, answer, hint, verified, selectedFile, observations, ...(spatial?{spatial:{inspected:[...spatial.inspected],rechecked:spatial.rechecked}}:{}) })),
   };
   if (!legacy) return data;
   return { ...data, version: 1, active: LEGACY_MISSION_IDS.indexOf(data.active), missions: LEGACY_MISSION_IDS.map(id => {
@@ -71,6 +72,11 @@ export async function decodeGame(raw) {
       if (!Array.isArray(p.clues) || p.clues.length > Object.keys(MISSIONS[i].clues).length || p.clues.some(key => !Object.hasOwn(MISSIONS[i].clues, key)) || new Set(p.clues).size !== p.clues.length || !(p.answer === null || Number.isInteger(p.answer) && p.answer >= 0 && p.answer < MISSIONS[i].answers.length) || !Number.isInteger(p.hint) || p.hint < 0 || p.hint > MISSIONS[i].hints.length || typeof p.verified !== 'boolean' || !(p.selectedFile === null || MISSIONS[i].id === 'integrity' && Object.hasOwn(ORIGINAL_FILES, p.selectedFile))) throw new Error('Invalid progress');
       if (i < state.active && !p.verified || i > state.active && (p.verified || p.clues.length || p.answer !== null || p.hint || p.selectedFile !== null)) throw new Error('Invalid order');
       state.missions[i] = { ...state.missions[i], clues: [...p.clues], answer: p.answer, hint: p.hint, verified: p.verified, selectedFile: p.selectedFile, observations: loadObservations(p.observations, i, state) };
+      if(p.spatial!==undefined) {
+        const s=p.spatial,ids=requiredDevices(MISSIONS[i].id);
+        if(!s||!Array.isArray(s.inspected)||s.inspected.length>ids.length||new Set(s.inspected).size!==s.inspected.length||s.inspected.some(id=>!ids.includes(id))||typeof s.rechecked!=='boolean'||i>state.active||s.rechecked&&(!state.missions[i].observations.changed||!s.inspected.includes(revisitDevice(MISSIONS[i].id))))throw new Error('Invalid spatial progress');
+        state.missions[i].spatial={inspected:[...s.inspected],rechecked:s.rechecked};
+      }
     });
     // 완료 플래그를 신뢰하지 않고 저장된 정책과 단서로 다시 판정한다.
     const active = state.active;

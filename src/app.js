@@ -1,7 +1,9 @@
 import { MISSIONS, ORIGINAL_FILES } from './missions.js';
 import { initialState, missionId, nextAction, progress, stage, score, runCommand, answerFeedback, accepted, loginSimulation, applyAnswer, applyPort, applyLogin, canRestoreFiles, restoreFile, nextMission, resetMission } from './engine.js';
 import { createSaveSession, CURRENT_SAVE_KEY, SAVE_KEY, BACKUP_KEY, exportGame, importGame, MAX_IMPORT_BYTES } from './storage.js';
-import { publishMission, onToolRequest } from './labbridge.js';
+import { publishMission, onToolRequest, onInspectionRequest, publishObservation } from './labbridge.js';
+import {inspectDevice,worldDevices,continueWithout3D} from './engine.js';
+import {DEVICES,requiredDevices} from './devices.js';
 import { initSceneView } from './scene-entry.js';
 
 const $ = id => document.getElementById(id);
@@ -141,6 +143,21 @@ function switchTab(name) {
   }
 }
 onToolRequest(name => { if (name !== 'brief') switchTab(name); });
+document.addEventListener('scene3d-degraded',()=>{
+  if(!continueWithout3D(state))return;
+  log('3D 오류로 2D 도구에서 이어갑니다. 현장 재방문 조건을 해제했고 단서·설정은 보존했습니다. 기존 명령으로 방어와 정상 기능을 재검증하세요.');
+  void persist();render();
+});
+onInspectionRequest(async device=>{
+  if(busy)return;
+  busy=true;render();
+  try {
+    const result=await inspectDevice(state,device);log(result.label+'\n'+result.text);
+    if(hashRetryNeeded&&progress(state).hashes.length)clearHashRetryNotice();
+    await persist();publishObservation({...result,stateKey:JSON.stringify(worldDevices(state)[device])});
+  } catch(error) {publishObservation({device,label:'조사 안내',text:error.message,tone:'pending'});}
+  finally {busy=false;render();}
+});
 function render() {
   const focused = document.activeElement;
   $('command').disabled = busy; $('command-form').querySelector('button').disabled = busy;
@@ -188,7 +205,9 @@ function render() {
   $('reset-all').disabled = busy;
   renderSettings(); renderFiles(); renderComparison(); renderResults();
   publishMission({ id: missionId(state), missionId: missionId(state), active: state.active, title: m.title,
-    objective: m.objective, nextAction: action.text, stage: stage(state), score: score(state), clues: p.clues.length, busy });
+    objective: m.objective, nextAction: action.text,
+    worldAction:!p.verified&&!p.spatial?`현장 조사: ${DEVICES[requiredDevices(m.id)[0]].label}에서 E를 누르세요.`:action.text,
+    stage: stage(state), score: score(state), clues: p.clues.length, busy, devices:worldDevices(state) });
   const commands = m.quickCommands;
   $('quick-commands').replaceChildren(...commands.map(command => {
     const button = el('button', command); button.id = 'quick-' + m.id + '-' + command.replaceAll(' ', '-'); button.disabled = busy;
@@ -328,6 +347,7 @@ async function execute(input) {
 $('follow-action').addEventListener('click', () => {
   if (busy) return;
   const action = nextAction(state);
+  if(action.device){document.dispatchEvent(new Event('scene3d-go'));return;}
   if (action.command) { execute(action.command); return; }
   if (action.tab) {
     switchTab(action.tab);

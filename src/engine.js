@@ -1,4 +1,5 @@
 import { MISSIONS, ORIGINAL_FILES, TAMPERED_BUDGET, COMMON_PASSWORDS, NORMAL_PASSWORD } from './missions.js';
+import {DEVICES,deviceCommands,requiredDevices,revisitDevice} from './devices.js';
 
 export function initialState() {
   return {
@@ -30,6 +31,7 @@ function changeEnvironment(state) {
   progress(state).observations.changed = true;
   progress(state).observations.after = null;
   invalidateVerification(state);
+  if(progress(state).spatial)progress(state).spatial.rechecked=false;
 }
 export function answerFeedback(state) {
   const p = progress(state), mission = MISSIONS[state.active];
@@ -50,13 +52,16 @@ export function defended(state, index = state.active) {
 }
 export function score(state, index = state.active) {
   const p = state.missions[index];
-  return (p.clues.length ? 30 : 0) + (explained(state, index) ? 20 : 0) + (defended(state, index) ? 30 : 0) + (p.verified ? 20 : 0);
+  const evidence=MISSIONS[index].evidence,found=evidence.filter(key=>p.clues.includes(key)).length;
+  const investigated=found===evidence.length;
+  return Math.floor(30*found/evidence.length) + (investigated&&explained(state,index) ? 20 : 0) + (investigated&&explained(state,index)&&defended(state,index) ? 30 : 0) + (p.verified ? 20 : 0);
 }
 export function stage(state) {
   const p = progress(state);
   if (p.verified) return '검증 완료';
-  if (defended(state)) return '방어 적용';
-  if (explained(state)) return '취약 상태 확인';
+  const investigated=MISSIONS[state.active].evidence.every(key=>p.clues.includes(key));
+  if (investigated&&explained(state)&&defended(state)) return p.spatial&&!p.spatial.rechecked&&revisitDevice(missionId(state))?'장비 재확인 필요':'방어 적용';
+  if (investigated&&explained(state)) return '취약 상태 확인';
   if (p.clues.length) return '조사';
   return '준비';
 }
@@ -171,6 +176,10 @@ export async function runCommand(state, input) {
     const p = progress(state);
     if (!explained(state)) return answerFeedback(state)?.text ?? '먼저 관찰한 근거에 맞는 원인 설명을 선택하세요.';
     const checks = VERIFIERS[mission.id](state);
+    if(p.spatial) {
+      checks.push(['3D 조사 장비 확인',requiredDevices(mission.id).every(id=>p.spatial.inspected.includes(id))]);
+      if(revisitDevice(mission.id))checks.push(['방어 후 현장 장비 재확인',p.observations.changed&&p.spatial.rechecked]);
+    }
     p.checks = checks.map(([label, passed]) => ({ label, passed }));
     p.verified = checks.every(([, passed]) => passed);
     return `${p.checks.map(check => `${check.passed ? '통과' : '미충족'}: ${check.label}`).join('\n')}\n\n${p.verified ? '검증 완료! ' + mission.explanation : '아직 완료되지 않았습니다. 미충족 항목을 확인하고 다시 검증하세요.'}`;
@@ -212,11 +221,66 @@ export function nextAction(state) {
     ? { text: '검증을 통과했습니다. 다음 미션으로 이동하세요.', focus: 'next', label: '다음 미션으로' }
     : { text: '모든 미션을 완료했습니다. 아래 결과를 확인하세요.', focus: 'results', label: '완료 결과 보기' };
   if (m.id === 'integrity' && state.files['budget.csv'] === ORIGINAL_FILES['budget.csv'] && !p.clues.includes('mismatch')) return { text: '현재 미션을 초기화한 뒤 기준과 변경을 다시 조사하세요.', focus: 'reset-mission', label: '초기화 위치로' };
+  if(p.spatial) {
+    const missingDevice=requiredDevices(m.id).find(id=>!p.spatial.inspected.includes(id));
+    if(missingDevice)return {text:`현장 조사: ${DEVICES[missingDevice].label}에 접근해 E를 누르세요.`,device:missingDevice,label:'3D 현장으로'};
+  }
   const missing = m.evidence.find(key => !p.clues.includes(key));
   if (missing) return { text: '다음 조사: ' + m.clues[missing].label, command: m.clues[missing].command, label: m.clues[missing].command };
   if (!explained(state)) return { text: '조사 노트에서 근거에 맞는 원인 설명을 선택하세요.', focus: 'answer-0', label: '원인 설명으로' };
   if (!defended(state)) return { text: m.defenseGuidance, tab: 'settings', label: '방어 설정 열기' };
+  if(p.spatial&&!p.spatial.rechecked&&revisitDevice(m.id))return {text:`방어 후 ${DEVICES[revisitDevice(m.id)].label}에서 E로 상태를 다시 확인하세요.`,device:revisitDevice(m.id),label:'3D 재확인으로'};
   if (m.id === 'services' && !p.clues.includes('rescan')) return { text: '변경한 접근 상태를 다시 조사하세요.', command: 'scan club-server', label: 'scan club-server' };
   if (m.id === 'integrity' && (p.hashes.length !== Object.keys(ORIGINAL_FILES).length || !p.hashes.every(row => row.matches))) return { text: '복구한 파일의 해시를 다시 계산하세요.', command: 'hash files', label: 'hash files' };
   return { text: '방어와 정상 기능을 함께 재검증하세요.', command: 'verify', label: '재검증 실행' };
+}
+
+export async function inspectDevice(state,device) {
+  if(!Object.hasOwn(DEVICES,device))throw new Error('알 수 없는 실습 장비입니다.');
+  const p=progress(state),id=missionId(state),commands=deviceCommands(id,device);
+  if(!commands.length)return {device,label:DEVICES[device].label,text:`현재 미션: ${MISSIONS[state.active].title}\n${nextAction(state).text}\nF로 이 장비의 도구를 열 수 있습니다.`,tone:'neutral'};
+  // Old completed saves stay completed. New field is opt-in on actual inspection.
+  if(!p.verified)p.spatial??={inspected:[],rechecked:false};
+  const results=[];
+  for(const command of commands)results.push(await runCommand(state,command));
+  if(progress(state)!==p)throw new Error('미션이 변경되었습니다. 다시 조사하세요.');
+  if(p.spatial) {
+    if(!p.spatial.inspected.includes(device))p.spatial.inspected.push(device);
+    if(p.observations.changed&&device===revisitDevice(id))p.spatial.rechecked=true;
+  }
+  const ok=defended(state);
+  if(id==='login')results.push('정상 더미 사용자의 첫 로그인: '+(loginSimulation(state.login).normal?'성공':'거부'));
+  if(id==='integrity'&&device==='INTERACT_AdminPC') {
+    results.splice(0,results.length,...p.hashes.map(row=>`${row.name}: ${row.matches?'승인 기준과 일치':'승인 기준과 불일치'}`),'F · 파일 비교에서 전체 SHA-256과 바이트 차이를 확인하세요.');
+  }
+  const heading=p.observations.changed?'변경 후 현장 확인':'현장 조사 · 내장 시뮬레이션';
+  return {device,label:DEVICES[device].label,text:heading+'\n'+results.join('\n\n'),tone:id==='tutorial'||id==='integrity'&&device==='INTERACT_FileCabinet'?'neutral':ok?'normal':'warning'};
+}
+
+export function continueWithout3D(state) {
+  const p=progress(state);if(!p.spatial||p.verified)return false;
+  delete p.spatial;p.checks=[];
+  return true;
+}
+
+export function worldDevices(state) {
+  const id=missionId(state),p=progress(state);
+  return Object.fromEntries(Object.keys(DEVICES).map(device=>{
+    const relevant=deviceCommands(id,device).length>0;
+    const inspected=p.spatial?.inspected.includes(device);
+    let text='현재 사건 조사 대상 아님',tone='neutral';
+    if(relevant) {
+      text='E · 현장 조사 필요';
+      if(p.verified&&!p.spatial){text='기존 완료 기록 유지\nE · 현재 상태 관찰';tone='normal';}
+      if(inspected) {
+        const pending=p.observations.changed&&!p.spatial.rechecked&&device===revisitDevice(id);
+        text=pending?'설정 변경 · E로 재확인':p.spatial.rechecked?'현장 재확인 완료':'현장 단서 확보';
+        tone=pending?'pending':id==='tutorial'||id==='integrity'&&device==='INTERACT_FileCabinet'?'neutral':p.spatial.rechecked&&defended(state)?'normal':'warning';
+        if(!pending&&id==='services')text+=`\n443 ${state.ports[443]?'OPEN':'FILTERED'} / 8080 ${state.ports[8080]?'OPEN':'FILTERED'}`;
+        if(!pending&&id==='login') {const r=loginSimulation(state.login);text+=`\n정상 로그인 ${r.normal?'성공':'거부'} / 반복 실패 ${r.repeatedBlocked?'제한':'무제한'}`;}
+        if(!pending&&id==='integrity'&&device==='INTERACT_AdminPC')text+=`\n해시 ${p.hashes.length?p.hashes.filter(row=>!row.matches).length+'개 불일치':'재계산 필요'}`;
+      }
+    } else if(device==='INTERACT_Router'&&id==='services')text='F · 접근 정책 편집';
+    return [device,{label:DEVICES[device].label,text,tone}];
+  }));
 }

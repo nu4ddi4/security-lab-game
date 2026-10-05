@@ -61,6 +61,10 @@ test('Windows Chrome: packaged first frame, collision, door, WASD, INTERACT, mis
  expect((await diagnostics(page)).doors[0].pivot[0]).toBeCloseTo(-.64,2);
  await walk(page,'KeyW',{axis:'z',lt:6.5});await walkTo(page,-3.4,3.2);await aim(page,-5.2,1.25,2.85);
  await expect.poll(async()=>(await diagnostics(page)).target,{timeout:15000}).toBe('INTERACT_AdminPC');await page.keyboard.press('KeyE');
+ await expect(page.locator('#device-observation')).toBeVisible();
+ await expect(page.locator('#device-observation-text')).toContainText('조사 승인서');
+ expect((await diagnostics(page)).pointerLocked).toBe(true);expect((await diagnostics(page)).statusPanels).toBe(4);
+ await expect(page.locator('#hud-stage')).toContainText('단서 2개');await page.keyboard.press('KeyF');
  await expect(page.locator('#panel-terminal')).toBeVisible();expect((await diagnostics(page)).pointerLocked).toBe(false);expect((await diagnostics(page)).keyboardCaptured).toBe(false);
  for(const command of ['help','inspect approval']){await page.locator('#command').fill(command);await page.locator('#command').press('Enter');await expect(page.locator('#command')).toBeEnabled();}
  await page.locator('#answer-0').check();await page.locator('#verify').click();await expect(page.locator('#next')).toBeVisible();await page.locator('#next').click();

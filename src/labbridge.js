@@ -15,3 +15,10 @@ export function requestTool(tab) {
   if (['terminal', 'settings', 'files', 'comparison', 'brief'].includes(tab)) bus.dispatchEvent(new CustomEvent('tool', { detail: tab }));
 }
 export function onToolRequest(listener) { bus.addEventListener('tool', event => listener(event.detail)); }
+export function requestInspection(device) {bus.dispatchEvent(new CustomEvent('inspect',{detail:device}));}
+export function onInspectionRequest(listener) {bus.addEventListener('inspect',event=>listener(event.detail));}
+export function publishObservation(result) {bus.dispatchEvent(new CustomEvent('observation',{detail:Object.freeze({...result})}));}
+export function observeDevice(listener) {
+  const receive=event=>listener(event.detail);bus.addEventListener('observation',receive);
+  return ()=>bus.removeEventListener('observation',receive);
+}

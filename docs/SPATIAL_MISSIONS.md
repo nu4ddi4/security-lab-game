@@ -1,0 +1,88 @@
+# v0.6.0 · 현장 조사와 미션
+
+## 조사와 선택
+
+v0.5.3은 움직임/문틀/바닥까지 안정화됐지만 E는 HTML 도구를 열 뿐이었다.
+점수도 단서 하나에 조사 30점을 모두 주고 조사 없는 정답 설정이 HUD의
+방어 단계와 점수에 반영됐다. 기존 UI/engine/save/배포/렌더링은 유지하면서
+이 두 문제에 집중했다. 새 미션이나 렌더링 실험 대신 기존 세 미션을 완성했다.
+
+| 미션 | 3D 단서/확인 | 2D 역할 |
+| --- | --- | --- |
+| 준비 | 관리 PC에서 사용법과 승인서 | 범위 설명 선택과 최종 검증 |
+| 서비스 | 서버에서 포트 목록/443 운영 조건/8080 용도, 방어 후 OPEN/FILTERED 확인 | 네트워크 방화벽 정책과 원인 설명 |
+| 로그인 | 관제 PC의 더미 후보/반복 실패/정상 로그인 결과, 정책 변경 후 재확인 | 길이/흔한 값/시도 제한 편집 |
+| 무결성 | 보관함의 승인 기준, 분석 PC(관리 PC)의 불일치 파일, 복구 후 해시 일치 | 전체 SHA-256/바이트 비교와 파일 복구 |
+
+E는 비모달 조사다. 포인터 잠금/이동을 유지하며 결과를 노트에 기록한다.
+F는 기존 상세 도구를 연다. 현장 카드는 장비를 바라보는 동안 보이며,
+설정·초기화·미션 변경 시 오래된 관찰을 숨긴다. 작은 상태판 네 개는
+단서 확보, 재확인 필요, 실제 확인 결과를 표시한다. 상태판도 같은 장비의
+E/F 대상이며, 2.65m 거리/벽 차단 규칙을 그대로 따른다. 빈 랙 구멍을
+가리키는 대신 식별 가능한 상태판으로 조사할 수 있다.
+
+## 구조와 저장
+
+`devices.js`는 기존 불변 anchor 이름과 허용된 내장 명령을 연결하는 작은
+표다. Blender metadata에 코드나 명령을 넣지 않는다. `Interaction`은
+raycast 대상의 device ID만 `labbridge`로 보내며 app의 busy/save 경계에서
+engine이 조사한다. 포트/로그인은 계속 시뮬레이션이고, 파일은 내장 바이트에
+Web Crypto SHA-256을 실행한다. 외부 URL/IP/셸/계정은 추가하지 않았다.
+
+현장 조사에 진입한 미완료 미션만 선택 필드 `spatial: {inspected, rechecked}`를
+얻는다. 검증은 모든 필수 조사 장비와 설정 변경 후 지정 장비 재확인을 요구한다.
+다시 설정을 변경하면 rechecked를 지운다. 터미널 명령과 저장 복원의 자동
+해시는 해당 값을 만들지 못한다. 미션 초기화는 필드를 지운다.
+
+저장 envelope/키/version/충돌/백업/import/export는 기존 v2 구조다.
+없는 필드는 v0.5.x와 2D 전용 진행으로 읽는다. 기존 완료 플래그는 원래
+검증기로 다시 판정하며 기존 완료를 강제로 재작업시키지 않는다.
+새 필드에는 장비 ID allowlist, 중복/타입/순서/변경 상태 검사를 적용한다.
+3D가 실패해도 2D 도구는 조사/방어를 할 수 있다. 이미 현장 조사를 시작한
+미션은 3D 복구 후 재확인할 수 있다. 실제 3D 오류 상태에서 2D로 전환하면 현장 조건만 해제하고 단서와 설정은 보존한다. 기존 2D 명령으로 방어와 정상 기능을 재검증한다. 정상적인 화면 전환은 현장 조건을 유지한다.
+
+조사 점수는 필수 evidence 비율에 따라 0~30점이다. 원인 20점/방어 30점은
+필수 evidence를 모두 확보한 이후에만 반영하며, 검증 20점은 실제 완료를
+요구한다. 조사를 하기 전에 정답 설정을 우연히 맞춰도 HUD가 답을 확인해
+주지 않는다. 기존 최종 100점/힌트 정책은 유지한다.
+
+## 자산과 비용
+
+Blender master Interior 06, GLB와 functional snapshot은 변경하지 않았다.
+Blender → GLB → error-bounded LOD → meshopt pack → exact functional 검증
+파이프라인과 INTERACT/DOOR/COLLIDER/SPAWN의 Transform/Pivot을 유지했다.
+상태판은 runtime에서 공유 plane 하나와 512×256 CanvasTexture 네 개를
+추가한다. 최대 4 draw calls/8 triangles, 새 light나 render pass는 없다.
+상태가 바뀔 때만 텍스처를 갱신하고 temporal history를 초기화한다.
+모델 재설치 시 상태판 geometry/material/texture를 정리한다.
+
+원본 도시/유리/LOD/culling/static batching/temporal/recovery는 유지했다.
+현재 temporal은 정지 jitter 누적과 이동 중 spatial resolve이며,
+motion-vector TAAU/DLSS라고 부르지 않는다. GLB는 41,775,284 bytes로 같다.
+새 외부 asset/texture/dependency가 없다. 상태판 글자는 자체 생성한다.
+
+## 검증과 제외
+
+engine 검사: 세 미션의 조사/재확인 gate, 잘못된 장비, 정책 재변경, 초기화,
+이전 완료 저장과 신규 진행 복원, 자동 해시가 재확인을 대체하지 않는 조건.
+scene 검사: runtime 상태판의 원본 anchor 연결, 벽/거리/숨김 차단과 기존
+101 인터페이스/98 문·충돌 geometry/89 collider 및 이동·문 검사.
+Chrome smoke: 한 번의 실제 장면 진입과 짧은 기존 이동에서 E 조사로
+단서 확보/포인터 유지, F 도구, 기존 미션/저장 흐름을 확인한다.
+일반 CI에 장거리 순회나 추가 GLB 로딩을 넣지 않았다.
+
+Push와 PR이 같은 SHA에서 서로의 필수 검사를 취소하던 동시 실행 그룹은
+event 이름으로 구분했다. 오래된 같은 event 실행만 취소하고, Push/PR의
+검사는 병렬 완료한다. 테스트/EXE 빌드/smoke 순서와 검사 범위는 유지했다.
+순수 장비 catalog만 3D 재시도 namespace에도 허용했다. app와 singleton
+labbridge는 그 경로에서 계속 차단하며 Python/Node 서버 모두 검사한다.
+
+로컬 고정 카메라 review는 실제 raycast/E/F/UI 편집/재확인/최종 검증/저장으로
+세 미션을 완료한다. 이는 전체 맵을 실제로 걸어 다닌 검증은 아니다.
+Windows EXE/launcher/핵심 Chrome 검증과 critical path 시간은 해당 PR
+Actions 결과 및 출력 보고서에 기록한다.
+
+Dynamic Resolution/GLB streaming/WebGPU/GI/SSAO/새 미션은 추가하지 않았다.
+현재 문제가 장비의 학습 역할이어서 이들의 구현 비용을 정당화할 병목이
+없었다. 이후 입문자 시연과 내장 GPU 장시간 테스트가 우선이다.
+상태판은 독립 placard이며 모든 기존 모니터 화면/LED를 동적으로 바꾸지는 않는다.

@@ -4,7 +4,8 @@ import { MeshoptDecoder } from '../vendor/three/examples/jsm/libs/meshopt_decode
 import { RoomEnvironment } from '../vendor/three/examples/jsm/environments/RoomEnvironment.js';
 import { Player } from './player3d.js';
 import { Interaction } from './interaction3d.js';
-import { observeMission, requestTool } from '/src/labbridge.js';
+import { observeMission, requestTool,requestInspection,observeDevice } from '/src/labbridge.js';
+import {createWorldStatus} from './world-status.js';
 import { batchStatic, isSoftwareRenderer } from './batch3d.js';
 import { createCity, refineGlass, restoreCityEnvironment, CITY_SUN } from './city3d.js';
 import { prepareVisibility } from './visibility3d.js';
@@ -21,6 +22,7 @@ let softwareRenderer = false, redraw = true, environmentTarget;
 let city, visibility, upscaler, preset='quality', optimization=true, debug=false, gpuName=null;
 let loadStarted=0, loadTimeMs=0, glbLoadMs=0, renderTimeMs=0, averageFrameMs=0;
 let keyboardCaptured=false,keyboardCapturePromise;
+let worldStatus,deviceObservation=null;
 function releaseKeyboard() {navigator.keyboard?.unlock?.();keyboardCaptured=false;}
 function captureKeyboard() {
   if(keyboardCaptured||keyboardCapturePromise||!document.fullscreenElement||!player?.controls.isLocked||!navigator.keyboard?.lock)return;
@@ -60,6 +62,7 @@ function stopInput() {
   player?.clear();
   $('crosshair').hidden = true;
   $('interaction-prompt').hidden = true;
+  $('device-observation').hidden=true;
   previousTime = 0;
 }
 function resetToolModal() {
@@ -282,13 +285,16 @@ async function installModel(gltf) {
   const spawn = spawnObject.getWorldPosition(new THREE.Vector3());
   batchStatic(loaded);
   player?.dispose();
+  worldStatus?.dispose();worldStatus=null;
   if (model) { scene.remove(model); clearResources(model); }
   model = loaded;
   scene.add(model);
   renderer.shadowMap.needsUpdate=true;
   player = new Player(camera, $('lab-canvas'), boxes, spawn);
-  interaction = new Interaction(model, camera, player, openTool);
+  interaction = new Interaction(model, camera, player, openTool,id=>{if(!busy())requestInspection(id);},()=>mission?.id??'tutorial');
   visibility?.dispose();visibility=await prepareVisibility(gltf);
+  worldStatus=createWorldStatus(model);worldStatus.update(mission?.devices);
+  for(const target of worldStatus.targets)interaction.addTarget(target.mesh,target.anchor);
   player.controls.addEventListener('lock', () => {
     if (!ready || !healthyContext() || toolsOpen || mode !== '3d') { player.controls.unlock(); return; }
     $('scene-cover').hidden = true;
@@ -476,6 +482,7 @@ function animate(time) {
   $('interaction-prompt').textContent = prompt;
   $('interaction-prompt').hidden = !prompt;
   $('crosshair').classList.toggle('target', Boolean(prompt));
+  $('device-observation').hidden=!deviceObservation||!player.controls.isLocked||interaction.target?.name!==deviceObservation.device;
   try {
     const lodChanged=visibility?.update(camera,innerHeight*RENDER_PRESETS[preset],optimization);
     const started=performance.now();
@@ -509,6 +516,7 @@ export function get3DDiagnostics() {
     fullscreen: Boolean(document.fullscreenElement), keyboardCaptured,
     yaw: direction ? Math.atan2(-direction.x, -direction.z) : 0, pitch: direction ? Math.asin(direction.y) : 0,
     target: interaction?.target?.name ?? null,
+    statusPanels:worldStatus?.count??0,
     doors: interaction?.doors.map(door => ({ name: door.object.name, angle: door.angle, target: door.target, pivot: door.object.position.toArray() })) ?? [],
     colliders: player?.boxes.length ?? 0, drawCalls: renderer?.info.render.calls ?? 0,
     triangles: renderer?.info.render.triangles ?? 0, fps, frameTimeMs:averageFrameMs,renderTimeMs, renderer: rendererVersion, softwareRenderer,
@@ -523,13 +531,22 @@ export function init3D() {
   if (!initialized) {
     initialized = true;
     observeMission(status => {
+      if(mission?.id!==status.id||deviceObservation?.stateKey&&deviceObservation.stateKey!==JSON.stringify(status.devices?.[deviceObservation.device]))deviceObservation=null;
       mission = status;
       $('hud-title').textContent = status.title;
       $('hud-objective').textContent = status.objective;
+      $('hud-action').textContent=status.worldAction;
       $('hud-stage').textContent = `${status.stage} · 단서 ${status.clues}개 · ${status.score}/100`;
       $('hud-mission').textContent = (status.missionId || status.id) === 'tutorial' ? 'CASE 001 / 조사 준비' : `CASE 001 / MISSION ${String(status.active).padStart(2, '0')}`;
       $('tool-close').disabled = toolsOpen && busy();
       if (toolsOpen) $('lab-tools').setAttribute('aria-busy', String(busy()));
+      if(worldStatus?.update(status.devices)){upscaler?.reset();redraw=true;}
+    });
+    observeDevice(result=>{
+      deviceObservation=result;
+      $('device-observation-title').textContent=result.label;
+      $('device-observation-text').textContent=result.text;
+      $('device-observation').dataset.tone=result.tone;
     });
     $('scene-start').addEventListener('click', lock);
     document.addEventListener('fullscreenchange',()=>{
@@ -588,6 +605,7 @@ export function init3D() {
       if(event.code==='F3'&&mode==='3d'){event.preventDefault();debug=!debug;$('graphics-debug').hidden=!debug;}
       if (mode !== '3d' || nativeDialogOpen()) return;
       if (event.code === 'KeyE' && !event.repeat && ready && player?.controls.isLocked && !toolsOpen) { event.preventDefault(); interaction.interact(); }
+      if (event.code === 'KeyF' && !event.repeat && ready && player?.controls.isLocked && !toolsOpen&&!busy()) {event.preventDefault();interaction.tool();}
       if (event.code === 'Escape' && player?.controls.isLocked && !toolsOpen) { event.preventDefault(); player.controls.unlock(); }
       if (event.code === 'Escape' && toolsOpen) { event.preventDefault(); closeTool(); }
       if (event.code === 'Tab' && toolsOpen) {

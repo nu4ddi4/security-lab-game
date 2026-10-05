@@ -1,12 +1,15 @@
 import { Raycaster, Vector2, Box3, Vector3 } from '../vendor/three/build/three.module.js';
 import { overlaps } from './collision.js';
+import {DEVICES,deviceTask} from './devices.js';
 export const REACH = 2.65;
 export class Interaction {
-  constructor(model, camera, player, openTool) {
+  constructor(model, camera, player, openTool, inspect = null, mission = ()=>'tutorial') {
     this.model=model; this.camera=camera; this.player=player; this.openTool=openTool;
+    this.inspect=inspect;this.mission=mission;
     this.ray=new Raycaster(); this.ray.far=REACH;
     this.doors=[]; this.target=null;
     this.raycastMeshes=[];
+    this.runtimeTargets=new Map();
     model.traverse(object => {
       if(object.isMesh && this.visible(object)) {
         object.geometry.computeBoundingBox();
@@ -45,6 +48,7 @@ export class Interaction {
     const hits=this.ray.intersectObjects(this.raycastMeshes,false);
     for (const hit of hits) {
       if (!hit.object.isMesh || !this.visible(hit.object)) continue;
+      const registered=this.runtimeTargets.get(hit.object);if(registered)return registered;
       let object=hit.object;
       while (object && object!==this.model) {
         if (object.userData.interaction) return object;
@@ -57,18 +61,25 @@ export class Interaction {
     return null;
   }
   visible(object) { for (let o=object;o;o=o.parent) if (!o.visible) return false; return true; }
+  addTarget(mesh,anchor) {this.runtimeTargets.set(mesh,anchor);this.raycastMeshes.push(mesh);}
   interact() {
     const object=this.findTarget();
     if (!object) return;
     if (object.userData.interaction==='door') {
       const door=this.doors.find(d=>d.object===object);
       door.from=door.angle; door.target=door.target===0 ? door.open : 0; door.time=0;
-    } else this.openTool(object.userData.interaction,object.userData.label);
+    } else if(this.inspect&&DEVICES[object.name])this.inspect(object.name);
+    else this.openTool(object.userData.interaction,object.userData.label);
+  }
+  tool() {
+    const object=this.findTarget();if(!object||!DEVICES[object.name])return;
+    const definition=DEVICES[object.name];
+    this.openTool(definition.tool,definition.label);
   }
   prompt() {
     if (!this.target) return '';
     const door=this.doors.find(d=>d.object===this.target);
-    return door ? `E · ${door.target===0?'문 열기':'문 닫기'}` : `E · ${this.target.userData.label}`;
+    return door ? `E · ${door.target===0?'문 열기':'문 닫기'}` : DEVICES[this.target.name]&&this.inspect?`E · ${deviceTask(this.mission(),this.target.name)} / F · 도구`:`E · ${this.target.userData.label}`;
   }
   get boxes() { return this.doors.map(d=>d.box); }
 }
