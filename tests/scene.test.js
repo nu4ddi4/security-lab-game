@@ -275,6 +275,6 @@ test('runtime device displays obey wall occlusion, reach, hidden state and origi
  const found=[],opened=[],interaction=new Interaction(model,camera,{camera,body:{feetY:0,height:1.8}},(...x)=>opened.push(x),id=>found.push(id));
  const panel=new Mesh(new PlaneGeometry(.58,.29),new MeshBasicMaterial());panel.position.y=1.6;model.add(panel);interaction.addTarget(panel,anchor);model.updateMatrixWorld(true);
  assert.equal(interaction.findTarget(),null,'a wall blocks the display');blocker.visible=false;
- assert.equal(interaction.findTarget(),anchor);interaction.interact();assert.deepEqual(found,['INTERACT_AdminPC']);interaction.tool();assert.equal(opened[0][0],'admin');
+ assert.equal(interaction.findTarget(),anchor);interaction.interact();assert.deepEqual(found,['INTERACT_AdminPC']);interaction.tool();assert.equal(opened[0][0],'terminal');
  panel.visible=false;assert.equal(interaction.findTarget(),null);panel.visible=true;camera.position.z=3;assert.equal(interaction.findTarget(),null,'display does not extend reach');
 });

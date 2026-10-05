@@ -42,3 +42,20 @@ body.lab-3d #lab-tools .intro { display: none; }
 .graphics-options label {display:flex;align-items:center;gap:8px}
 .graphics-options select {background:#192a38;color:#e5edf2;border:1px solid #527080;border-radius:6px;padding:7px}
 .graphics-debug {position:absolute;right:20px;top:80px;z-index:8;background:#10202bdd;color:#e4f3ff;padding:14px;font:12px/1.7 monospace;pointer-events:none}
+
+/* Compact contextual guidance; no center overlay or new rendering pass. */
+.mission-hud .hud-location{font-size:11px;color:#adbabf;margin-top:10px}
+.mission-hud .hud-action{margin-top:12px;padding-top:12px;color:#e1ede9;line-height:1.6}
+.device-observation{width:345px;max-height:none;font-size:13px}
+.device-observation #device-observation-status{color:#bccdce;font-size:12px;margin:8px 0}
+.device-observation pre{font-size:13px;line-height:1.8;margin:12px 0;max-height:none}
+.device-observation #device-observation-next{border-top:1px solid #b4c2c72b;padding-top:12px;margin:12px 0 0;line-height:1.65;color:#dcebe5}
+.device-observation small{font-size:11px}
+.onboarding-hint{position:absolute;left:34px;bottom:82px;max-width:340px;padding:13px 17px;background:#18272eed;border-left:3px solid #b4c2c7;border-radius:4px;pointer-events:none;font-size:12px;line-height:1.8;color:#dce7e8}
+.onboarding-hint small{display:block;color:#b4c2c7}
+#recheck-notice{border-left:3px solid #e0c376;color:#ebd49a;margin:0 0 18px;padding:12px 16px}
+@media(max-height:800px){.device-observation{top:135px;padding:14px 17px}.device-observation pre{font-size:12px}.mission-hud{padding:17px}}
+
+.mission-hud,.device-observation{word-break:keep-all;overflow-wrap:break-word}
+
+#hud-stage[data-tone="pending"]{color:#e0c376}#hud-stage[data-tone="neutral"]{color:#b4c2c7}

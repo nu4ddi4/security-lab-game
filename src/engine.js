@@ -1,5 +1,5 @@
 import { MISSIONS, ORIGINAL_FILES, TAMPERED_BUDGET, COMMON_PASSWORDS, NORMAL_PASSWORD } from './missions.js';
-import {DEVICES,deviceCommands,requiredDevices,revisitDevice} from './devices.js';
+import {DEVICES,deviceCommands,requiredDevices,revisitDevice,deviceTool} from './devices.js';
 
 export function initialState() {
   return {
@@ -60,7 +60,8 @@ export function stage(state) {
   const p = progress(state);
   if (p.verified) return '검증 완료';
   const investigated=MISSIONS[state.active].evidence.every(key=>p.clues.includes(key));
-  if (investigated&&explained(state)&&defended(state)) return p.spatial&&!p.spatial.rechecked&&revisitDevice(missionId(state))?'장비 재확인 필요':'방어 적용';
+  if(p.spatial&&p.observations.changed&&!p.spatial.rechecked&&revisitDevice(missionId(state)))return '장비 재확인 필요';
+  if (investigated&&explained(state)&&defended(state)) return '방어 적용';
   if (investigated&&explained(state)) return '취약 상태 확인';
   if (p.clues.length) return '조사';
   return '준비';
@@ -225,36 +226,63 @@ export function nextAction(state) {
     const missingDevice=requiredDevices(m.id).find(id=>!p.spatial.inspected.includes(id));
     if(missingDevice)return {text:`현장 조사: ${DEVICES[missingDevice].label}에 접근해 E를 누르세요.`,device:missingDevice,label:'3D 현장으로'};
   }
+  if(p.spatial&&p.observations.changed&&!p.spatial.rechecked&&revisitDevice(m.id))return {text:worldAction(state).text,device:revisitDevice(m.id),label:'3D 재확인으로'};
   const missing = m.evidence.find(key => !p.clues.includes(key));
   if (missing) return { text: '다음 조사: ' + m.clues[missing].label, command: m.clues[missing].command, label: m.clues[missing].command };
   if (!explained(state)) return { text: '조사 노트에서 근거에 맞는 원인 설명을 선택하세요.', focus: 'answer-0', label: '원인 설명으로' };
   if (!defended(state)) return { text: m.defenseGuidance, tab: 'settings', label: '방어 설정 열기' };
-  if(p.spatial&&!p.spatial.rechecked&&revisitDevice(m.id))return {text:`방어 후 ${DEVICES[revisitDevice(m.id)].label}에서 E로 상태를 다시 확인하세요.`,device:revisitDevice(m.id),label:'3D 재확인으로'};
   if (m.id === 'services' && !p.clues.includes('rescan')) return { text: '변경한 접근 상태를 다시 조사하세요.', command: 'scan club-server', label: 'scan club-server' };
   if (m.id === 'integrity' && (p.hashes.length !== Object.keys(ORIGINAL_FILES).length || !p.hashes.every(row => row.matches))) return { text: '복구한 파일의 해시를 다시 계산하세요.', command: 'hash files', label: 'hash files' };
   return { text: '방어와 정상 기능을 함께 재검증하세요.', command: 'verify', label: '재검증 실행' };
 }
 
+// Read-only UX projections: no additional saved fields or mission rules.
+export function worldAction(state) {
+  const p=progress(state),id=missionId(state),devices=requiredDevices(id);
+  if(p.verified)return {mode:'complete',device:null,text:'검증 완료 · 조사 노트에서 결과와 다음 미션을 확인하세요.'};
+  if(!devices.length)return {mode:'tool',device:null,text:'조사 노트에서 현재 목표와 다음 행동을 확인하세요.'};
+  const missing=devices.find(device=>!p.spatial?.inspected.includes(device));
+  if(missing)return {mode:'inspect',device:missing,text:`${DEVICES[missing].label}에서 E로 ${id==='tutorial'?'승인서':'현장 근거'}를 확인하세요.`};
+  const revisit=revisitDevice(id);
+  if(p.observations.changed&&!p.spatial.rechecked&&revisit)return {mode:'recheck',device:revisit,text:`설정 변경으로 이전 관찰이 만료됐습니다. ${DEVICES[revisit].label}에서 E로 재확인하세요.`};
+  const device=id==='services'?'INTERACT_Router':'INTERACT_AdminPC';
+  if(!explained(state))return {mode:'tool',device,text:`${DEVICES[device].label}에서 F · 조사 노트의 근거를 읽고 ${id==='tutorial'?'허용 범위를':'원인 설명을'} 선택하세요.`};
+  if(!defended(state))return {mode:'tool',device,text:`${DEVICES[device].label}에서 F · ${id==='integrity'?'파일 비교와 방어 설정':'방어 설정'}을 검토하세요.`};
+  return {mode:'verify',device,text:`${DEVICES[device].label}에서 F · 「현재 상태 재검증」으로 방어와 정상 기능을 함께 확인하세요.`};
+}
+function fieldFindings(state,device) {
+  const p=progress(state),id=missionId(state),before=p.observations.before,changed=p.observations.changed;
+  const transition=(previous,current)=>changed&&previous!=null&&previous!==current?`${previous} → ${current}`:current;
+  if(id==='tutorial')return ['조사 승인서 · club-server의 내장 가상 데이터만 조사','E로 근거를 확보하고 F로 판단·설정 도구를 엽니다.'];
+  if(id==='services')return [443,8080].map(port=>`${port} ${transition(before?.[port]===undefined?null:before[port]?'OPEN':'FILTERED',state.ports[port]?'OPEN':'FILTERED')} · ${port===443?(state.ports[port]?'자료 열람 가능':'자료 열람 불가'):(state.ports[port]?'사용하지 않는 관리 접근 허용':'관리 접근 차단')}`);
+  if(id==='login') {
+    const r=loginSimulation(state.login),old=before?loginSimulation(before):null;
+    const allowed=COMMON_PASSWORDS.filter(value=>accepted(value,state.login)).length;
+    return [`정상 더미 로그인 · ${transition(old?old.normal?'성공':'거부':null,r.normal?'성공':'거부')}`,`반복 실패 · ${transition(old?old.repeatedBlocked?'제한됨':'무제한':null,r.repeatedBlocked?'제한됨':'무제한')}`,`흔한 더미 후보 ${allowed}/${COMMON_PASSWORDS.length}개 허용 · 최소 길이 ${state.login.minLength}자`];
+  }
+  if(device==='INTERACT_FileCabinet')return ['승인된 오프라인 원본이 비교 기준입니다.','관제 / 분석 PC에서 현재 파일을 이 기준과 비교하세요.'];
+  return p.hashes.map(row=>`${row.name} · ${transition(before?.matches?.[row.name]===undefined?null:before.matches[row.name]?'승인 기준과 일치':'승인 기준과 불일치',row.matches?'승인 기준과 일치':'승인 기준과 불일치')}`);
+}
 export async function inspectDevice(state,device) {
   if(!Object.hasOwn(DEVICES,device))throw new Error('알 수 없는 실습 장비입니다.');
   const p=progress(state),id=missionId(state),commands=deviceCommands(id,device);
-  if(!commands.length)return {device,label:DEVICES[device].label,text:`현재 미션: ${MISSIONS[state.active].title}\n${nextAction(state).text}\nF로 이 장비의 도구를 열 수 있습니다.`,tone:'neutral'};
+  if(!commands.length) {
+    const next=worldAction(state).text,status='현재 사건 조사 대상 아님',findings=[device==='INTERACT_Router'&&id==='services'?'이 장비는 F로 접근 정책을 편집하는 곳입니다.':'이 장비에서는 현재 사건의 단서를 얻지 않습니다.'];
+    return {device,label:DEVICES[device].label,status,findings,next,recorded:false,text:[status,...findings,'다음: '+next].join('\n'),tone:'neutral'};
+  }
   // Old completed saves stay completed. New field is opt-in on actual inspection.
   if(!p.verified)p.spatial??={inspected:[],rechecked:false};
-  const results=[];
-  for(const command of commands)results.push(await runCommand(state,command));
+  for(const command of commands)await runCommand(state,command);
   if(progress(state)!==p)throw new Error('미션이 변경되었습니다. 다시 조사하세요.');
   if(p.spatial) {
     if(!p.spatial.inspected.includes(device))p.spatial.inspected.push(device);
     if(p.observations.changed&&device===revisitDevice(id))p.spatial.rechecked=true;
   }
-  const ok=defended(state);
-  if(id==='login')results.push('정상 더미 사용자의 첫 로그인: '+(loginSimulation(state.login).normal?'성공':'거부'));
-  if(id==='integrity'&&device==='INTERACT_AdminPC') {
-    results.splice(0,results.length,...p.hashes.map(row=>`${row.name}: ${row.matches?'승인 기준과 일치':'승인 기준과 불일치'}`),'F · 파일 비교에서 전체 SHA-256과 바이트 차이를 확인하세요.');
-  }
-  const heading=p.observations.changed?'변경 후 현장 확인':'현장 조사 · 내장 시뮬레이션';
-  return {device,label:DEVICES[device].label,text:heading+'\n'+results.join('\n\n'),tone:id==='tutorial'||id==='integrity'&&device==='INTERACT_FileCabinet'?'neutral':ok?'normal':'warning'};
+  const informational=id==='tutorial'||id==='integrity'&&device==='INTERACT_FileCabinet';
+  const ok=defended(state),rechecked=p.observations.changed&&device===revisitDevice(id);
+  const status=rechecked?'변경 후 현장 재확인 · '+(ok?'정상 동작 확인':'문제 남음'):'현장 조사 완료';
+  const findings=fieldFindings(state,device),next=worldAction(state).text;
+  return {device,label:DEVICES[device].label,status,findings,next,recorded:true,text:[status,...findings,'현장 단서가 조사 노트에 기록되었습니다.','다음: '+next].join('\n'),tone:informational?'neutral':ok?'normal':'warning'};
 }
 
 export function continueWithout3D(state) {
@@ -264,23 +292,23 @@ export function continueWithout3D(state) {
 }
 
 export function worldDevices(state) {
-  const id=missionId(state),p=progress(state);
+  const id=missionId(state),p=progress(state),action=worldAction(state);
   return Object.fromEntries(Object.keys(DEVICES).map(device=>{
-    const relevant=deviceCommands(id,device).length>0;
-    const inspected=p.spatial?.inspected.includes(device);
+    const relevant=deviceCommands(id,device).length>0,inspected=p.spatial?.inspected.includes(device);
     let text='현재 사건 조사 대상 아님',tone='neutral';
     if(relevant) {
       text='E · 현장 조사 필요';
       if(p.verified&&!p.spatial){text='기존 완료 기록 유지\nE · 현재 상태 관찰';tone='normal';}
       if(inspected) {
         const pending=p.observations.changed&&!p.spatial.rechecked&&device===revisitDevice(id);
-        text=pending?'설정 변경 · E로 재확인':p.spatial.rechecked?'현장 재확인 완료':'현장 단서 확보';
-        tone=pending?'pending':id==='tutorial'||id==='integrity'&&device==='INTERACT_FileCabinet'?'neutral':p.spatial.rechecked&&defended(state)?'normal':'warning';
+        const informational=id==='tutorial'||id==='integrity'&&device==='INTERACT_FileCabinet';
+        text=pending?'이전 관찰 만료\n설정 변경됨 · E 재확인':p.spatial.rechecked?'현장 재확인 완료':'현장 단서 확보';
+        tone=pending?'pending':informational?'neutral':defended(state)?'normal':'warning';
         if(!pending&&id==='services')text+=`\n443 ${state.ports[443]?'OPEN':'FILTERED'} / 8080 ${state.ports[8080]?'OPEN':'FILTERED'}`;
-        if(!pending&&id==='login') {const r=loginSimulation(state.login);text+=`\n정상 로그인 ${r.normal?'성공':'거부'} / 반복 실패 ${r.repeatedBlocked?'제한':'무제한'}`;}
+        if(!pending&&id==='login'){const r=loginSimulation(state.login);text+=`\n정상 로그인 ${r.normal?'성공':'거부'}\n반복 실패 ${r.repeatedBlocked?'제한됨':'무제한'}`;}
         if(!pending&&id==='integrity'&&device==='INTERACT_AdminPC')text+=`\n해시 ${p.hashes.length?p.hashes.filter(row=>!row.matches).length+'개 불일치':'재계산 필요'}`;
       }
-    } else if(device==='INTERACT_Router'&&id==='services')text='F · 접근 정책 편집';
-    return [device,{label:DEVICES[device].label,text,tone}];
+    } else if(device==='INTERACT_Router'&&id==='services')text='서비스 접근 정책\nF · 접근 정책 편집';
+    return [device,{label:DEVICES[device].label,text,tone,objective:action.device===device,action:action.device===device?`${['tool','verify'].includes(action.mode)?'F':'E'} · ${action.mode==='recheck'?'재확인':action.mode==='verify'?'최종 검증':action.mode==='tool'?deviceTool(id,device).label:'현장 조사'}`:'',zone:DEVICES[device].zone}];
   }));
 }

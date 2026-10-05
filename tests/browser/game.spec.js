@@ -829,3 +829,13 @@ test('only an error-state 2D fallback removes spatial gate and preserves clues a
  await command(page,'scan club-server');await command(page,'verify');await expect(page.locator('#stage')).toHaveText('검증 완료');
  await reloadGame(page);await expect(page.locator('#stage')).toHaveText('검증 완료');
 });
+
+
+test('pending spatial settings consistently explain expired observation without revealing correct settings',async({page})=>{
+ const state=await missionState(1);await inspectDevice(state,'INTERACT_ServerRack');applyPort(state,443,false);
+ await seedGame(page,state);await expect(page.locator('#recheck-notice')).toContainText('이전 관찰이 만료');
+ await expect(page.locator('#recheck-notice')).toContainText('F로 도구를 열어도');await expect(page.locator('#stage')).toHaveText('장비 재확인 필요');
+ await page.evaluate(async()=>{(await import('/src/labbridge.js')).requestInspection('INTERACT_ServerRack');});
+ await expect(page.locator('#recheck-notice')).toBeHidden();await expect(page.locator('#terminal')).toContainText('자료 열람 불가');
+ await command(page,'verify');await expect(page.locator('#next')).toBeHidden();
+});

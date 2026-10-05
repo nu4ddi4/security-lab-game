@@ -4,7 +4,7 @@
 
 ## 자산과 기능
 
-아래 크기/triangle 최적화 비교는 v0.5.0 당시 기록이다. 현재 v0.6.0은
+아래 크기/triangle 최적화 비교는 v0.5.0 당시 기록이다. 현재 v0.6.1은
 Interior 06의 41,775,284-byte runtime GLB를 그대로 사용한다. 현장 상태판은
 최대 4 calls/8 triangles와 512×256 CanvasTexture 4개만 추가하며 새 pass나
 조명을 만들지 않는다. 상태 변경 시 temporal history를 초기화한다.

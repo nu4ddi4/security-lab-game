@@ -1,11 +1,11 @@
 import { Raycaster, Vector2, Box3, Vector3 } from '../vendor/three/build/three.module.js';
 import { overlaps } from './collision.js';
-import {DEVICES,deviceTask} from './devices.js';
+import {DEVICES,deviceTask,deviceTool} from './devices.js';
 export const REACH = 2.65;
 export class Interaction {
-  constructor(model, camera, player, openTool, inspect = null, mission = ()=>'tutorial') {
+  constructor(model, camera, player, openTool, inspect = null, mission = ()=>'tutorial', status = ()=>({})) {
     this.model=model; this.camera=camera; this.player=player; this.openTool=openTool;
-    this.inspect=inspect;this.mission=mission;
+    this.inspect=inspect;this.mission=mission;this.status=status;
     this.ray=new Raycaster(); this.ray.far=REACH;
     this.doors=[]; this.target=null;
     this.raycastMeshes=[];
@@ -74,12 +74,12 @@ export class Interaction {
   tool() {
     const object=this.findTarget();if(!object||!DEVICES[object.name])return;
     const definition=DEVICES[object.name];
-    this.openTool(definition.tool,definition.label);
+    this.openTool(deviceTool(this.mission(),object.name).tab,definition.label);
   }
   prompt() {
     if (!this.target) return '';
     const door=this.doors.find(d=>d.object===this.target);
-    return door ? `E · ${door.target===0?'문 열기':'문 닫기'}` : DEVICES[this.target.name]&&this.inspect?`E · ${deviceTask(this.mission(),this.target.name)} / F · 도구`:`E · ${this.target.userData.label}`;
+    return door ? `E · ${door.target===0?'문 열기':'문 닫기'}` : DEVICES[this.target.name]&&this.inspect?`E · ${this.status().devices?.[this.target.name]?.tone==='pending'?'변경 후 상태 재확인':deviceTask(this.mission(),this.target.name)} / F · ${deviceTool(this.mission(),this.target.name).label}`:`E · ${this.target.userData.label}`;
   }
   get boxes() { return this.doors.map(d=>d.box); }
 }
