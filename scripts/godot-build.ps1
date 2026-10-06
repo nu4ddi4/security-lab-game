@@ -21,5 +21,8 @@ try {
     $exportLog = & $Godot --headless --path godot --export-release "Windows Native" $target 2>&1
     $exportLog | Write-Output
     if ($LASTEXITCODE -ne 0 -or ($exportLog | Select-String 'ERROR:|SCRIPT ERROR:') -or -not (Test-Path -LiteralPath $target)) { throw "Windows native export failed" }
+    $binary = Get-Item -LiteralPath $target -ErrorAction Stop
+    if ($binary.PSIsContainer -or $binary.Length -le 0) { throw "Native Windows EXE missing or empty" }
+    Write-Host "Native EXE: $($binary.Length) bytes"
     Get-FileHash -LiteralPath $target -Algorithm SHA256
 } finally { Pop-Location }

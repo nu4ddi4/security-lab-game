@@ -57,7 +57,8 @@ func setup(manager: LabMissions, actor: LabPlayer):
 	add_child(ceiling)
 	box_collision(ceiling, AABB(Vector3(-12.2,3.4,-10.2),Vector3(24.4,.2,20.4)))
 	if protected_nodes.has("SPAWN_Player"):
-		player.global_position = protected_nodes.SPAWN_Player.global_position - Vector3(0,1.65,0) + Vector3(0,.01,0)
+		# The authored anchor is at the feet; the player camera supplies eye height.
+		player.global_position = protected_nodes.SPAWN_Player.global_position + Vector3(0,.01,0)
 	lighting()
 	add_child(preload("res://scripts/exterior.gd").new())
 

@@ -221,12 +221,78 @@ func reset_mission():
 func action() -> Dictionary:
 	var m = mission()
 	var p = progress()
-	if p.verified: return {"device": "", "mode": "complete", "text": "검증 완료 · 조사 노트에서 다음 미션 또는 완료 결과를 확인하세요."}
+	if p.verified: return {"device": "", "mode": "complete", "text": "검증 완료 · 조사 노트에서 다음 미션 또는 완료 결과를 확인하세요.", "reason":""}
 	for id in m.required_devices:
-		if id not in p.get("spatial", {}).get("inspected", []): return {"device": id, "mode": "inspect", "text": definitions.devices[id].label + "에서 E로 현장 근거를 확인하세요."}
-	if p.observations.changed and not p.get("spatial", {}).get("rechecked", false) and m.revisit_device != null: return {"device": m.revisit_device, "mode": "recheck", "text": "이전 관찰 만료 · 장비에서 E로 변경 후 상태를 재확인하세요."}
+		if id not in p.get("spatial", {}).get("inspected", []):
+			var reason = {"tutorial":"조사 전에 승인된 범위를 확인합니다.","services":"서버에서 노출 상태와 서비스 용도를 확인합니다.","login":"관제석에서 정상 로그인과 반복 실패를 함께 확인합니다."}.get(m.id,"보관함의 승인 원본이 비교 기준입니다." if id == "INTERACT_FileCabinet" else "분석 PC에서 현재 파일을 승인 원본과 비교합니다.")
+			return {"device":id,"mode":"inspect","text":definitions.devices[id].label + "에서 E · " + device_task(id),"reason":reason}
+	if p.observations.changed and not p.get("spatial", {}).get("rechecked", false) and m.revisit_device != null:
+		return {"device":m.revisit_device,"mode":"recheck","text":"이전 관찰 만료 · " + definitions.devices[m.revisit_device].label + "에서 E로 변경 결과를 재확인하세요.","reason":"F는 설정 도구입니다. 변경 결과는 현장에서 E로 확인합니다."}
 	var target = "INTERACT_Router" if m.id == "services" else "INTERACT_AdminPC"
-	return {"device": target, "mode": "verify" if explained() and defended() else "tool", "text": "F · 조사 노트에서 설명을 선택하세요." if not explained() else "F · 방어 설정을 검토하세요." if not defended() else "F · 현재 상태 재검증으로 방어와 정상 기능을 확인하세요."}
+	var instruction = "조사 노트에서 " + ("허용 범위" if m.id == "tutorial" else "원인 설명") + "를 선택하세요." if not explained() else "파일 비교·복구를 검토하세요." if not defended() and m.id == "integrity" else "방어 설정을 검토하세요." if not defended() else "현재 상태 재검증으로 방어와 정상 기능을 확인하세요."
+	var reason = {"services":"서버는 상태 확인, 방화벽은 접근 정책 변경을 담당합니다.","login":"로그인 기록을 근거로 정책을 판단하고 변경합니다.","integrity":"보관함은 비교 기준, 분석 PC는 검사·복구를 담당합니다."}.get(m.id,"E로 확보한 승인서를 조사 노트에서 읽고 판단합니다.")
+	return {"device":target,"mode":"verify" if explained() and defended() else "tool","text":definitions.devices[target].label + "에서 F · " + instruction,"reason":reason}
+
+func device_task(id: String) -> String:
+	if mission().device_commands.get(id,[]).is_empty(): return "조사 위치 안내"
+	match mission().id:
+		"tutorial": return "조사 승인서 확인"
+		"services": return "서비스 상태 조사"
+		"login": return "로그인 기록 조사"
+	return "승인 원본 기준 조사" if id == "INTERACT_FileCabinet" else "파일 해시 비교"
+
+func device_tool(id: String) -> Dictionary:
+	if id == "INTERACT_Router": return {"tab":"Settings","label":"접근 정책"}
+	if id == "INTERACT_FileCabinet": return {"tab":"Files","label":"파일 비교"}
+	if id == "INTERACT_Whiteboard": return {"tab":"Notes","label":"조사 안내"}
+	if id == "INTERACT_ServerRack": return {"tab":"Terminal","label":"터미널"}
+	match mission().id:
+		"tutorial": return {"tab":"Terminal","label":"조사 노트 · 터미널"}
+		"integrity": return {"tab":"Files","label":"파일 비교·복구"}
+	return {"tab":"Settings","label":"정책 설정"}
+
+func field_transition(previous, current: String) -> String:
+	return str(previous) + " → " + current if progress().observations.changed and previous != null and previous != current else current
+
+func field_findings(id: String) -> Array:
+	var before = progress().observations.before
+	match mission().id:
+		"tutorial": return ["조사 승인서 · club-server의 내장 가상 데이터만 조사","E로 근거를 확보하고 F로 판단·설정 도구를 엽니다."]
+		"services":
+			var rows = []
+			for port in ["443","8080"]:
+				var old = null if before == null else "OPEN" if before[port] else "FILTERED"
+				var current = "OPEN" if state.ports[port] else "FILTERED"
+				rows.append(port + " " + field_transition(old,current) + " · " + (("자료 열람 가능" if state.ports[port] else "자료 열람 불가") if port == "443" else ("관리 접근 허용" if state.ports[port] else "관리 접근 차단")))
+			return rows
+		"login":
+			var old_normal = null if before == null else "성공" if accepted(definitions.normal_password,before) else "거부"
+			var old_limit = null if before == null else "제한됨" if before.limitAttempts else "무제한"
+			var allowed = definitions.common_passwords.filter(func(value): return accepted(value,state.login)).size()
+			return ["정상 더미 로그인 · " + field_transition(old_normal,"성공" if login_result().normal else "거부"),"반복 실패 · " + field_transition(old_limit,"제한됨" if state.login.limitAttempts else "무제한"),"흔한 더미 후보 %d/%d개 허용 · 최소 길이 %d자" % [allowed,definitions.common_passwords.size(),state.login.minLength]]
+	if id == "INTERACT_FileCabinet": return ["승인된 오프라인 원본이 비교 기준입니다.","분석 PC에서 현재 파일을 이 기준과 비교하세요."]
+	var rows = []
+	for row in progress().hashes:
+		var old = null if before == null or not before.get("matches",{}).has(row.name) else "승인 기준과 일치" if before.matches[row.name] else "승인 기준과 불일치"
+		rows.append(row.name + " · " + field_transition(old,"승인 기준과 일치" if row.matches else "승인 기준과 불일치"))
+	return rows
+
+func device_status(id: String) -> Dictionary:
+	var p = progress()
+	var next = action()
+	var relevant = not mission().device_commands.get(id,[]).is_empty()
+	var inspected = id in p.get("spatial",{}).get("inspected",[])
+	var pending = inspected and p.observations.changed and not p.get("spatial",{}).get("rechecked",false) and id == mission().revisit_device
+	var informational = mission().id == "tutorial" or mission().id == "integrity" and id == "INTERACT_FileCabinet"
+	var tone = "pending" if pending else "neutral" if not inspected or informational else "normal" if defended() else "warning"
+	var text = "E · " + device_task(id) if relevant else "현재 사건 조사 대상 아님"
+	if id == "INTERACT_Router" and mission().id == "services": text = "서비스 접근 정책\nF · 접근 정책 편집"
+	if inspected:
+		text = "이전 관찰 만료\n설정 변경됨 · E 재확인" if pending else "현장 재확인 완료" if p.get("spatial",{}).get("rechecked",false) and id == mission().revisit_device else "현장 단서 확보"
+		if not pending and mission().id == "services": text += "\n443 %s / 8080 %s" % ["OPEN" if state.ports["443"] else "FILTERED","OPEN" if state.ports["8080"] else "FILTERED"]
+		if not pending and mission().id == "login": text += "\n정상 로그인 %s\n반복 실패 %s" % ["성공" if login_result().normal else "거부","제한됨" if state.login.limitAttempts else "무제한"]
+		if not pending and mission().id == "integrity" and id == "INTERACT_AdminPC": text += "\n해시 %d개 불일치" % p.hashes.filter(func(row): return not row.matches).size()
+	return {"text":text,"tone":tone,"objective":next.device == id,"action":"E · 변경 결과 재확인" if pending else "F · 최종 검증" if next.mode == "verify" else "F · " + device_tool(id).label if next.mode == "tool" else "E · " + device_task(id)}
 
 func inspect(id: String) -> Dictionary:
 	var p = progress()
@@ -241,7 +307,8 @@ func inspect(id: String) -> Dictionary:
 			if id not in p.spatial.inspected: p.spatial.inspected.append(id)
 			if p.observations.changed and id == mission().revisit_device: p.spatial.rechecked = true
 	var recheck = p.observations.changed and id == mission().revisit_device
-	var result = {"device": id, "label": definitions.devices[id].label, "status": "변경 후 재확인 · " + ("정상 동작" if defended() else "문제 남음") if recheck else "현장 조사 완료" if not relevant.is_empty() else "현재 사건 조사 대상 아님", "findings": lines, "recorded": not relevant.is_empty(), "next": action().text}
+	var informational = mission().id == "tutorial" or mission().id == "integrity" and id == "INTERACT_FileCabinet"
+	var result = {"device":id,"label":definitions.devices[id].label,"status":"변경 후 재확인 · " + ("정상 동작" if defended() else "문제 남음") if recheck else "현장 조사 완료" if not relevant.is_empty() else "현재 사건 조사 대상 아님","findings":field_findings(id) if not relevant.is_empty() else ["이 장비는 F로 접근 정책을 편집하는 곳입니다." if id == "INTERACT_Router" and mission().id == "services" else "현재 사건의 단서를 얻는 장비가 아닙니다."],"transcript":"\n".join(lines),"recorded":not relevant.is_empty(),"next":action().text,"evidenceFound":mission().evidence.filter(func(key): return key in p.clues).size(),"evidenceTotal":mission().evidence.size(),"tone":"neutral" if relevant.is_empty() or informational else "normal" if defended() else "warning"}
 	state_changed.emit()
 	observation.emit(result)
 	return result

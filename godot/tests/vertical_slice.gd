@@ -12,6 +12,7 @@ func run(root: Node):
 	check(game.world.protected_nodes.size() == 101,"All 101 protected nodes imported")
 	check(game.world.collider_count == 89,"All 89 authored colliders imported")
 	check(game.world.doors.size() == 3,"Three preserved door pivots")
+	check(game.player.global_position.y >= 0 and game.player.camera.global_position.y >= 1.6,"Initial view is above the floor at authored foot-level spawn")
 	check(game.equipment.screen_bindings > 0,"Actual monitor surfaces bound")
 	check(game.equipment.leds.size() > 0,"Actual server LED materials bound")
 	var m = game.missions
@@ -24,7 +25,10 @@ func run(root: Node):
 	m.apply_answer(1)
 	m.apply_port("443",false)
 	m.apply_port("8080",false)
+	check(game.ui.recheck_notice.visible and game.ui.recheck_notice.text.contains("자료 서버"),"Tool banner names E recheck destination")
+	check(game.world.devices.INTERACT_ServerRack.placard.text.contains("이전 관찰 만료"),"Physical placard agrees with tool banner")
 	m.inspect("INTERACT_ServerRack")
+	check(game.ui.observation_status.text.contains("문제 남음") and game.ui.observation_text.text.contains("자료 열람 불가"),"Structured field card shows wrong-defense impact")
 	m.run_command("verify")
 	check(not m.progress().verified,"Wrong defense must fail when HTTPS is blocked")
 	m.apply_port("443",true)

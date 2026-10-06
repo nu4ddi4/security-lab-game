@@ -39,8 +39,12 @@ jobs:
           key: native-import-4.7.2-${{ runner.os }}-${{ hashFiles('godot/assets/**', 'godot/project.godot') }}
           restore-keys: native-import-4.7.2-${{ runner.os }}-
       - name: Build and validate native EXE
+        id: native-exe
         shell: pwsh
-        run: ./scripts/godot-build.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE
+        run: |
+          ./scripts/godot-build.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "exe_bytes=$((Get-Item -LiteralPath 'godot/builds/Windows/SecurityLab.exe').Length)" >> $env:GITHUB_OUTPUT
       - name: Native scene binding smoke
         shell: pwsh
         run: |
@@ -54,8 +58,23 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
       - uses: actions/upload-artifact@v4
+        id: native-artifact
         with:
           name: SecurityLab-Native-Windows-x64
           path: godot/builds/Windows/SecurityLab.exe
           if-no-files-found: error
           retention-days: 14
+      - name: Native artifact summary
+        shell: pwsh
+        env:
+          EXE_BYTES: ${{ steps.native-exe.outputs.exe_bytes }}
+          ARTIFACT_URL: ${{ steps.native-artifact.outputs.artifact-url }}
+        run: |
+          @"
+          ### Native Windows test build
+          [SecurityLab-Native-Windows-x64]($env:ARTIFACT_URL)
+
+          Contains SecurityLab.exe ($env:EXE_BYTES bytes), with an embedded PCK.
+          Native engine and scene checks passed. No Chrome or Python is needed to play.
+          This workflow does not create a GitHub release or tag.
+          "@ >> $env:GITHUB_STEP_SUMMARY
