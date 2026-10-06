@@ -1,22 +1,24 @@
 name: Godot Native Windows
 on:
+  workflow_call:
   workflow_dispatch:
-  push:
-    paths: ['godot/**', 'scripts/godot-*', 'scripts/prototype-*', '.github/workflows/godot-native.yml']
-  pull_request:
-    paths: ['godot/**', 'scripts/godot-*', 'scripts/prototype-*', '.github/workflows/godot-native.yml']
 permissions:
   contents: read
-concurrency:
-  group: godot-native-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
 jobs:
   native:
     runs-on: windows-latest
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch native and baseline runtime only
+      - name: Require a native project on the selected branch
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'godot/project.godot')) { throw 'Select a branch containing the Godot project.' }
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs/objects
+          key: native-lfs-${{ hashFiles('godot/assets/models/*.glb', 'assets/models/security_lab.glb') }}
+      - name: Fetch native and baseline runtime
         shell: pwsh
         run: git lfs pull --include="godot/assets/models/Interior_07_Godot.glb,assets/models/security_lab.glb" --exclude=""
       - uses: actions/setup-node@v4
@@ -25,27 +27,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - uses: chickensoft-games/setup-godot@v2
+      - uses: ./.github/actions/godot-setup
         with:
-          version: 4.7.2
-          use-dotnet: false
-          include-templates: true
-      - name: Select Windows console executable
-        shell: pwsh
-        run: |
-          # setup-godot creates a hard-link alias to the GUI binary on Windows.
-          # Use the installed wrapper directly; a hard link has no target path.
-          $godotConsole = Join-Path $env:USERPROFILE 'godot/Godot_v4.7.2-stable_win64_console.exe'
-          # The action caches the GUI file and templates, omitting its wrapper.
-          # Restore the small editor archive only when that companion is absent.
-          if (-not (Test-Path -LiteralPath $godotConsole -PathType Leaf)) {
-            $editorArchive = Join-Path $env:RUNNER_TEMP 'Godot-4.7.2-win64.zip'
-            Invoke-WebRequest 'https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip' -OutFile $editorArchive
-            Expand-Archive -LiteralPath $editorArchive -DestinationPath (Join-Path $env:USERPROFILE 'godot') -Force
-          }
-          if (-not (Test-Path -LiteralPath $godotConsole -PathType Leaf)) { throw "Godot console wrapper missing: $godotConsole" }
-          "SECURITY_LAB_GODOT_CONSOLE=$godotConsole" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Validate authored baseline and build native EXE
+          export: 'true'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            godot/.godot
+            godot/assets/models/Interior_07_Godot_*.jpg
+            godot/assets/models/Interior_07_Godot_*.png
+          key: native-import-4.7.2-${{ runner.os }}-${{ hashFiles('godot/assets/**', 'godot/project.godot') }}
+          restore-keys: native-import-4.7.2-${{ runner.os }}-
+      - name: Build and validate native EXE
         shell: pwsh
         run: ./scripts/godot-build.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE
       - name: Native scene binding smoke
@@ -53,12 +46,16 @@ jobs:
         run: |
           & $env:SECURITY_LAB_GODOT_CONSOLE --headless --path godot -- --qa
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Investigation prototype scenarios and dummy scene
+      - name: Investigation prototype
         shell: pwsh
-        run: python scripts/prototype-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
+        run: |
+          if (Test-Path 'godot/prototype/main.tscn') {
+            python scripts/prototype-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: SecurityLab-Native-Windows-x64
           path: godot/builds/Windows/SecurityLab.exe
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 14

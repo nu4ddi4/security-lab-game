@@ -1,6 +1,6 @@
 # 개발 규칙
 
-- 웹 학습 게임의 기획은 `docs/PLAN.md`, Godot 조사 프로토타입의 구현 계획은 `docs/INVESTIGATION_PROTOTYPE.md`이다.
+- 웹 학습 게임의 기획은 `docs/PLAN.md`이다. Godot 프로젝트가 있는 브랜치의 조사 계획은 `docs/INVESTIGATION_PROTOTYPE.md`이다. CI 운영은 `docs/CI.md`를 따른다.
 - 실제 IP·URL로 요청하지 않는다. 명령어는 허용 목록만 해석한다.
 - `eval`, `Function`, 사용자 입력 기반 `fetch`, 소켓, 셸 실행을 도입하지 않는다.
 - 웹 동적 출력에는 `textContent`를 사용한다. 개인 파일·실제 비밀번호는 받지 않는다.
@@ -21,9 +21,9 @@
 | 웹 엔진·저장·장면 로직 | `npm test` |
 | 웹 서버·실행기 | `npm run test:server` |
 | 웹 UI·CSS·입력·브라우저 시작 | 관련 Playwright 검사만 `npm run test:e2e -- --grep "검사 이름"`으로 실행. 로직·서버도 바꾸면 해당 검사 추가 |
-| 자산·패키징·CI | 변경한 자산 검사·빌드·워크플로 검증. Godot 보호 지오메트리 변경은 `node scripts/godot-asset-test.mjs`로 확인 |
+| 자산·패키징·CI | 변경한 자산 검사·빌드·워크플로 검증. CI 정책은 `python -m unittest discover -s tests/ci`, YAML은 actionlint로 확인. Godot 보호 지오메트리 변경은 `node scripts/godot-asset-test.mjs`로 확인 |
 
-- Godot는 **4.7.2 stable**을 사용한다. CLI가 PATH에 없으면 실행 파일 경로를 사용한다. 프로토타입 검사에는 `npm run test:prototype -- --godot "실행 파일 경로"`를 쓸 수 있다.
+- Godot 명령은 프로젝트가 있는 브랜치에서 실행한다. Godot는 **4.7.2 stable**을 사용한다. CLI가 PATH에 없으면 실행 파일 경로를 사용한다. 프로토타입 검사에는 `npm run test:prototype -- --godot "실행 파일 경로"`를 쓸 수 있다.
 - Godot·의존성·가져온 자산 캐시를 재사용한다. 버전·의존성·자산 변경이나 캐시 오류가 없으면 다운로드·전체 가져오기를 반복하지 않는다.
 - 웹 공식 E2E는 **Windows 10/11 + 설치된 최신 Google Chrome Desktop**이다. 해당 환경이 없으면 실행 가능한 검사만 수행하고 미검증 항목을 명시한다. 같은 환경 오류를 반복 실행하지 않는다.
 - 개발 중에는 느린 전체 CI가 끝날 때까지 매번 기다리지 않는다. 현재 커밋의 통과한 CI 검사를 로컬에서 중복 실행하지 않는다.
