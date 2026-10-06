@@ -34,7 +34,8 @@ def main():
     source = Path(args.project).resolve()
     with tempfile.TemporaryDirectory(prefix='security-lab-ci-') as temporary:
         target = Path(temporary)
-        for name in ['scripts/missions.gd', 'scripts/save_manager.gd', 'scripts/player.gd', 'tests/unit.gd']:
+        for name in ['scripts/missions.gd', 'scripts/save_manager.gd', 'scripts/player.gd', 'tests/unit.gd',
+                     'scripts/diagnostics.gd', 'scripts/diagnostics_serializer.gd', 'tests/diagnostics_test.gd']:
             destination = target / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source / name, destination)
@@ -52,6 +53,7 @@ def main():
         (target / 'project.godot').write_text('config_version=5\n[application]\nconfig/name="Security Lab CI"\n' + scene + '[physics]\ncommon/physics_ticks_per_second=120\n', encoding='utf-8')
         run(args.godot, target, ['--editor', '--import'])
         run(args.godot, target, ['--script', 'res://tests/unit.gd'], 'NATIVE_UNIT')
+        run(args.godot, target, ['--script', 'res://tests/diagnostics_test.gd'], 'NATIVE_DIAGNOSTICS')
         if prototype:
             run(args.godot, target, ['--script', 'res://prototype/tests/unit.gd'], 'INVESTIGATION_UNIT')
             run(args.godot, target, ['--', '--prototype-smoke'], 'INVESTIGATION_SMOKE')

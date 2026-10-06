@@ -18,9 +18,21 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Protected native geometry changed" }
     $target = [System.IO.Path]::GetFullPath($Output, $repoRoot)
     New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
-    $exportLog = & $Godot --headless --path godot --export-release "Windows Native" $target 2>&1
+    # Stamp only the commit. A future updater's version/channel metadata survives.
+    # Restore source metadata even when export fails; runtime gets the exact HEAD.
+    $nativeInfoPath = Join-Path $repoRoot 'godot/resources/build_info.json'
+    $nativeInfoOriginal = [System.IO.File]::ReadAllBytes($nativeInfoPath)
+    try {
+        $nativeBuildInfo = Get-Content -LiteralPath $nativeInfoPath -Raw | ConvertFrom-Json
+        $nativeCommit = (& git rev-parse HEAD).Trim()
+        if ($LASTEXITCODE -ne 0 -or $nativeCommit -notmatch '^[0-9a-f]{40}$') { throw 'Cannot identify native build commit' }
+        $nativeBuildInfo.commit = $nativeCommit
+        [System.IO.File]::WriteAllText($nativeInfoPath, ($nativeBuildInfo | ConvertTo-Json -Depth 8), [System.Text.UTF8Encoding]::new($false))
+        $exportLog = & $Godot --headless --path godot --export-release "Windows Native" $target 2>&1
+        $nativeExportExit = $LASTEXITCODE
+    } finally { [System.IO.File]::WriteAllBytes($nativeInfoPath, $nativeInfoOriginal) }
     $exportLog | Write-Output
-    if ($LASTEXITCODE -ne 0 -or ($exportLog | Select-String 'ERROR:|SCRIPT ERROR:') -or -not (Test-Path -LiteralPath $target)) { throw "Windows native export failed" }
+    if ($nativeExportExit -ne 0 -or ($exportLog | Select-String 'ERROR:|SCRIPT ERROR:') -or -not (Test-Path -LiteralPath $target)) { throw "Windows native export failed" }
     $binary = Get-Item -LiteralPath $target -ErrorAction Stop
     if ($binary.PSIsContainer -or $binary.Length -le 0) { throw "Native Windows EXE missing or empty" }
     Write-Host "Native EXE: $($binary.Length) bytes"

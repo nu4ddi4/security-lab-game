@@ -95,6 +95,7 @@ func show_menu():
 	var sfx = slider(body,"환경음 / 효과음",values.sfx,0,1,.05)
 	var sensitivity = slider(body,"마우스 감도",values.sensitivity,.0005,.004,.0001)
 	var fov = slider(body,"시야각",values.fov,60,90,1)
+	diagnostics_controls(body)
 	game.ui.button(body,"적용하고 저장",func():
 		values = {"resolution":resolution.selected,"fullscreen":fullscreen.button_pressed,"vsync":vsync.button_pressed,"quality":quality.selected,"master":master.value,"sfx":sfx.value,"sensitivity":sensitivity.value,"fov":fov.value}
 		apply()
@@ -102,6 +103,37 @@ func show_menu():
 		if file != null: file.store_string(JSON.stringify(values,"\t")); file.close()
 		panel.queue_free(); panel = null)
 	panel.popup_centered()
+
+func diagnostics_controls(body: VBoxContainer):
+	game.ui.label(body,"진단 / 지원",22)
+	game.ui.wrapped_label(body,"이 기기에서만 수집합니다. 저장 원문·계정·네트워크 주소·자유 형식 로그는 포함하지 않습니다. 공유 전에 ZIP 내용을 확인하세요.",16,600)
+	var status = RichTextLabel.new()
+	status.fit_content = true
+	status.selection_enabled = true
+	status.custom_minimum_size.y = 50
+	body.add_child(status)
+	var buttons = HBoxContainer.new()
+	buttons.add_theme_constant_override("separation",10)
+	body.add_child(buttons)
+	var copy = game.ui.button(buttons,"진단 정보 복사",func(): status.text = game.diagnostics.copy_information().message)
+	var package = game.ui.button(buttons,"지원 패키지 만들기",func(): status.text = game.diagnostics.create_package().message)
+	var choose = game.ui.button(body,"다른 폴더에 지원 패키지 저장…",func():
+		var dialog = FileDialog.new()
+		dialog.title = "지원 패키지를 저장할 폴더"
+		dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
+		dialog.access = FileDialog.ACCESS_FILESYSTEM
+		dialog.dir_selected.connect(func(path):
+			if is_instance_valid(status): status.text = game.diagnostics.create_package(path).message
+			dialog.queue_free())
+		dialog.canceled.connect(func(): dialog.queue_free())
+		panel.add_child(dialog)
+		dialog.popup_centered(Vector2i(800,500)))
+	game.ui.button(body,"생성 폴더 열기",func():
+		if game.diagnostics.last_package.is_empty(): status.text = "먼저 지원 패키지를 만드세요."
+		elif OS.shell_open(game.diagnostics.last_package.get_base_dir()) != OK: status.text = "폴더를 열지 못했습니다. 위의 경로를 사용하세요.")
+	if OS.get_name() != "Windows":
+		for control in [copy,package,choose]: control.disabled = true
+		status.text = "Windows Native 전용 기능입니다."
 
 func slider(body: Node, title: String, value: float, low: float, high: float, step: float) -> HSlider:
 	game.ui.label(body,title,17)
