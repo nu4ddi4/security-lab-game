@@ -312,3 +312,9 @@ export function worldDevices(state) {
     return [device,{label:DEVICES[device].label,text,tone,objective:action.device===device,action:action.device===device?`${['tool','verify'].includes(action.mode)?'F':'E'} · ${action.mode==='recheck'?'재확인':action.mode==='verify'?'최종 검증':action.mode==='tool'?deviceTool(id,device).label:'현장 조사'}`:'',zone:DEVICES[device].zone}];
   }));
 }
+
+
+export function equipmentStatus(state) {
+ const p=progress(state),m=MISSIONS[state.active],r=loginSimulation(state.login);
+ return {mission:m.id,title:m.title,active:state.active,ports:{...state.ports},login:{minLength:state.login.minLength,normal:r.normal,limited:r.repeatedBlocked,commonAllowed:COMMON_PASSWORDS.filter(v=>accepted(v,state.login)).length,adequate:state.login.minLength>=15&&state.login.blockCommon&&state.login.limitAttempts},hashes:p.hashes.map(({name,matches})=>({name,matches})),restored:state.files['budget.csv']===ORIGINAL_FILES['budget.csv'],changed:p.observations.changed,inspected:Boolean(p.spatial?.inspected.length),rechecked:Boolean(p.spatial?.rechecked),verified:p.verified};
+}

@@ -36,3 +36,10 @@ python run.py
 3D 일시정지 화면에서 Native/Ultra/Quality/Balanced/Performance 화질을 선택합니다. 기본 Quality는 75%로 3D만 렌더링하고 HTML은 원래 해상도를 유지합니다. F3으로 성능 정보를 확인합니다. [런타임·CI 최적화](docs/CHROME_RUNTIME.md).
 
 [구조](docs/PROJECT_REVIEW.md) · [계획](docs/PLAN.md) · [안정화 계획](docs/STABILIZATION_PLAN.md) · [다음 작업](docs/ROADMAP.md) · [검증](docs/VALIDATION.md) · [배포](docs/DEPLOYMENT.md)
+
+
+v0.7.0은 회사형 실내 조명·재질과 실제 장비의 시각 피드백을 개선합니다.
+SOC 화면, 네트워크 콘솔과 랙 표시등은 내장 미션 상태를 읽기 전용으로
+표시합니다. 보이는 결과가 단서 기록이나 최종 검증을 대신하지 않으며
+E 현장 조사 / F 상세 도구와 설정 후 재확인 흐름은 그대로입니다.
+[제작·검증 구조](docs/EXPERIENCE_07.md).

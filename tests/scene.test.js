@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { Matrix4, Quaternion, Vector3, Group, Mesh, BoxGeometry, MeshStandardMaterial, MeshPhysicalMaterial, Raycaster, MeshBasicMaterial, DoubleSide, Box3,PerspectiveCamera,PlaneGeometry } from '../vendor/three/build/three.module.js';
+import {createDeviceVisuals} from '../src/device-visuals.js';
 import {Interaction} from '../src/interaction3d.js';
 import { MeshoptDecoder } from '../vendor/three/examples/jsm/libs/meshopt_decoder.module.js';
 import { batchStatic, isSoftwareRenderer } from '../src/batch3d.js';
@@ -123,7 +124,8 @@ test('Corporate compressed asset decodes with exact protected geometry and full 
   assert.equal(modelReport.triangles,triangles);
   assert.ok(gltf.asset.extras.runtimeExport.masterPreserved);
   assert.equal(gltf.asset.extras.runtimeExport.baseErrorMetres,.0012);
-  assert.equal(modelReport.embeddedImages,52);
+  assert.equal(modelReport.embeddedImages,gltf.images.length);
+  assert.ok(modelReport.embeddedImages<=60,'bounded embedded texture budget');
   assert.ok(gltf.extensionsRequired.includes('EXT_meshopt_compression'));
 });
 
@@ -277,4 +279,20 @@ test('runtime device displays obey wall occlusion, reach, hidden state and origi
  assert.equal(interaction.findTarget(),null,'a wall blocks the display');blocker.visible=false;
  assert.equal(interaction.findTarget(),anchor);interaction.interact();assert.deepEqual(found,['INTERACT_AdminPC']);interaction.tool();assert.equal(opened[0][0],'terminal');
  panel.visible=false;assert.equal(interaction.findTarget(),null);panel.visible=true;camera.position.z=3;assert.equal(interaction.findTarget(),null,'display does not extend reach');
+});
+
+
+test('live device materials bind imported rack primitives, preserve geometry/anchors, update actual wrong-defense state and dispose',()=>{
+ const model=new Group(),root=new Group();root.name='INTERACT_AdminPC';root.userData.interaction='admin';model.add(root);
+ const screen=new Mesh(new PlaneGeometry(2.2,1.23),new MeshStandardMaterial());screen.name='CORP_SOC_Status_Display';screen.material.name='CORP_Display_overview';root.add(screen);
+ const rack=new Group();rack.name='ServerRack_01';model.add(rack);
+ const led=new Mesh(new BoxGeometry(.02,.01,.01),new MeshStandardMaterial());led.material.name='LAB_LED';led.name='ServerRack_01_7';rack.add(led);
+ const positions=Array.from(screen.geometry.attributes.position.array),matrix=root.matrix.clone(),original=led.material;
+ const logs=[],canvasFactory=()=>({width:0,height:0,getContext:()=>new Proxy({fillText:t=>logs.push(t)},{get:(o,k)=>o[k]??(()=>{}),set:(o,k,v)=>(o[k]=v,true)})});
+ const v=createDeviceVisuals(model,{canvasFactory});assert.equal(v.screens,1);assert.equal(v.indicators,1);
+ const d={mission:'services',title:'노출된 서비스',active:1,ports:{443:true,8080:true},login:{},hashes:[],verified:false,inspected:false,changed:false,rechecked:false};
+ assert.equal(v.update(d),true);assert.equal(v.update(d),false);assert.ok(logs.some(t=>t.includes('EXPOSED')));
+ const before=led.material.color.getHex();assert.equal(v.update({...d,ports:{443:false,8080:false},changed:true}),true);assert.notEqual(led.material.color.getHex(),before);assert.ok(logs.some(t=>t.includes('UNAVAILABLE')));
+ assert.deepEqual(Array.from(screen.geometry.attributes.position.array),positions);assert.deepEqual(root.matrix.elements,matrix.elements);
+ v.dispose();assert.equal(led.material,original);assert.equal(v.update(d),false);v.dispose();
 });

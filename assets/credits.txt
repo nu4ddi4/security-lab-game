@@ -61,3 +61,5 @@ Corporate Interior 05: project-generated carpet, static contact AO and accessori
 reuses the credited Poly Haven maple veneer, office stationery and chair assets.
 High-resolution authoring master is separate from the 2K runtime export.
 Interior 06 entry/server floor finishes and cleaned frame geometry: project-generated.
+
+Interior 07: original project-generated laminate/fabric/metal roughness, fabric normals, carpet finish, shared desk props and network console laptop. Live equipment screens, office sample graphics and printed procedures are project-authored Canvas graphics. No new external asset sources.

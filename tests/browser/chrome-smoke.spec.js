@@ -72,6 +72,7 @@ test('Windows Chrome: packaged first frame, collision, door, WASD, INTERACT, mis
  await expect(page.locator('#device-observation-next')).toContainText('F');await expect(page.locator('#onboarding-hint')).toBeHidden();
  await expect(page.locator('#device-observation-text')).toContainText('조사 승인서');
  expect((await diagnostics(page)).pointerLocked).toBe(true);expect((await diagnostics(page)).statusPanels).toBe(4);
+ expect((await diagnostics(page)).liveScreens).toBeGreaterThan(30);expect((await diagnostics(page)).liveIndicators).toBeGreaterThan(0);
  await expect(page.locator('#hud-stage')).toContainText('근거 2/2');await page.keyboard.press('KeyF');
  await expect(page.locator('#panel-terminal')).toBeVisible();expect((await diagnostics(page)).pointerLocked).toBe(false);expect((await diagnostics(page)).keyboardCaptured).toBe(false);
  for(const command of ['help','inspect approval']){await page.locator('#command').fill(command);await page.locator('#command').press('Enter');await expect(page.locator('#command')).toBeEnabled();}

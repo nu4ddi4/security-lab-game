@@ -2,7 +2,7 @@ import { MISSIONS, ORIGINAL_FILES } from './missions.js';
 import { initialState, missionId, nextAction, progress, stage, score, runCommand, answerFeedback, accepted, loginSimulation, applyAnswer, applyPort, applyLogin, canRestoreFiles, restoreFile, nextMission, resetMission } from './engine.js';
 import { createSaveSession, CURRENT_SAVE_KEY, SAVE_KEY, BACKUP_KEY, exportGame, importGame, MAX_IMPORT_BYTES } from './storage.js';
 import { publishMission, onToolRequest, onInspectionRequest, publishObservation } from './labbridge.js';
-import {inspectDevice,worldDevices,worldAction,continueWithout3D} from './engine.js';
+import {inspectDevice,worldDevices,worldAction,equipmentStatus,continueWithout3D} from './engine.js';
 import { initSceneView } from './scene-entry.js';
 
 const $ = id => document.getElementById(id);
@@ -208,7 +208,7 @@ function render() {
   publishMission({ id: missionId(state), missionId: missionId(state), active: state.active, title: m.title,
     objective: m.id==='tutorial'?'관제 PC에서 조사 권한을 확인하고 허용된 범위를 선택하세요.':m.objective, nextAction: action.text,
     worldAction:spatialAction.text, objectiveDevice:spatialAction.device, actionMode:spatialAction.mode, evidenceTotal:m.evidence.length, evidenceFound:m.evidence.filter(key=>p.clues.includes(key)).length,
-    stage: stage(state), score: score(state), clues: p.clues.length, busy, devices:worldDevices(state) });
+    stage: stage(state), score: score(state), clues: p.clues.length, busy, equipment:equipmentStatus(state), devices:worldDevices(state) });
   const commands = m.quickCommands;
   $('quick-commands').replaceChildren(...commands.map(command => {
     const button = el('button', command); button.id = 'quick-' + m.id + '-' + command.replaceAll(' ', '-'); button.disabled = busy;

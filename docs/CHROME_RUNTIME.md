@@ -4,8 +4,8 @@
 
 ## 자산과 기능
 
-아래 크기/triangle 최적화 비교는 v0.5.0 당시 기록이다. 현재 v0.6.1은
-Interior 06의 41,775,284-byte runtime GLB를 그대로 사용한다. 현장 상태판은
+아래 크기/triangle 최적화 비교는 v0.5.0 당시 기록이다. v0.6.1은 Interior 06의 41,775,284-byte GLB를 사용했다.
+현재 v0.7.0은 별도 Interior 07에서 40,457,480-byte GLB를 만든다. 현장 상태판은
 최대 4 calls/8 triangles와 512×256 CanvasTexture 4개만 추가하며 새 pass나
 조명을 만들지 않는다. 상태 변경 시 temporal history를 초기화한다.
 동작/저장/검증은 [SPATIAL_MISSIONS.md](SPATIAL_MISSIONS.md)를 참고한다.
@@ -37,3 +37,5 @@ MainOffice / SOC / ServerRoom / Network / Training / Forensics / Exterior로 구
 이제 Windows 하나에서 runtime LFS만 받으며 Blender master를 다운로드하지 않는다. npm/pip cache와 runner에 설치된 Chrome을 사용한다. core Node unit + Python server → PyInstaller → source-free native launcher/port/single-instance/version/restart → Chrome의 한 번의 3D first frame, 실제 WASD/충돌/문/관리 PC, tutorial와 save 복원 → artifact 순서다. 장거리 5개 장비 순회, 반복 scene startup/context/door E2E와 cross-browser·mobile 조합을 제거했다. 2D의 빠른 회귀는 로컬 `npm run check`에 남겼다. CI는 겹치는 동일 branch 실행을 취소한다. 실제 Actions 측정 결과는 PR와 별도 검증 보고서에 기록한다.
 
 실행 환경마다 GPU가 달라 성능 수치를 일반화하지 않는다. 로컬 benchmark는 RTX 5060 Ti / D3D11 / Chrome 154.0.8037.93 / 1920×1080 기준이다. CI WARP는 기능 확인용이며 실제 GPU FPS의 근거가 아니다. 제공된 도시 이미지의 별도 배포 권리는 프로젝트 소유자가 확인해야 한다.
+
+장비의 실제 화면/LED 표시와 공유 그래픽은 [EXPERIENCE_07.md](EXPERIENCE_07.md)에 설명한다.

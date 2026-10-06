@@ -22,7 +22,7 @@ const requiredFiles = [
 const optionalFiles = [
   'assets/credits.txt',
   'src/collision.js', 'src/player3d.js', 'src/interaction3d.js',
-  'src/scene3d.js', 'src/batch3d.js', 'src/scene3d.css', 'src/world-status.js',
+  'src/scene3d.js', 'src/batch3d.js', 'src/scene3d.css', 'src/world-status.js', 'src/device-visuals.js',
   'src/city3d.js', 'src/visibility3d.js', 'src/upscale3d.js',
   'assets/environment/city-sunset.png',
   'assets/models/security_lab.glb',
