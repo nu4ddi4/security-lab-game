@@ -10,7 +10,7 @@ Godot **4.7.2 stable**에서 `godot/project.godot`을 열고 F5를 누릅니다.
 
 Windows 테스트 빌드는 `Investigation prototype Windows`의 Actions 아티팩트로 제공합니다. `SecurityLab-Prototype-0.1.0-커밋-Windows-x64.exe`만 실행하면 됩니다. 더미 환경·사건 자료·한국어 폰트를 EXE에 포함하며 기존 맵·웹·가이드는 포함하지 않습니다. 이 빌드는 OpenGL 호환 렌더러를 사용합니다.
 
-빌드는 수동 실행 또는 이 브랜치의 `.github/workflows/godot-prototype.yml` 변경 시에만 실행합니다. 일반 개발 push에서는 빠른 검사만 유지합니다. 로컬 Windows 빌드 명령은 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로"`입니다.
+이 브랜치의 `.github/workflows/godot-prototype.yml`을 변경하면 빌드를 실행합니다. 일반 개발 push에서는 빠른 검사만 유지합니다. 같은 커밋은 Actions에서 재실행할 수 있습니다. 로컬 Windows 빌드 명령은 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로"`입니다.
 
 - WASD·마우스: 이동·시점, Shift: 달리기, C: 앉기, Space: 점프.
 - E: 외관 확인. 원본 기록을 확보하지 않습니다.
@@ -67,9 +67,9 @@ python scripts/prototype-test.py --godot "C:/path/to/Godot_v4.7.2-stable_win64_c
 
 새 시나리오 8개와 더미 장면의 이동·실제 장비 레이캐스트·UI 정지·저장 검사를 실행합니다. 매 시나리오 전이에서 입력 상태 불변성과 저장 복원을 확인합니다. Windows Native CI에도 같은 검사를 연결했습니다.
 
-로컬 기존 웹 unit 72개와 서버 검사 26개는 통과했습니다. `npm run check`의 Chrome E2E는 현재 Linux 환경에 Google Chrome이 없어 브라우저 실행에 실패했습니다. Windows 실제 플레이와 EXE 검증은 아직 확인하지 않았습니다.
+Windows 프로토타입 0.1.0 빌드 `1339e19`에서 시나리오 8개·433개 검증과 더미 장면 검사가 통과했습니다. EXE만 있는 폴더에서도 headless 실행·상호작용·이동·저장 검사를 두 번 통과했습니다. 실제 화면·마우스 조작의 사용성은 직접 플레이로 확인합니다.
 
-프로토타입 전용 빌드는 임시 프로젝트에서 규칙·더미 장면을 검사합니다. 내보내기 후 임시 소스를 삭제하고 EXE만 별도 폴더로 복사해 Windows headless 실행·장비 상호작용·이동·저장 검사를 두 번 실행합니다. 실제 화면·마우스 조작의 사용성은 직접 플레이로 확인합니다.
+프로토타입 전용 빌드는 임시 프로젝트에서 규칙·더미 장면을 검사합니다. 내보내기 후 임시 소스를 삭제하고 EXE만 별도 폴더로 복사해 검증합니다.
 
 ## 다음 작업 순서
 
