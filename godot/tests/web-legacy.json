@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "active": 3,
+  "ports": {
+    "443": true,
+    "8080": false
+  },
+  "login": {
+    "minLength": 15,
+    "blockCommon": true,
+    "limitAttempts": true
+  },
+  "restored": true,
+  "hashComputed": true,
+  "missions": [
+    {
+      "clues": [
+        "help",
+        "approval"
+      ],
+      "answer": 0,
+      "hint": 0,
+      "verified": true,
+      "selectedFile": null,
+      "observations": {
+        "changed": false,
+        "before": null,
+        "after": null
+      },
+      "spatial": {
+        "inspected": [
+          "INTERACT_AdminPC"
+        ],
+        "rechecked": false
+      }
+    },
+    {
+      "clues": [
+        "scan",
+        "port-443",
+        "port-8080",
+        "rescan"
+      ],
+      "answer": 1,
+      "hint": 0,
+      "verified": true,
+      "selectedFile": null,
+      "observations": {
+        "changed": true,
+        "before": {
+          "443": true,
+          "8080": true
+        },
+        "after": {
+          "443": true,
+          "8080": false
+        }
+      },
+      "spatial": {
+        "inspected": [
+          "INTERACT_ServerRack"
+        ],
+        "rechecked": true
+      }
+    },
+    {
+      "clues": [
+        "login"
+      ],
+      "answer": 2,
+      "hint": 0,
+      "verified": true,
+      "selectedFile": null,
+      "observations": {
+        "changed": true,
+        "before": {
+          "minLength": 6,
+          "blockCommon": false,
+          "limitAttempts": false
+        },
+        "after": {
+          "minLength": 15,
+          "blockCommon": true,
+          "limitAttempts": true
+        }
+      },
+      "spatial": {
+        "inspected": [
+          "INTERACT_AdminPC"
+        ],
+        "rechecked": true
+      }
+    },
+    {
+      "clues": [
+        "baseline",
+        "hash",
+        "mismatch"
+      ],
+      "answer": 1,
+      "hint": 0,
+      "verified": true,
+      "selectedFile": "budget.csv",
+      "observations": {
+        "changed": true,
+        "before": {
+          "matches": {
+            "notice.txt": true,
+            "budget.csv": false,
+            "members.txt": true
+          }
+        },
+        "after": {
+          "matches": {
+            "notice.txt": true,
+            "budget.csv": true,
+            "members.txt": true
+          }
+        }
+      },
+      "spatial": {
+        "inspected": [
+          "INTERACT_FileCabinet",
+          "INTERACT_AdminPC"
+        ],
+        "rechecked": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+name: Godot Native Windows
+on:
+  workflow_dispatch:
+  push:
+    paths: ['godot/**', 'scripts/godot-*', '.github/workflows/godot-native.yml']
+  pull_request:
+    paths: ['godot/**', 'scripts/godot-*', '.github/workflows/godot-native.yml']
+permissions:
+  contents: read
+concurrency:
+  group: godot-native-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  native:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch native and baseline runtime only
+        shell: pwsh
+        run: git lfs pull --include="godot/assets/models/Interior_07_Godot.glb,assets/models/security_lab.glb" --exclude=""
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: true
+      - name: Validate authored baseline and build native EXE
+        shell: pwsh
+        run: ./scripts/godot-build.ps1 -Godot godot
+      - name: Native scene binding smoke
+        shell: pwsh
+        run: |
+          godot --headless --path godot -- --qa
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecurityLab-Native-Windows-x64
+          path: godot/builds/Windows/SecurityLab.exe
+          if-no-files-found: error
+          retention-days: 90
