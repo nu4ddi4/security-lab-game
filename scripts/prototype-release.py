@@ -1,5 +1,6 @@
 """Publish a verified prototype artifact as a separate, non-latest prerelease."""
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -15,11 +16,11 @@ def main():
     repository = os.environ['GITHUB_REPOSITORY']
     run_id = os.environ['PROTOTYPE_RUN_ID']
     sha = os.environ['PROTOTYPE_BUILD_SHA']
-    version = os.environ['PROTOTYPE_BETA_VERSION']
+    version = os.environ['PROTOTYPE_VERSION']
     if not run_id.isdecimal() or not re.fullmatch(r'[0-9a-f]{40}', sha):
         raise ValueError('Invalid verified build reference')
-    if not re.fullmatch(r'\d+\.\d+\.\d+-beta\.\d+', version):
-        raise ValueError('Use an explicit prototype beta version')
+    if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        raise ValueError('Use a prototype version in X.Y.Z form')
     prefix = 'repos/' + repository
     run = github(prefix + '/actions/runs/' + run_id)
     if (run.get('status') != 'completed' or run.get('conclusion') != 'success'
@@ -39,11 +40,22 @@ def main():
             or matching[0].get('size_in_bytes', 0) <= 0
             or matching[0].get('workflow_run', {}).get('head_sha', sha) != sha):
         raise ValueError('Prototype artifact is missing, expired or from another commit')
-    tag = 'prototype-v' + version
-    if github(prefix + '/releases/tags/' + tag, missing_ok=True) is not None:
-        raise ValueError('This beta already exists; keep it or choose the next beta version')
-    if github(prefix + '/git/ref/tags/' + tag, missing_ok=True) is not None:
-        raise ValueError('This beta tag already exists')
+    tag = 'SecurityLab-proto-' + version
+    release = github(prefix + '/releases/tags/' + tag, missing_ok=True)
+    migrate = os.environ.get('PROTOTYPE_MIGRATE_FROM_TAG', '')
+    if release is None and migrate:
+        if not re.fullmatch(r'prototype-v\d+\.\d+\.\d+-beta\.\d+', migrate):
+            raise ValueError('Unsupported old prototype tag')
+        release = github(prefix + '/releases/tags/' + migrate)
+    if release:
+        if not release.get('prerelease') or release.get('draft'):
+            raise ValueError('Only a published prototype prerelease can be updated')
+        original_ref = github(prefix + '/git/ref/tags/' + release['tag_name'])
+        if original_ref['object']['sha'] != sha:
+            raise ValueError('Existing prototype release points to another build')
+    reference = github(prefix + '/git/ref/tags/' + tag, missing_ok=True)
+    if reference and reference['object']['sha'] != sha:
+        raise ValueError('Prototype tag already points to another build')
     with tempfile.TemporaryDirectory(prefix='prototype-beta-') as temporary:
         directory = Path(temporary)
         download = directory / 'download'
@@ -54,7 +66,7 @@ def main():
         digest = hashlib.sha256(original.read_bytes()).hexdigest()
         if checksum.read_text(encoding='utf-8').strip() != digest + '  ' + original.name:
             raise ValueError('Downloaded EXE differs from the verified artifact checksum')
-        exe = directory / ('SecurityLab-Prototype-' + version + '-Windows-x64.exe')
+        exe = directory / (tag + '.exe')
         shutil.copyfile(original, exe)
         archive = exe.with_suffix('.zip')
         with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as bundle:
@@ -65,15 +77,38 @@ def main():
         notes = directory / 'release-notes.md'
         notes.write_text('Windows 조사 프로토타입. EXE만 실행하면 됩니다.\n\n'
                          '5~7일차 상세 조사와 정식 결말은 개발 중입니다.\n', encoding='utf-8')
-        subprocess.run(['gh', 'release', 'create', tag, str(exe), str(archive), str(sums),
-                        '--repo', repository, '--target', sha, '--prerelease', '--latest=false',
-                        '--title', 'Security Lab Prototype ' + version, '--notes-file', str(notes)], check=True)
+        if release:
+            if reference is None:
+                subprocess.run(['gh', 'api', '--method', 'POST', prefix + '/git/refs',
+                                '-f', 'ref=refs/tags/' + tag, '-f', 'sha=' + sha, '--silent'], check=True)
+            subprocess.run(['gh', 'release', 'upload', release['tag_name'], str(exe), str(archive), str(sums),
+                            '--repo', repository, '--clobber'], check=True)
+            payload = directory / 'release-update.json'
+            payload.write_text(json.dumps({'tag_name':tag, 'name':tag, 'prerelease':True,
+                                           'make_latest':'false'}), encoding='utf-8')
+            subprocess.run(['gh', 'api', '--method', 'PATCH', prefix + '/releases/' + str(release['id']),
+                            '--input', str(payload), '--silent'], check=True)
+            updated = github(prefix + '/releases/tags/' + tag)
+            expected = {exe.name, archive.name, sums.name}
+            uploaded = {item['name'] for item in updated['assets'] if item.get('state') == 'uploaded'}
+            if not expected <= uploaded:
+                raise ValueError('Renamed prototype files were not fully uploaded')
+            if migrate:
+                old_stem = 'SecurityLab-Prototype-' + migrate.removeprefix('prototype-v') + '-Windows-x64'
+                for item in updated['assets']:
+                    if item['name'] in {old_stem + '.exe', old_stem + '.zip'}:
+                        subprocess.run(['gh', 'api', '--method', 'DELETE',
+                                        prefix + '/releases/assets/' + str(item['id']), '--silent'], check=True)
+        else:
+            subprocess.run(['gh', 'release', 'create', tag, str(exe), str(archive), str(sums),
+                            '--repo', repository, '--target', sha, '--prerelease', '--latest=false',
+                            '--title', tag, '--notes-file', str(notes)], check=True)
     release = github(prefix + '/releases/tags/' + tag)
     if not release.get('prerelease') or release.get('draft'):
         raise ValueError('The beta must be a published prerelease')
     print(release['html_url'])
     with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
-        summary.write('[Security Lab Prototype ' + version + '](' + release['html_url'] + ')\n')
+        summary.write('[' + tag + '](' + release['html_url'] + ')\n')
 
 
 if __name__ == '__main__':
