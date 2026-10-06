@@ -10,6 +10,11 @@ var ui: InvestigationUI
 var context = ""
 var blocked_save = false
 var save_timer: Timer
+var targets = {}
+var dialogue_camera_pose: Transform3D
+var dialogue_camera_fov = 72.0
+var dialogue_camera_active = false
+var dialogue_camera_tween: Tween
 
 func _ready():
 	content = InvestigationContent.load_case()
@@ -26,7 +31,7 @@ func _ready():
 	player = LabPlayer.new()
 	player.name = "Player"
 	add_child(player)
-	player.global_position = Vector3(0,.01,5)
+	player.global_position = Vector3(-6,.01,5.6)
 	_build_world()
 	ui = InvestigationUI.new()
 	add_child(ui)
@@ -55,11 +60,31 @@ func _setup_input():
 		InputMap.action_add_event(action,event)
 
 func _use(id: String, kind: String, tool: bool):
-	if kind == "npc": ui.open_messenger(id); return
+	if kind == "npc": ui.open_dialogue(id); return
 	if tool:
 		context = id
 		ui.open_terminal()
 	else: ui.notice(content.case.devices[id].description)
+
+func frame_speaker(id: String):
+	if not targets.has(id): return
+	if not dialogue_camera_active:
+		dialogue_camera_pose = player.camera.global_transform
+		dialogue_camera_fov = player.camera.fov
+		dialogue_camera_active = true
+	if dialogue_camera_tween != null: dialogue_camera_tween.kill()
+	var head = targets[id].global_position + Vector3(0,.55,0)
+	var pose = player.camera.global_transform.looking_at(head,Vector3.UP)
+	dialogue_camera_tween = create_tween().set_parallel(true)
+	dialogue_camera_tween.tween_property(player.camera,"global_transform",pose,.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	dialogue_camera_tween.tween_property(player.camera,"fov",68.0,.25)
+
+func release_speaker():
+	if not dialogue_camera_active: return
+	if dialogue_camera_tween != null: dialogue_camera_tween.kill()
+	player.camera.global_transform = dialogue_camera_pose
+	player.camera.fov = dialogue_camera_fov
+	dialogue_camera_active = false
 
 func dispatch(action: Dictionary) -> Dictionary:
 	if blocked_save:
@@ -90,6 +115,7 @@ func new_game():
 	state = engine.create_state()
 	blocked_save = false
 	context = ""
+	ui.reset_session()
 	ui.sync_memo()
 	ui.refresh()
 	save_now()
@@ -103,14 +129,16 @@ func transfer_file(path: String, exporting: bool):
 	if not store.preserve(): ui.notice(store.error); return
 	state = candidate.state
 	blocked_save = false
+	ui.reset_session()
 	ui.sync_memo()
 	ui.refresh()
 	save_now()
 	ui.notice("사건 진행을 가져왔습니다.")
 
 func _unhandled_input(event):
-	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_TAB and not ui.modal_open:
-		ui.open_tablet()
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_TAB:
+		if ui.mode == "field": ui.open_tablet()
+		elif ui.mode == "tablet": ui.close()
 		get_viewport().set_input_as_handled()
 
 func _notification(what):
@@ -160,10 +188,11 @@ func _target(id: String, kind: String, position: Vector3, text: String):
 	target.collision_mask = 0
 	var shape = CollisionShape3D.new()
 	var box = BoxShape3D.new()
-	box.size = Vector3(1,.9,.4)
+	box.size = Vector3(.7,1.7,.6) if kind == "npc" else Vector3(1,.9,.4)
 	shape.shape = box
 	target.add_child(shape)
 	add_child(target)
+	targets[id] = target
 	target.used.connect(_use)
 	_label(text,position+Vector3(0,.9,0),28)
 

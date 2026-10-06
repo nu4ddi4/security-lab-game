@@ -1,26 +1,115 @@
 extends Node
 
+var capture_directory = ""
+
+func capture(game: InvestigationPrototype, name: String):
+	if capture_directory.is_empty() or DisplayServer.get_name() == "headless": return
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var result = get_viewport().get_texture().get_image().save_png(capture_directory.path_join(name+".png"))
+	if result != OK: push_error("Cannot capture prototype UI: "+error_string(result))
+
 func run(game: InvestigationPrototype):
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--prototype-capture-dir="):
+			capture_directory = argument.trim_prefix("--prototype-capture-dir=")
+			DirAccess.make_dir_recursive_absolute(capture_directory)
 	await get_tree().physics_frame
 	var failures = []
-	if game.player.enabled or not game.ui.modal_open: failures.append("UI freezes movement")
+	if game.player.enabled or game.ui.mode != "briefing": failures.append("New investigation starts with assignment briefing")
+	if game.content.case.briefing.assignment.is_empty(): failures.append("Assignment explains the player's job")
+	await capture(game,"01-briefing")
+	game.ui.close()
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	if not game.player.target is InvestigationTarget or game.player.target.logical_id != "oh": failures.append("First NPC is reachable from spawn")
+	game.ui._process(0)
+	if not game.ui.prompt.text.ends_with("F — 대화"): failures.append("NPC has a contextual interaction hint")
+	var camera_pose = game.player.camera.global_transform
+	game._use("oh","npc",true)
+	await get_tree().create_timer(.3).timeout
+	if game.ui.mode != "dialogue" or game.ui.modal.visible or game.ui.terminal_panel.visible: failures.append("Local dialogue is separate from tablet and terminal")
+	if game.ui.dialogue_panel.size.y >= get_viewport().get_visible_rect().size.y*.5: failures.append("Dialogue leaves the scene visible")
+	if game.player.enabled or not game.dialogue_camera_active: failures.append("Conversation locks movement and frames the speaker")
+	if game.player.camera.global_position.distance_to(camera_pose.origin) > .001: failures.append("Conversation keeps the player's camera position")
+	if not is_equal_approx(game.player.camera.fov,68.0): failures.append("Conversation gently adjusts the camera")
+	game.ui.dialogue_questions.get_child(0).pressed.emit()
+	if "oh_intro" not in game.state.statements or not game.ui.guide_info().title.begins_with("2 / 8"): failures.append("Actual conversation advances the tutorial")
+	await capture(game,"02-dialogue")
+	game.ui.close()
+	if not game.player.camera.global_transform.is_equal_approx(camera_pose): failures.append("Closing dialogue restores the camera")
+	game.dispatch({"type":"dialogue","payload":{"id":"park_intro"}})
 	var initial = game.state.known.duplicate()
 	game._use("server_console","device",false)
-	if game.state.known != initial: failures.append("E never awards evidence")
+	if game.state.known != initial: failures.append("External inspection never awards evidence")
 	game._use("server_console","device",true)
-	if game.context != "server_console" or game.player.enabled: failures.append("F captures context and freezes movement")
-	game.command("inspect account")
-	if "E02" not in game.state.evidence: failures.append("Terminal query awards actual record")
+	if game.context != "server_console" or game.player.enabled or game.ui.mode != "terminal": failures.append("F opens only the current device terminal")
+	game.ui.command_input.text = "status"
+	game.ui.execute_command()
+	var known_before_ls = game.state.known.duplicate()
+	game.ui.command_input.text = "ls"
+	game.ui.execute_command()
+	if not game.ui.terminal.text.contains("account.txt") or game.state.known != known_before_ls: failures.append("Directory lists files without granting unread evidence")
+	if game.engine.parse("cat /etc/passwd",game.context,game.state).type != "invalid": failures.append("Terminal cannot read arbitrary system paths")
+	game.ui.command_input.text = "inspect acc"
+	var key = InputEventKey.new()
+	key.pressed = true
+	key.keycode = KEY_TAB
+	game.ui._terminal_input(key)
+	if game.ui.command_input.text != "inspect account": failures.append("Terminal completes a device command")
+	game.ui.execute_command()
+	if "E02" not in game.state.evidence: failures.append("Terminal query awards the actual record")
+	key.keycode = KEY_UP
+	game.ui._terminal_input(key)
+	if game.ui.command_input.text != "inspect account": failures.append("Terminal recalls command history")
+	game.ui.command_input.text = "logs tasks"
+	game.ui.execute_command()
+	if not game.ui.guide_info().title.begins_with("4 / 8"): failures.append("Server baseline advances the tutorial")
+	var server_output = game.ui.terminal.text
+	if not server_output.contains("sec.ops > status"): failures.append("Terminal shows the session transcript")
+	await capture(game,"03-terminal")
 	game._use("project_pc","device",true)
 	var bad = game.dispatch(game.engine.parse("logs access --task T-17",game.context,game.state))
-	if bad.code != "WRONG_DEVICE": failures.append("Device guard")
+	if bad.code != "WRONG_DEVICE": failures.append("Device command guard remains enforced")
+	game._use("server_console","device",true)
+	if game.ui.terminal.text != server_output: failures.append("Returning to a device preserves its output")
+	game.dispatch({"type":"dialogue","payload":{"id":"han_intro"}})
+	game._use("project_pc","device",true)
+	game.ui.command_input.text = "inspect files"
+	game.ui.execute_command()
+	game._use("seo","npc",true)
+	for child in game.ui.dialogue_questions.get_children():
+		if child is Button and child.text == "유지보수 채널의 이전 제출 보기": failures.append("Messenger-only questions do not appear in local dialogue")
+	game.dispatch({"type":"dialogue","payload":{"id":"seo_intro"}})
+	game.ui.open_tablet(1)
+	game.ui.contact = "seo"
+	game.ui.refresh_messenger()
+	for child in game.ui.messenger.get_children():
+		if child is Button and child.text == "유지보수 채널의 이전 제출 보기": child.pressed.emit(); break
+	if "E11" not in game.state.evidence or "message" not in game.state.known: failures.append("Messenger attachment acquires its own source record")
+	if game.ui.mode != "tablet" or game.ui.dialogue_panel.visible: failures.append("Messenger is a separate asynchronous screen")
+	await capture(game,"04-messenger")
+	game._use("approval_archive","device",true)
+	game.ui.command_input.text = "cat scope.txt"
+	game.ui.execute_command()
+	if not game.ui.guide_info().title.begins_with("8 / 8") or not game.engine.missing_work(game.state).is_empty(): failures.append("First-day tutorial finishes only after required work")
+	game.ui.open_tablet(0)
+	await capture(game,"05-notes")
 	game.ui.close()
-	if not game.player.enabled: failures.append("Close restores movement")
+	if not game.player.enabled: failures.append("Closing the UI restores movement")
+	game.player.global_position = Vector3(0,.01,7)
+	game.player.camera.rotation = Vector3.ZERO
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	game.ui._process(0)
+	if game.ui.prompt.visible: failures.append("Empty field has no permanent control-key list")
 	var start = game.player.global_position
 	Input.action_press("forward")
 	await get_tree().create_timer(.3).timeout
 	Input.action_release("forward")
 	if game.player.global_position.distance_to(start) < .2: failures.append("Dummy scene movement")
+	await capture(game,"06-field")
 	game.player.global_position = Vector3(0,.01,-2)
 	game.player.camera.look_at(Vector3(0,1.2,-3.85))
 	await get_tree().physics_frame
@@ -28,11 +117,11 @@ func run(game: InvestigationPrototype):
 	if not game.player.target is InvestigationTarget or game.player.target.logical_id != "server_console": failures.append("Actual device raycast")
 	else:
 		game.player.tool_requested.emit(game.player.target)
-		if game.context != "server_console": failures.append("Raycast F context captured")
+		if game.context != "server_console" or game.ui.mode != "terminal": failures.append("Raycast F captures only its terminal")
 	game.ui.open_tablet()
 	if game.player.enabled: failures.append("Tablet freezes movement")
 	game.save_now()
-	if not game.store.load_state(game.content).has("state"): failures.append("Separate save loads")
+	if not game.store.load_state(game.content).has("state"): failures.append("Existing save format accepts the new UI flow")
 	var path = game.store.directory.path_join("save.json")
 	var broken = "{broken-prototype-save"
 	var file = FileAccess.open(path,FileAccess.WRITE)

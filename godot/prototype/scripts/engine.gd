@@ -77,7 +77,7 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 	if kind == "invalid": return _result(original,action.get("code","INVALID_ACTION"))
 	if original.ended and kind != "memo": return _result(original,"PROTOTYPE_ENDED")
 	if not payload is Dictionary: return _result(original,"INVALID_ACTION")
-	if kind in ["help","status","checklist","read","backup_disable","backup_enable","index_repair","snapshot","pause","verify_service","verify_search"]:
+	if kind in ["help","status","directory","working_directory","checklist","read","backup_disable","backup_enable","index_repair","snapshot","pause","verify_service","verify_search"]:
 		var allowed = false
 		for row in content.commands:
 			if row.action == kind and device in row.devices and (kind != "read" or row.args.kind == payload.get("kind")): allowed = true
@@ -85,10 +85,18 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 	var s = original.duplicate(true)
 	var result: Dictionary
 	match kind:
+		"working_directory": result = _result(s,"DIRECTORY",content.case.devices[device].directory)
+		"directory":
+			var rows = [content.case.devices[device].directory]
+			for file in content.case.devices[device].files:
+				var command = parse(file.command,device,s)
+				if not s.report.approved and command.payload.get("kind","") in ["submissions","package"]: continue
+				rows.append(file.name+"  —  "+file.description)
+			result = _result(s,"DIRECTORY","\n".join(rows))
 		"help":
 			var rows = []
 			for row in content.commands:
-				if device in row.devices and (s.report.approved or row.args.get("kind","") not in ["submissions","package"]): rows.append(row.text)
+				if device in row.devices and (s.report.approved or row.args.get("kind","") not in ["submissions","package"]): rows.append(row.text + "  —  " + row.get("description",""))
 			result = _result(s,"HELP", "\n".join(rows))
 		"status":
 			if device == "server_console" and "service" not in s.baseline: s.baseline.append("service")
@@ -273,7 +281,7 @@ func _end_day(s: Dictionary, payload: Dictionary) -> Dictionary:
 func project(s: Dictionary, context: String = "") -> Dictionary:
 	var questions = []
 	for q in content.dialogue:
-		if condition(s,q.condition): questions.append({"id":q.id,"npc":q.npc,"label":q.label})
+		if condition(s,q.condition): questions.append({"id":q.id,"npc":q.npc,"label":q.label,"channel":q.get("channel","dialogue")})
 	var notes = []
 	var observed_documents = []
 	var collection_observed = false

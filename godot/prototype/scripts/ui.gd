@@ -4,18 +4,32 @@ extends CanvasLayer
 var game: InvestigationPrototype
 var root: Control
 var modal: PanelContainer
-var modal_open = true
+var terminal_panel: PanelContainer
+var dialogue_panel: PanelContainer
+var briefing_panel: PanelContainer
+var modal_open = false
+var mode = "field"
 var tabs: TabContainer
 var hud: Label
+var guide: Label
 var prompt: Label
+var dot: Label
 var message: Label
 var source: Label
 var terminal: RichTextLabel
 var command_input: LineEdit
+var command_list: VBoxContainer
+var terminal_buffers = {}
+var command_history = {}
+var history_index = 0
 var notes: VBoxContainer
 var messenger: VBoxContainer
+var contact_title: Label
+var contact = "oh"
+var dialogue_title: Label
 var conversation: RichTextLabel
-var npc_select: OptionButton
+var dialogue_questions: VBoxContainer
+var speaker = ""
 var report: VBoxContainer
 var claim: OptionButton
 var attachments = {}
@@ -26,103 +40,145 @@ var ready_memo = false
 func setup(controller: InvestigationPrototype):
 	game = controller
 	root = Control.new()
+	add_child(root)
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var theme = Theme.new()
-	theme.default_font = load("res://assets/fonts/NotoSansKR.ttf")
-	theme.default_font_size = 19
+	var font = FontVariation.new()
+	font.base_font = load("res://assets/fonts/NotoSansKR.ttf")
+	font.variation_opentype = {"wght":450}
+	theme.default_font = font
+	theme.default_font_size = 18
+	var normal = surface(Color(.08,.13,.17))
+	normal.content_margin_top = 6
+	normal.content_margin_bottom = 6
+	var hover = normal.duplicate()
+	hover.bg_color = Color(.12,.25,.3)
+	theme.set_stylebox("normal","Button",normal)
+	theme.set_stylebox("hover","Button",hover)
+	theme.set_color("font_color","Button",Color(.9,.95,.98))
 	root.theme = theme
-	add_child(root)
-	hud = label(root,"")
-	hud.position = Vector2(22,18)
-	prompt = label(root,"WASD 이동 · E 외관 · F 현장 도구 · Tab/Esc 휴대 단말")
+	var objective = PanelContainer.new()
+	root.add_child(objective)
+	objective.position = Vector2(24,20)
+	objective.custom_minimum_size = Vector2(380,0)
+	objective.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	objective.add_theme_stylebox_override("panel",surface(Color(.025,.045,.065,.85)))
+	var info = VBoxContainer.new()
+	objective.add_child(info)
+	hud = label(info,"")
+	hud.add_theme_color_override("font_color",Color(.45,.85,.82))
+	guide = label(info,"")
+	guide.custom_minimum_size.x = 350
+	guide.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	guide.add_theme_font_size_override("font_size",16)
+	prompt = label(root,"")
 	prompt.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	prompt.offset_top = -55
+	prompt.offset_top = -78
+	prompt.offset_bottom = -16
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	var dot = label(root,"+")
+	prompt.add_theme_color_override("font_color",Color(.65,1,.9))
+	dot = label(root,"·")
 	dot.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	dot.add_theme_font_size_override("font_size",28)
 	message = label(root,"")
-	message.position = Vector2(22,100)
-	message.custom_minimum_size.x = 900
+	message.position = Vector2(24,190)
+	message.custom_minimum_size.x = 380
 	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	modal = PanelContainer.new()
-	modal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	modal.offset_left = 50
-	modal.offset_right = -50
-	modal.offset_top = 50
-	modal.offset_bottom = -65
-	root.add_child(modal)
-	var body = VBoxContainer.new()
-	body.add_theme_constant_override("separation",10)
-	modal.add_child(body)
-	var heading = HBoxContainer.new()
-	body.add_child(heading)
-	var title = label(heading,"잔여 권한 · 조사 프로토타입")
+	_build_tablet()
+	_build_terminal()
+	_build_dialogue()
+	_build_briefing()
+	sync_memo()
+	refresh()
+	if game.blocked_save: open_tablet(3)
+	elif game.state.day == 1 and "oh_intro" not in game.state.statements: open_briefing()
+	else: close()
+
+func surface(color: Color) -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = color
+	style.set_corner_radius_all(10)
+	style.set_content_margin_all(18)
+	style.border_color = Color(.18,.3,.36)
+	style.set_border_width_all(1)
+	return style
+
+func panel(left: float, top: float, right: float, bottom: float) -> PanelContainer:
+	var node = PanelContainer.new()
+	root.add_child(node)
+	node.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	node.anchor_left = left
+	node.anchor_top = top
+	node.anchor_right = right
+	node.anchor_bottom = bottom
+	node.add_theme_stylebox_override("panel",surface(Color(.035,.055,.075,.98)))
+	node.hide()
+	return node
+
+func heading(parent: Node, text: String) -> Label:
+	var row = HBoxContainer.new()
+	parent.add_child(row)
+	var title = label(row,text)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button(heading,"현장으로 · Esc",close)
+	title.add_theme_font_size_override("font_size",22)
+	button(row,"닫기 · Esc",close)
+	return title
+
+func _build_tablet():
+	modal = panel(.14,.09,.86,.91)
+	var body = VBoxContainer.new()
+	modal.add_child(body)
+	heading(body,"휴대 단말 · 보안 운영")
+	label(body,"현장 기록 · 사내 연락 · 보고 · 오늘 업무")
 	tabs = TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(tabs)
-	for name in ["터미널","노트","메신저","발생 보고","업무"]:
+	for name in ["노트","메신저","발생 보고","업무"]:
 		var scroll = ScrollContainer.new()
 		scroll.name = name
 		tabs.add_child(scroll)
 		var box = VBoxContainer.new()
 		box.name = "Body"
 		box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		box.add_theme_constant_override("separation",10)
+		box.add_theme_constant_override("separation",12)
 		scroll.add_child(box)
-	var term = tab(0)
-	source = label(term,"현장 장비를 선택하세요.")
-	var chooser = OptionButton.new()
-	chooser.add_item("장비 선택 · 대체 조사")
-	for id in game.content.case.devices:
-		chooser.add_item(game.content.case.devices[id].label)
-		chooser.set_item_metadata(chooser.item_count-1,id)
-	chooser.item_selected.connect(func(index):
-		if index > 0: game.context = chooser.get_item_metadata(index); refresh())
-	term.add_child(chooser)
-	terminal = RichTextLabel.new()
-	terminal.custom_minimum_size.y = 280
-	terminal.selection_enabled = true
-	term.add_child(terminal)
-	var row = HBoxContainer.new()
-	term.add_child(row)
-	command_input = LineEdit.new()
-	command_input.placeholder_text = "help로 현재 장비의 명령 확인"
-	command_input.max_length = 200
-	command_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(command_input)
-	command_input.text_submitted.connect(func(text): game.command(text); command_input.clear())
-	button(row,"실행",func(): game.command(command_input.text); command_input.clear())
+	label(tab(0),"확보한 원본 · 장비에서 조회한 기록과 받은 첨부만 표시됩니다.")
 	notes = VBoxContainer.new()
-	tab(1).add_child(notes)
-	label(tab(1),"개인 메모 · 내용은 채점하지 않습니다.")
+	tab(0).add_child(notes)
+	label(tab(0),"개인 메모")
 	memo = TextEdit.new()
-	memo.custom_minimum_size.y = 150
-	tab(1).add_child(memo)
+	memo.custom_minimum_size.y = 160
+	memo.placeholder_text = "원본 사이의 차이와 추가로 확인할 질문을 적으세요."
+	tab(0).add_child(memo)
 	memo.text_changed.connect(func():
 		if ready_memo: game.dispatch({"type":"memo","payload":{"text":memo.text}}))
-	sync_memo()
-	npc_select = OptionButton.new()
+	label(tab(1),"사내 메신저 · 비동기 업무 연락과 이전 제출 자료")
+	var layout = HBoxContainer.new()
+	layout.add_theme_constant_override("separation",20)
+	tab(1).add_child(layout)
+	var contacts = VBoxContainer.new()
+	contacts.custom_minimum_size.x = 210
+	layout.add_child(contacts)
 	for id in game.content.case.npcs:
-		npc_select.add_item(game.content.case.npcs[id].name+" · "+game.content.case.npcs[id].role)
-		npc_select.set_item_metadata(npc_select.item_count-1,id)
-	npc_select.item_selected.connect(func(_i): refresh_dialogue())
-	tab(2).add_child(npc_select)
+		var npc = game.content.case.npcs[id]
+		button(contacts,npc.name+"\n"+npc.role,func(): contact = id; refresh_messenger())
+	var thread = VBoxContainer.new()
+	thread.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	layout.add_child(thread)
+	contact_title = label(thread,"")
+	contact_title.add_theme_font_size_override("font_size",21)
 	messenger = VBoxContainer.new()
-	tab(2).add_child(messenger)
-	conversation = RichTextLabel.new()
-	conversation.custom_minimum_size.y = 240
-	conversation.selection_enabled = true
-	tab(2).add_child(conversation)
-	report = tab(3)
-	label(report,"확인한 행동과 직접 고른 원본을 첨부하세요. 행위자·고의성·외부 반출은 추가 확인 대상입니다.")
+	messenger.add_theme_constant_override("separation",12)
+	thread.add_child(messenger)
+	report = tab(2)
+	var explanation = label(report,"승인 범위와 실제 행동을 대조하고, 확인한 원본을 직접 첨부하세요. 실행 계정과 실제 사람, 내부 수집과 외부 반출은 구분합니다.")
+	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	claim = OptionButton.new()
 	claim.add_item("주장 선택")
-	for c in game.content.rules.claims:
-		claim.add_item(c.label)
-		claim.set_item_metadata(claim.item_count-1,c.id)
+	for item in game.content.rules.claims:
+		claim.add_item(item.label)
+		claim.set_item_metadata(claim.item_count-1,item.id)
 	report.add_child(claim)
 	for slot in ["scope","access","collection"]:
 		label(report,{"scope":"허용 범위 근거","access":"실제 접근 근거","collection":"실제 수집 근거"}[slot])
@@ -130,14 +186,91 @@ func setup(controller: InvestigationPrototype):
 		attachments[slot] = option
 		report.add_child(option)
 	button(report,"발생 보고 제출",submit_report)
-	work = label(tab(4),"")
+	work = label(tab(3),"")
 	work.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	button(tab(4),"오늘 업무 종료",end_day)
-	button(tab(4),"진행 내보내기",func(): file_dialog(true))
-	button(tab(4),"진행 가져오기",func(): file_dialog(false))
-	button(tab(4),"새 조사",func(): confirm("현재 진행을 보관하고 새 조사를 시작할까요?",game.new_game))
-	refresh()
-	open_tablet()
+	button(tab(3),"오늘 업무 종료",end_day)
+	button(tab(3),"업무 배경과 점검 방법",open_briefing)
+	button(tab(3),"진행 내보내기",func(): file_dialog(true))
+	button(tab(3),"진행 가져오기",func(): file_dialog(false))
+	button(tab(3),"새 조사",func(): confirm("현재 진행을 보관하고 새 조사를 시작할까요?",game.new_game))
+
+func _build_terminal():
+	terminal_panel = panel(.08,.09,.92,.91)
+	var body = VBoxContainer.new()
+	terminal_panel.add_child(body)
+	source = heading(body,"")
+	var layout = HBoxContainer.new()
+	layout.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	layout.add_theme_constant_override("separation",20)
+	body.add_child(layout)
+	var session = VBoxContainer.new()
+	session.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	layout.add_child(session)
+	terminal = RichTextLabel.new()
+	terminal.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	terminal.custom_minimum_size = Vector2(550,310)
+	terminal.selection_enabled = true
+	terminal.add_theme_color_override("default_color",Color(.65,.92,.78))
+	session.add_child(terminal)
+	var row = HBoxContainer.new()
+	session.add_child(row)
+	label(row,"sec.ops >")
+	command_input = LineEdit.new()
+	command_input.placeholder_text = "명령 입력 · help로 도움말"
+	command_input.max_length = 200
+	command_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(command_input)
+	command_input.text_submitted.connect(func(_text): execute_command())
+	command_input.gui_input.connect(_terminal_input)
+	button(row,"실행",execute_command)
+	var tools = HBoxContainer.new()
+	session.add_child(tools)
+	button(tools,"출력 복사",func(): DisplayServer.clipboard_set(terminal.text))
+	button(tools,"화면 지우기",clear_terminal)
+	label(tools,"↑↓ 이력 · Tab 자동완성 · Ctrl+L 지우기").add_theme_font_size_override("font_size",14)
+	var sidebar = VBoxContainer.new()
+	sidebar.custom_minimum_size.x = 340
+	layout.add_child(sidebar)
+	label(sidebar,"이 장비의 명령")
+	label(sidebar,"선택하면 입력됩니다. Enter로 실행하세요.").add_theme_font_size_override("font_size",14)
+	var scroll = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sidebar.add_child(scroll)
+	command_list = VBoxContainer.new()
+	command_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(command_list)
+
+func _build_dialogue():
+	dialogue_panel = panel(.16,.62,.84,.96)
+	var body = VBoxContainer.new()
+	dialogue_panel.add_child(body)
+	dialogue_title = heading(body,"")
+	conversation = RichTextLabel.new()
+	conversation.custom_minimum_size.y = 84
+	conversation.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	conversation.selection_enabled = true
+	body.add_child(conversation)
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size.y = 90
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body.add_child(scroll)
+	dialogue_questions = VBoxContainer.new()
+	dialogue_questions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(dialogue_questions)
+
+func _build_briefing():
+	briefing_panel = panel(.24,.16,.76,.84)
+	var body = VBoxContainer.new()
+	body.add_theme_constant_override("separation",18)
+	briefing_panel.add_child(body)
+	label(body,game.content.case.briefing.heading).add_theme_font_size_override("font_size",25)
+	for key in ["background","assignment","method","first"]:
+		var text = label(body,game.content.case.briefing[key])
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	button(body,"현장 점검 시작",close)
+	button(body,"휴대 단말에서 업무 확인",func(): open_tablet(3))
 
 func tab(index: int) -> VBoxContainer:
 	return tabs.get_child(index).get_node("Body")
@@ -163,11 +296,37 @@ func sync_memo():
 	memo.text = game.state.memo
 	ready_memo = true
 
+func reset_session():
+	terminal_buffers.clear()
+	command_history.clear()
+	contact = "oh"
+	close()
+	if game.state.day == 1 and "oh_intro" not in game.state.statements: open_briefing()
+
+func guide_info() -> Dictionary:
+	var state = game.state
+	if state.ended: return {"title":"점검 종료","text":"휴대 단말에서 기록과 진행 파일을 확인하세요.","target":""}
+	if state.day != 1:
+		var remaining = game.engine.missing_work(state)
+		return {"title":"%d일차 · 운영 점검" % state.day,"text":remaining[0] if not remaining.is_empty() else "오늘의 운영 확인을 마쳤습니다. 휴대 단말에서 기록·연락을 확인하고 업무를 종료하세요.","target":""}
+	if "oh_intro" not in state.statements: return {"title":"1 / 8 · 담당 업무 인계","text":"눈앞의 보안팀장 오세진과 대화하세요. 가까이서 F를 누르면 대화를 시작합니다.","target":"oh"}
+	if "park_intro" not in state.statements: return {"title":"2 / 8 · 서버 담당자","text":"중앙 서버실 입구의 박도윤에게 운영 업무를 인계받으세요.","target":"park"}
+	for item in [["service","status","자료 서비스"],["account","inspect account","실행 계정"],["tasks","logs tasks","자동 작업"]]:
+		if item[0] not in state.baseline: return {"title":"3 / 8 · 서버 기준 상태","text":"중앙 서버실의 서버 단말에서 F로 조작을 시작하세요. %s 명령으로 %s을 확인합니다." % [item[1],item[2]],"target":"server_console"}
+	if "han_intro" not in state.statements: return {"title":"4 / 8 · 프로젝트 담당자","text":"오른쪽 업무 구역의 한지우에게 LUMEN 자료를 인계받으세요.","target":"han"}
+	if "files" not in state.baseline: return {"title":"5 / 8 · 원본 자료 확인","text":"오른쪽 업무 PC에서 inspect files를 실행해 실제 원본 파일을 확인하세요.","target":"project_pc"}
+	if "seo_intro" not in state.statements: return {"title":"6 / 8 · 정비 담당자","text":"업무 구역의 서유진에게 유지보수 범위를 확인하세요. 이전 제출 자료는 휴대 단말의 메신저에서 볼 수 있습니다.","target":"seo"}
+	if "approval" not in state.baseline: return {"title":"7 / 8 · 승인 범위 원본","text":"왼쪽 관제실의 승인서 보관함에서 inspect W-218을 실행하세요. 확인한 원본은 휴대 단말의 노트에 자동으로 모입니다.","target":"approval_archive"}
+	return {"title":"8 / 8 · 첫날 점검 완료","text":"Tab으로 휴대 단말을 열어 노트와 메신저를 확인하세요. 업무 탭의 ‘오늘 업무 종료’로 다음 날을 시작합니다.","target":""}
+
 func refresh():
 	var view = game.engine.project(game.state,game.context)
-	hud.text = "%d일차 · 수집 작업 %s · 자료 서비스 %s · 검색 %s" % [view.day,"중지" if view.held else "미통제","지연" if view.backupDelay else "정상","정상" if view.indexHealthy else "누락"]
-	source.text = view.device.get("label","현장 장비를 선택하세요.")
+	var objective = guide_info()
+	hud.text = "%d일차 · %s" % [view.day,objective.title]
+	guide.text = objective.text
+	source.text = view.device.get("label","현장 단말")+" · 운영 점검 세션"
 	clear(notes)
+	if view.notes.is_empty(): label(notes,"아직 확보한 원본이 없습니다. 현장 장비에서 원본을 조회하거나 메신저의 첨부를 확인하세요.")
 	for record in view.notes:
 		var row = HBoxContainer.new()
 		notes.add_child(row)
@@ -183,56 +342,182 @@ func refresh():
 			option.set_item_metadata(option.item_count-1,record.id)
 			if record.id == selected: option.select(option.item_count-1)
 	refresh_dialogue()
-	work.text = "오늘의 필수 운영 확인\n"+("확인 완료" if view.work.is_empty() else "\n".join(view.work))
+	refresh_messenger()
+	refresh_commands()
+	work.text = objective.title+"\n"+objective.text+"\n\n오늘의 필수 운영 확인\n"+("확인 완료" if view.work.is_empty() else "\n".join(view.work))
 	work.text += "\n\n발생 보고: "+("승인됨 · 감사 권한 유지" if view.approved else "미승인")
 	work.text += "\n확인한 내부 수집 문서: "+("미확인" if view.documentCount < 0 else "%d개 · 반출과 별도" % view.documentCount)
 	if view.ended: work.text += "\n\n"+game.engine._t("PROTOTYPE_ENDED")
-	for msg in view.messages: work.text += "\n\n%d일차 · %s\n%s" % [msg.day,game.content.case.npcs[msg.npc].name,msg.text]
 
 func refresh_dialogue():
-	clear(messenger)
-	var npc = npc_select.get_item_metadata(npc_select.selected)
-	for q in game.engine.project(game.state).questions:
-		if q.npc == npc:
-			button(messenger,q.label,func():
-				var output = game.dispatch({"type":"dialogue","payload":{"id":q.id}})
-				conversation.text = output.text)
+	clear(dialogue_questions)
+	if speaker == "": return
+	var questions = game.engine.project(game.state).questions
+	for question in questions:
+		if question.npc == speaker and question.channel == "dialogue":
+			button(dialogue_questions,question.label,func():
+				var result = game.dispatch({"type":"dialogue","payload":{"id":question.id}})
+				conversation.text = result.text)
+	if dialogue_questions.get_child_count() == 0: label(dialogue_questions,"지금 더 물어볼 내용이 없습니다.")
 
-func submit_report():
-	var selected = {}
-	for slot in attachments:
-		var option = attachments[slot]
-		selected[slot] = option.get_item_metadata(option.selected) if option.selected > 0 else ""
-	var value = claim.get_item_metadata(claim.selected) if claim.selected > 0 else ""
-	var result = game.dispatch({"type":"report","payload":{"claim":value,"attachments":selected}})
-	notice(result.text)
+func bubble(text: String, outgoing = false):
+	var row = HBoxContainer.new()
+	messenger.add_child(row)
+	if outgoing:
+		var space = Control.new()
+		space.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(space)
+	var card = PanelContainer.new()
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_stylebox_override("panel",surface(Color(.1,.25,.3) if outgoing else Color(.09,.12,.16)))
+	row.add_child(card)
+	var body = label(card,text)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size.x = 380
+
+func refresh_messenger():
+	clear(messenger)
+	var npc = game.content.case.npcs[contact]
+	contact_title.text = npc.name+" · "+npc.role
+	var count = 0
+	for msg in game.state.messages:
+		if msg.npc == contact:
+			bubble("%d일차 · %s\n%s" % [msg.day,npc.name,msg.text])
+			count += 1
+	for question in game.content.dialogue:
+		if question.npc == contact and question.get("channel","dialogue") == "messenger" and question.id in game.state.statements:
+			bubble("나\n"+question.label,true)
+			bubble(npc.name+"\n"+question.response)
+			if question.record != "" and question.record in game.state.known:
+				var record = game.state.records[question.record]
+				button(messenger,"첨부 · "+record.title,func(): notice(record.title+"\n"+record.source+"\n"+record.body))
+			count += 1
+	if count == 0: bubble("아직 받은 메시지가 없습니다. 담당자와 직접 대화하려면 현장에서 만나세요.")
+	for question in game.engine.project(game.state).questions:
+		if question.npc == contact and question.channel == "messenger" and question.id not in game.state.statements:
+			button(messenger,question.label,func(): game.dispatch({"type":"dialogue","payload":{"id":question.id}}))
+
+func available_commands() -> Array:
+	var rows = []
+	for row in game.content.commands:
+		if game.context in row.devices and (game.state.report.approved or row.args.get("kind","") not in ["submissions","package"]): rows.append(row)
+	return rows
+
+func refresh_commands():
+	clear(command_list)
+	var category = ""
+	for row in available_commands():
+		if row.get("category","조회") != category:
+			category = row.get("category","조회")
+			label(command_list,category).add_theme_color_override("font_color",Color(.4,.8,.8))
+		button(command_list,row.text,func(): command_input.text = row.text; command_input.caret_column = row.text.length(); command_input.grab_focus())
+		var detail = label(command_list,row.get("description",""))
+		detail.custom_minimum_size.x = 300
+		detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		detail.add_theme_font_size_override("font_size",14)
+
+func execute_command():
+	if mode != "terminal": return
+	var text = command_input.text.strip_edges()
+	command_input.clear()
+	if text.is_empty(): return
+	if not command_history.has(game.context): command_history[game.context] = []
+	var history = command_history[game.context]
+	if history.is_empty() or history[-1] != text: history.append(text)
+	if history.size() > 80: history.pop_front()
+	history_index = history.size()
+	match text.to_lower():
+		"clear", "cls": clear_terminal()
+		"history":
+			var rows = []
+			for i in range(history.size()): rows.append("%d  %s" % [i+1,history[i]])
+			print_output(text,"\n".join(rows))
+		_: game.command(text)
+	command_input.grab_focus()
+
+func _terminal_input(event: InputEvent):
+	if not event is InputEventKey or not event.pressed: return
+	var history = command_history.get(game.context,[])
+	if event.keycode in [KEY_UP,KEY_DOWN]:
+		history_index = clampi(history_index + (-1 if event.keycode == KEY_UP else 1),0,history.size())
+		command_input.text = history[history_index] if history_index < history.size() else ""
+		command_input.caret_column = command_input.text.length()
+		command_input.accept_event()
+	elif event.keycode == KEY_TAB:
+		var prefix = command_input.text.to_lower()
+		var options = available_commands().filter(func(row): return row.text.to_lower().begins_with(prefix))
+		if options.size() == 1:
+			command_input.text = options[0].text
+			command_input.caret_column = command_input.text.length()
+		elif not options.is_empty(): print_output("자동완성","\n".join(options.map(func(row): return row.text)))
+		command_input.accept_event()
+	elif event.ctrl_pressed and event.keycode == KEY_L:
+		clear_terminal()
+		command_input.accept_event()
+
+func clear_terminal():
+	terminal_buffers[game.context] = ""
+	terminal.text = ""
 
 func print_output(command: String, text: String):
-	terminal.text = (terminal.text+"\n> "+command+"\n"+text+"\n").right(24000)
-	terminal.scroll_to_line(terminal.get_line_count()-1)
+	var output = terminal_buffers.get(game.context,"")+"\nsec.ops > "+command+"\n"+text+"\n"
+	terminal_buffers[game.context] = output.right(24000)
+	terminal.text = terminal_buffers[game.context]
+	terminal.scroll_to_line(maxi(0,terminal.get_line_count()-1))
 
-func show_tab(index: int):
-	modal.show()
+func _show(next_mode: String, window: Control):
+	game.release_speaker()
+	for item in [modal,terminal_panel,dialogue_panel,briefing_panel]: item.hide()
+	mode = next_mode
 	modal_open = true
+	window.show()
+	hud.get_parent().get_parent().visible = next_mode == "dialogue"
+	message.hide()
 	game.player.set_enabled(false)
 	for key in ["forward","back","left","right","sprint","crouch","jump"]: Input.action_release(key)
-	tabs.current_tab = index
+	prompt.hide()
+	dot.hide()
 
-func open_tablet(): show_tab(4)
-func open_terminal(): show_tab(0); refresh(); command_input.grab_focus()
-func open_messenger(id: String):
-	for i in range(npc_select.item_count):
-		if npc_select.get_item_metadata(i) == id: npc_select.select(i)
-	show_tab(2)
+func open_tablet(index = 3):
+	_show("tablet",modal)
+	tabs.current_tab = index
+	refresh()
+
+func open_briefing(): _show("briefing",briefing_panel)
+
+func open_terminal():
+	_show("terminal",terminal_panel)
+	refresh()
+	if not terminal_buffers.has(game.context):
+		var device = game.content.case.devices[game.context]
+		terminal_buffers[game.context] = "SECURITY OPERATIONS / "+device.label+"\n접속 사용자: sec.ops · "+device.zone+"\n\n"+device.description+"\n\npwd / ls / cat 파일명  —  위치 · 파일 목록 · 원본 조회\nhelp  —  명령과 설명\nhistory  —  이 세션의 입력 이력\nclear  —  출력 지우기\n\n오른쪽 명령을 선택하거나 직접 입력하고 Enter를 누르세요."
+	terminal.text = terminal_buffers[game.context]
+	history_index = command_history.get(game.context,[]).size()
+	command_input.grab_focus()
+
+func open_dialogue(id: String):
+	speaker = id
+	_show("dialogue",dialogue_panel)
+	var npc = game.content.case.npcs[id]
+	dialogue_title.text = npc.name+" · "+npc.role
+	conversation.text = "무엇을 확인하시겠어요?"
 	refresh_dialogue()
+	game.frame_speaker(id)
 
 func close():
 	if game.blocked_save: return
 	var focused = get_viewport().gui_get_focus_owner()
 	if focused != null: focused.release_focus()
-	modal.hide()
+	for item in [modal,terminal_panel,dialogue_panel,briefing_panel]: item.hide()
+	game.release_speaker()
+	mode = "field"
 	modal_open = false
 	game.player.set_enabled(true)
+	hud.get_parent().get_parent().show()
+	message.show()
+	dot.show()
+	prompt.text = ""
+	prompt.hide()
 
 func toggle():
 	if modal_open: close()
@@ -240,7 +525,10 @@ func toggle():
 
 func notice(text: String):
 	message.text = text.left(180)
-	if text.length() > 220:
+	var previous = message.text
+	get_tree().create_timer(6).timeout.connect(func():
+		if is_instance_valid(message) and message.text == previous: message.text = "")
+	if modal_open or text.length() > 220:
 		var popup = AcceptDialog.new()
 		popup.title = "조사 기록"
 		popup.dialog_text = text
@@ -258,13 +546,19 @@ func confirm(text: String, callback: Callable):
 	dialog.canceled.connect(dialog.queue_free)
 	dialog.popup_centered(Vector2i(680,260))
 
+func submit_report():
+	var selected = {}
+	for slot in attachments:
+		var option = attachments[slot]
+		selected[slot] = option.get_item_metadata(option.selected) if option.selected > 0 else ""
+	var value = claim.get_item_metadata(claim.selected) if claim.selected > 0 else ""
+	notice(game.dispatch({"type":"report","payload":{"claim":value,"attachments":selected}}).text)
+
 func end_day():
 	var day = game.state.day
 	var text = game.engine._t("CONFIRM_END")
 	if day == 7: text = game.engine._t("PROTOTYPE_ENDED_KNOWN" if "E12" in game.state.evidence else "PROTOTYPE_ENDED")+"\n조사로 돌아가려면 취소하세요."
-	confirm(text,func():
-		var result = game.dispatch({"type":"day.end","payload":{"expectedDay":day,"confirmed":true}})
-		notice(result.text))
+	confirm(text,func(): notice(game.dispatch({"type":"day.end","payload":{"expectedDay":day,"confirmed":true}}).text))
 
 func file_dialog(exporting: bool):
 	var dialog = FileDialog.new()
@@ -278,5 +572,10 @@ func file_dialog(exporting: bool):
 	dialog.popup_centered(Vector2i(800,550))
 
 func _process(_delta):
-	if game == null or modal_open: return
-	prompt.text = game.player.target.get_interaction_prompt() if game.player.target != null else "WASD 이동 · E 외관 · F 현장 도구 · Tab/Esc 휴대 단말"
+	if game == null: return
+	if modal_open:
+		prompt.hide()
+		return
+	var target = game.player.target
+	prompt.text = target.get_interaction_prompt() if target != null else ""
+	prompt.visible = target != null

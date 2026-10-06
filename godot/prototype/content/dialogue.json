@@ -3,45 +3,49 @@
     "id": "oh_intro",
     "npc": "oh",
     "label": "담당 업무와 인계 확인",
-    "response": "정상 운영을 확인한 뒤 승인 범위와 실제 행동을 구분해 보고해 주세요. 기록을 읽었다고 범인이 정해지는 것은 아닙니다.",
+    "response": "이번 주 보안 운영 점검을 맡아 주셔서 고맙습니다. 외부 유지보수 이후의 설정과 접근 범위를 인계받는 것이 오늘의 업무예요. 먼저 서버 운영 담당 박도윤과 이야기하고 서버실에서 서비스 상태, 실행 계정, 자동 작업을 확인하세요. 이어 한지우에게 LUMEN 자료를, 서유진에게 정비 범위를 인계받으세요. 확인한 원본은 휴대 단말의 노트에 모입니다. 오늘 점검을 마치면 업무 탭에서 퇴근할 수 있어요.",
     "evidence": "",
     "record": "",
     "condition": {
       "op": "always"
-    }
+    },
+    "channel": "dialogue"
   },
   {
     "id": "park_intro",
     "npc": "park",
     "label": "담당 업무와 인계 확인",
-    "response": "서버와 백업을 맡습니다. 정상 업무를 유지하면서 잘못된 설정을 바로잡아 주세요.",
+    "response": "서버와 백업을 담당하는 박도윤입니다. 중앙 서버실의 서버 단말에서 status로 현재 서비스 상태를, inspect account로 자동 실행 계정을, logs tasks로 작업 목록을 확인하세요. 오늘은 기준 상태를 기록하는 날입니다. 장애가 보이면 원인을 확인하고 복구한 뒤 서비스를 다시 검증해야 합니다.",
     "evidence": "",
     "record": "",
     "condition": {
       "op": "always"
-    }
+    },
+    "channel": "dialogue"
   },
   {
     "id": "han_intro",
     "npc": "han",
     "label": "담당 업무와 인계 확인",
-    "response": "LUMEN 자료와 정상 배포를 맡습니다. svc_release는 자동 작업 계정이라 실행 계정과 실제 사람을 구분해야 합니다.",
+    "response": "LUMEN 프로젝트 개발 담당 한지우입니다. 오른쪽 업무 구역의 업무 PC에서 inspect files로 원본 자료가 있는지 확인해 주세요. 검색 결과와 실제 원본은 다를 수 있습니다. svc_release는 자동 실행 계정이므로 그 계정이 기록에 나온다는 이유로 사람을 특정하면 안 됩니다.",
     "evidence": "",
     "record": "",
     "condition": {
       "op": "always"
-    }
+    },
+    "channel": "dialogue"
   },
   {
     "id": "seo_intro",
     "npc": "seo",
     "label": "담당 업무와 인계 확인",
-    "response": "W-218 범위의 상태 점검과 임시 파일 정리를 맡았습니다.",
+    "response": "협력업체 정비 담당 서유진입니다. W-218에 승인된 장비 상태 점검과 임시 파일 정리를 맡았어요. 왼쪽 관제실의 승인서 보관함에서 inspect W-218로 범위를 확인할 수 있습니다. 이전에 제출한 정비 자료는 사내 메신저의 유지보수 연락처에 남아 있습니다.",
     "evidence": "",
     "record": "",
     "condition": {
       "op": "always"
-    }
+    },
+    "channel": "dialogue"
   },
   {
     "id": "park_backup",
@@ -53,7 +57,8 @@
     "condition": {
       "op": "evidence_known",
       "id": "E03"
-    }
+    },
+    "channel": "dialogue"
   },
   {
     "id": "han_account",
@@ -64,7 +69,8 @@
     "record": "account",
     "condition": {
       "op": "always"
-    }
+    },
+    "channel": "dialogue"
   },
   {
     "id": "han_files",
@@ -75,7 +81,8 @@
     "record": "",
     "condition": {
       "op": "always"
-    }
+    },
+    "channel": "dialogue"
   },
   {
     "id": "seo_message",
@@ -86,7 +93,8 @@
     "record": "message",
     "condition": {
       "op": "always"
-    }
+    },
+    "channel": "messenger"
   },
   {
     "id": "seo_collection",
@@ -98,7 +106,8 @@
     "condition": {
       "op": "evidence_known",
       "id": "E07"
-    }
+    },
+    "channel": "dialogue"
   },
   {
     "id": "seo_submission",
@@ -119,7 +128,8 @@
           "id": "E11"
         }
       ]
-    }
+    },
+    "channel": "dialogue"
   },
   {
     "id": "oh_audit",
@@ -130,6 +140,7 @@
     "record": "",
     "condition": {
       "op": "report_approved"
-    }
+    },
+    "channel": "dialogue"
   }
 ]

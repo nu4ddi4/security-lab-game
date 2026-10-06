@@ -7,7 +7,7 @@ var kind = "device"
 var label = ""
 
 func get_interaction_prompt() -> String:
-	return label + " · E 외관 / F 터미널" if kind == "device" else label + " · E/F 대화"
+	return label + "\nF — 조작" if kind == "device" else label + "\nF — 대화"
 
 func inspect():
 	used.emit(logical_id,kind,false)

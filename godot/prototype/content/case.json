@@ -8,32 +8,125 @@
     "control_console": {
       "label": "관제 단말",
       "zone": "관제실",
-      "description": "승인 범위와 중앙 감사 기록을 확인하는 단말입니다."
+      "description": "승인 범위와 중앙 감사 기록을 확인하는 단말입니다.",
+      "directory": "/security/audit",
+      "files": [
+        {
+          "name": "scope.txt",
+          "command": "inspect W-218",
+          "description": "유지보수 승인 범위"
+        },
+        {
+          "name": "submissions.log",
+          "command": "logs submissions",
+          "description": "제출·적용 감사 원본"
+        },
+        {
+          "name": "package.txt",
+          "command": "inspect PKG-218-R2",
+          "description": "중앙 보관 패키지"
+        }
+      ]
     },
     "server_console": {
       "label": "서버 단말",
       "zone": "서버실",
-      "description": "서비스·백업·자동 작업을 확인하는 단말입니다."
+      "description": "서비스·백업·자동 작업을 확인하는 단말입니다.",
+      "directory": "/srv/operations",
+      "files": [
+        {
+          "name": "tasks.log",
+          "command": "logs tasks",
+          "description": "등록·실행 작업"
+        },
+        {
+          "name": "account.txt",
+          "command": "inspect account",
+          "description": "서비스 계정 원본"
+        },
+        {
+          "name": "backups.log",
+          "command": "logs backups",
+          "description": "백업 구성과 변경"
+        },
+        {
+          "name": "access-t17.log",
+          "command": "logs access --task T-17",
+          "description": "작업별 파일 접근"
+        },
+        {
+          "name": "staging.log",
+          "command": "inspect staging",
+          "description": "임시 보관 목록"
+        }
+      ]
     },
     "project_pc": {
       "label": "업무 PC",
       "zone": "업무 구역",
-      "description": "LUMEN 원본 자료와 검색 상태를 확인하는 PC입니다."
+      "description": "LUMEN 원본 자료와 검색 상태를 확인하는 PC입니다.",
+      "directory": "/workspace/LUMEN",
+      "files": [
+        {
+          "name": "files.txt",
+          "command": "inspect files",
+          "description": "원본 파일 목록"
+        },
+        {
+          "name": "index.log",
+          "command": "logs indexing",
+          "description": "검색 색인 기록"
+        },
+        {
+          "name": "deployments.log",
+          "command": "logs deployments",
+          "description": "정상 배포 기록"
+        }
+      ]
     },
     "maintenance_terminal": {
       "label": "유지보수 단말",
       "zone": "업무 구역",
-      "description": "장비 배정과 정비 업무를 확인하는 임시 단말입니다."
+      "description": "장비 배정과 정비 업무를 확인하는 임시 단말입니다.",
+      "directory": "/maintenance",
+      "files": [
+        {
+          "name": "scope.txt",
+          "command": "inspect assignment",
+          "description": "장비 배정과 승인 범위"
+        },
+        {
+          "name": "submissions.log",
+          "command": "logs submissions",
+          "description": "제출·적용 감사 원본"
+        }
+      ]
     },
     "approval_archive": {
       "label": "승인서 보관함",
       "zone": "관제실",
-      "description": "보존된 유지보수 승인서를 조회합니다."
+      "description": "보존된 유지보수 승인서를 조회합니다.",
+      "directory": "/archive/approvals",
+      "files": [
+        {
+          "name": "scope.txt",
+          "command": "inspect W-218",
+          "description": "유지보수 승인 원본"
+        }
+      ]
     },
     "briefing_board": {
       "label": "인계 게시판",
       "zone": "공용 구역",
-      "description": "오늘의 점검과 운영 업무를 확인합니다."
+      "description": "오늘의 점검과 운영 업무를 확인합니다.",
+      "directory": "/handover",
+      "files": [
+        {
+          "name": "checklist.txt",
+          "command": "inspect checklist",
+          "description": "오늘 남은 점검"
+        }
+      ]
     }
   },
   "npcs": {
@@ -86,5 +179,12 @@
         "minute": 1050
       }
     }
+  },
+  "briefing": {
+    "heading": "첫 출근 · 보안 운영 점검",
+    "background": "이 회사는 사내 문서 서비스와 LUMEN 프로젝트를 운영합니다. 설계 자료와 계약·가격 문서는 업무 담당자와 승인된 정비 인력만 다룰 수 있습니다.",
+    "assignment": "당신은 유지보수 이후의 운영 상태와 접근 권한을 점검하러 온 보안 담당자입니다. 오늘은 문제가 생기기 전의 정상 상태와 각 담당자의 업무 범위를 인계받습니다.",
+    "method": "장비에서 원본을 확인하고 노트에 근거를 남기세요. 이상이 확인되면 업무를 복구하고 보안팀장에게 보고합니다. 실행 계정만 보고 실제 사람을 단정하지 마세요.",
+    "first": "먼저 눈앞의 보안팀장 오세진에게 다가가 대화를 시작하세요. 오늘의 점검 순서는 왼쪽 업무 안내와 휴대 단말에서 확인할 수 있습니다."
   }
 }
