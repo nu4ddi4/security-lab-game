@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -26,7 +27,15 @@ def run(command, directory, marker=None, timeout=90):
     return output
 
 
+def prototype_version(source):
+    version = json.loads((source / 'prototype/version.json').read_text(encoding='utf-8'))['version']
+    if not isinstance(version, str) or not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        raise SystemExit('Use a prototype version in X.Y.Z form.')
+    return version
+
+
 def stage(source, target):
+    version = prototype_version(source)
     shutil.copytree(source / 'prototype', target / 'prototype')
     for name in ['scripts/player.gd', 'assets/fonts/NotoSansKR.ttf', 'assets/fonts/OFL.txt', 'LICENSES.txt']:
         destination = target / name
@@ -37,7 +46,7 @@ def stage(source, target):
     project = project.replace('Forward Plus', 'GL Compatibility').replace('"forward_plus"', '"gl_compatibility"')
     project = project.replace('Offline security investigation simulator. Native companion to web v0.7.0.',
                               'Offline dummy investigation prototype.')
-    project = project.replace('config/version="0.7.0-native.1"', 'config/version="0.1.0-prototype"')
+    project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '-prototype"', project, flags=re.MULTILINE)
     (target / 'project.godot').write_text(project, encoding='utf-8')
     (target / 'export_presets.cfg').write_text('''[preset.0]
 name="Windows Prototype"
@@ -60,7 +69,7 @@ application/file_version="0.1.0.0"
 application/product_version="0.1.0.0"
 application/product_name="Security Lab Prototype"
 application/file_description="Offline dummy security investigation prototype"
-''', encoding='utf-8')
+'''.replace('0.1.0.0', version + '.0'), encoding='utf-8')
 
 
 def check(godot, target):
@@ -74,14 +83,16 @@ def check(godot, target):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--godot', default=os.environ.get('SECURITY_LAB_GODOT_CONSOLE', 'godot'))
-    parser.add_argument('--output', default='prototype-dist/SecurityLab-Prototype-0.1.0-Windows-x64.exe')
+    parser.add_argument('--output', help='Defaults to prototype-dist/SecurityLab-proto-X.Y.Z.exe')
     parser.add_argument('--check-only', action='store_true')
+    parser.add_argument('--rendered-check', action='store_true', help='Also exercise and capture the exported Windows UI')
     args = parser.parse_args()
     godot = shutil.which(args.godot) or str(Path(args.godot).resolve())
     if not subprocess.check_output([godot, '--version'], text=True).startswith('4.7.2.stable'):
         raise SystemExit('Godot 4.7.2 stable is required.')
     root = Path(__file__).resolve().parents[1]
-    output = Path(args.output).resolve()
+    version = prototype_version(root / 'godot')
+    output = Path(args.output or ('prototype-dist/SecurityLab-proto-' + version + '.exe')).resolve()
     with tempfile.TemporaryDirectory(prefix='security-lab-prototype-') as directory:
         target = Path(directory)
         stage(root / 'godot', target)
@@ -103,6 +114,14 @@ def main():
             run([str(executable), '--headless', '--', '--prototype-smoke'],
                 directory, 'INVESTIGATION_SMOKE')
             print('Standalone EXE launch', attempt + 1, 'passed.')
+        if args.rendered_check:
+            captures = output.parent / 'ui'
+            run([str(executable), '--audio-driver', 'Dummy', '--', '--prototype-smoke',
+                 '--prototype-capture-dir=' + str(captures)], directory, 'INVESTIGATION_SMOKE')
+            expected = ['01-briefing', '02-dialogue', '03-terminal', '04-messenger', '05-notes', '06-field']
+            if any(not (captures / (name + '.png')).is_file() for name in expected):
+                raise SystemExit('Exported Windows UI captures are incomplete.')
+            print('Rendered Windows EXE UI and interaction passed.')
     digest = hashlib.sha256(output.read_bytes()).hexdigest()
     output.with_suffix('.sha256').write_text(digest + '  ' + output.name + '\n', encoding='utf-8')
     print('PROTOTYPE_EXE', json.dumps({'file':output.name, 'bytes':output.stat().st_size, 'sha256':digest}))
