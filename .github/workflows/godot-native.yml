@@ -36,6 +36,13 @@ jobs:
           # setup-godot creates a hard-link alias to the GUI binary on Windows.
           # Use the installed wrapper directly; a hard link has no target path.
           $godotConsole = Join-Path $env:USERPROFILE 'godot/Godot_v4.7.2-stable_win64_console.exe'
+          # The action caches the GUI file and templates, omitting its wrapper.
+          # Restore the small editor archive only when that companion is absent.
+          if (-not (Test-Path -LiteralPath $godotConsole -PathType Leaf)) {
+            $editorArchive = Join-Path $env:RUNNER_TEMP 'Godot-4.7.2-win64.zip'
+            Invoke-WebRequest 'https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip' -OutFile $editorArchive
+            Expand-Archive -LiteralPath $editorArchive -DestinationPath (Join-Path $env:USERPROFILE 'godot') -Force
+          }
           if (-not (Test-Path -LiteralPath $godotConsole -PathType Leaf)) { throw "Godot console wrapper missing: $godotConsole" }
           "SECURITY_LAB_GODOT_CONSOLE=$godotConsole" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Validate authored baseline and build native EXE

@@ -33,6 +33,8 @@ The setup action creates a hard-link GUI alias on Windows, so CI explicitly
 selects `Godot_v4.7.2-stable_win64_console.exe` from its installation directory.
 Hard-link aliases without a companion wrapper fail with a useful message instead
 of silently starting the GUI binary.
+The action's Windows cache omits the wrapper, so CI restores the pinned official
+editor archive when that file is absent while retaining the export-template cache.
 
 Forward+ is the default renderer. For machines that cannot initialize it, Godot's
 Compatibility renderer can be selected with the fixed engine argument
