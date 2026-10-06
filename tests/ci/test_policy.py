@@ -19,6 +19,7 @@ class ScopeTests(unittest.TestCase):
 
     def test_each_runtime_and_shared_assets(self):
         self.assertEqual(classify(['godot/prototype/content/rules.json'], True), {'web':False, 'godot':True})
+        self.assertEqual(classify(['.github/workflows/godot-prototype.yml'], True), {'web':False, 'godot':True})
         self.assertEqual(classify(['src/app.js'], True), {'web':True, 'godot':False})
         self.assertEqual(classify(['assets/models/security_lab.glb'], True), {'web':True, 'godot':True})
         self.assertEqual(classify(['godot/project.godot'], False), {'web':False, 'godot':False})

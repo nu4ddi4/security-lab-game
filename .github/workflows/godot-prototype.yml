@@ -1,0 +1,42 @@
+name: Investigation prototype Windows
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/godot-investigation-prototype']
+    paths: ['.github/workflows/godot-prototype.yml']
+permissions:
+  contents: read
+concurrency:
+  group: prototype-windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  prototype:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: ./.github/actions/godot-setup
+        with:
+          export: 'true'
+      - name: Export and check standalone prototype
+        shell: pwsh
+        run: |
+          $name = "SecurityLab-Prototype-0.1.0-$($env:GITHUB_SHA.Substring(0,7))-Windows-x64.exe"
+          python scripts/prototype-build.py --output "prototype-dist/$name"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        id: artifact
+        with:
+          name: SecurityLab-Prototype-0.1.0-Windows-x64
+          path: prototype-dist/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Download link
+        shell: pwsh
+        env:
+          ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
+        run: |
+          "[Security Lab Prototype 0.1.0]($env:ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
