@@ -156,7 +156,7 @@ func recent_logs() -> Array:
 
 func valid_log_name(name: String) -> bool:
 	var regex = RegEx.new()
-	regex.compile("^godot(?:[0-9_.-]+)?\\.log$")
+	regex.compile("^godot(?:[0-9_.T-]+)?\\.log$")
 	return regex.search(name) != null
 
 func property(object: Object, name: String, fallback = null):
