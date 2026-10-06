@@ -11,7 +11,7 @@
 
 ## 릴리즈
 
-`package.json`과 잠금 파일의 버전, `docs/RELEASE.md`를 갱신해 PR을 머지합니다. Windows 빌드·독립 실행·게임 검사가 통과하면 태그와 릴리즈를 게시합니다. 제목은 `Security Lab vX.Y.Z`입니다.
+`package.json`과 잠금 파일의 버전, `docs/RELEASE.md`를 갱신해 PR을 머지합니다. main의 Windows 검사가 통과하면 같은 커밋의 EXE를 재사용해 태그와 릴리즈를 게시합니다. 빌드는 반복하지 않습니다. 제목은 `Security Lab vX.Y.Z`입니다. [검사·보관·수동 릴리즈](CI.md).
 
 ## 웹 파일 내보내기
 

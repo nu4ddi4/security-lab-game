@@ -1,0 +1,31 @@
+name: Pinned Godot CLI
+description: Godot 4.7.2 with optional export templates and a working console entry
+inputs:
+  export:
+    default: 'false'
+    description: Install export templates
+runs:
+  using: composite
+  steps:
+    - uses: chickensoft-games/setup-godot@v2
+      with:
+        version: 4.7.2
+        use-dotnet: false
+        include-templates: ${{ inputs.export }}
+    - name: Select Linux CLI
+      if: runner.os != 'Windows'
+      shell: bash
+      run: echo "SECURITY_LAB_GODOT_CONSOLE=$(command -v godot)" >> "$GITHUB_ENV"
+    - name: Select Windows console companion
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $godotConsole = Join-Path $env:USERPROFILE 'godot/Godot_v4.7.2-stable_win64_console.exe'
+        # setup-godot's Windows cache can omit the console companion.
+        if (-not (Test-Path -LiteralPath $godotConsole -PathType Leaf)) {
+          $archive = Join-Path $env:RUNNER_TEMP 'Godot-4.7.2-win64.zip'
+          Invoke-WebRequest 'https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip' -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $env:USERPROFILE 'godot') -Force
+        }
+        if (-not (Test-Path -LiteralPath $godotConsole -PathType Leaf)) { throw "Godot console wrapper missing: $godotConsole" }
+        "SECURITY_LAB_GODOT_CONSOLE=$godotConsole" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
