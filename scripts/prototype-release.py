@@ -21,6 +21,9 @@ def main():
         raise ValueError('Invalid verified build reference')
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
         raise ValueError('Use a prototype version in X.Y.Z form')
+    configured_version = json.loads(Path('godot/prototype/version.json').read_text(encoding='utf-8'))['version']
+    if version != configured_version:
+        raise ValueError('Release version differs from the prototype version')
     prefix = 'repos/' + repository
     run = github(prefix + '/actions/runs/' + run_id)
     if (run.get('status') != 'completed' or run.get('conclusion') != 'success'
@@ -31,16 +34,17 @@ def main():
             or run.get('event') not in {'push', 'workflow_dispatch'}):
         raise ValueError('Expected the successful Windows prototype build from this branch')
     subprocess.run(['git', 'merge-base', '--is-ancestor', sha, 'HEAD'], check=True)
+    subprocess.run(['git', 'diff', '--quiet', sha, 'HEAD', '--', 'godot', 'scripts/prototype-build.py'], check=True)
     jobs = github(prefix + '/actions/runs/' + run_id + '/jobs?per_page=100')['jobs']
     if not any(job['name'] == 'prototype' and job.get('conclusion') == 'success' for job in jobs):
         raise ValueError('Windows EXE verification did not succeed')
     artifacts = github(prefix + '/actions/runs/' + run_id + '/artifacts?per_page=100')['artifacts']
-    matching = [item for item in artifacts if item['name'] == 'SecurityLab-Prototype-0.1.0-Windows-x64']
+    tag = 'SecurityLab-proto-' + version
+    matching = [item for item in artifacts if item['name'] == tag + '-Windows-x64']
     if (len(matching) != 1 or matching[0].get('expired') is not False
             or matching[0].get('size_in_bytes', 0) <= 0
             or matching[0].get('workflow_run', {}).get('head_sha', sha) != sha):
         raise ValueError('Prototype artifact is missing, expired or from another commit')
-    tag = 'SecurityLab-proto-' + version
     release = github(prefix + '/releases/tags/' + tag, missing_ok=True)
     migrate = os.environ.get('PROTOTYPE_MIGRATE_FROM_TAG', '')
     if release is None and migrate:
@@ -61,7 +65,7 @@ def main():
         download = directory / 'download'
         subprocess.run(['gh', 'run', 'download', run_id, '--repo', repository,
                         '--name', matching[0]['name'], '--dir', str(download)], check=True)
-        original = download / ('SecurityLab-Prototype-0.1.0-' + sha[:7] + '-Windows-x64.exe')
+        original = download / (tag + '.exe')
         checksum = original.with_suffix('.sha256')
         digest = hashlib.sha256(original.read_bytes()).hexdigest()
         if checksum.read_text(encoding='utf-8').strip() != digest + '  ' + original.name:
@@ -75,8 +79,7 @@ def main():
         sums.write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest() + '  ' + path.name + '\n'
                                 for path in [exe, archive]), encoding='utf-8')
         notes = directory / 'release-notes.md'
-        notes.write_text('Windows 조사 프로토타입. EXE만 실행하면 됩니다.\n\n'
-                         '5~7일차 상세 조사와 정식 결말은 개발 중입니다.\n', encoding='utf-8')
+        notes.write_text(Path('docs/PROTOTYPE_RELEASE_NOTES.md').read_text(encoding='utf-8'), encoding='utf-8')
         if release:
             if reference is None:
                 subprocess.run(['gh', 'api', '--method', 'POST', prefix + '/git/refs',
@@ -104,8 +107,14 @@ def main():
                             '--repo', repository, '--target', sha, '--prerelease', '--latest=false',
                             '--title', tag, '--notes-file', str(notes)], check=True)
     release = github(prefix + '/releases/tags/' + tag)
-    if not release.get('prerelease') or release.get('draft'):
+    if (not release.get('prerelease') or release.get('draft')
+            or release.get('tag_name') != tag or release.get('name') != tag):
         raise ValueError('The beta must be a published prerelease')
+    expected = {tag + '.exe', tag + '.zip', 'SHA256SUMS.txt'}
+    uploaded = {item['name'] for item in release['assets']
+                if item.get('state') == 'uploaded' and item.get('size', 0) > 0}
+    if not expected <= uploaded:
+        raise ValueError('The prototype release is missing an uploaded file')
     print(release['html_url'])
     with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
         summary.write('[' + tag + '](' + release['html_url'] + ')\n')

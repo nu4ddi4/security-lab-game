@@ -8,11 +8,11 @@
 
 Godot **4.7.2 stable**에서 `godot/project.godot`을 열고 F5를 누릅니다. 기본 진입은 조사 프로토타입입니다. 새 조사는 회사·담당 업무 설명과 첫날 인계 안내로 시작합니다. 메인 메뉴는 이후 작업입니다.
 
-Windows 테스트 빌드는 `Investigation prototype Windows`의 Actions 아티팩트로 제공합니다. `SecurityLab-Prototype-0.1.0-커밋-Windows-x64.exe`만 실행하면 됩니다. 더미 환경·사건 자료·한국어 폰트를 EXE에 포함하며 기존 맵·웹·가이드는 포함하지 않습니다. 이 빌드는 OpenGL 호환 렌더러를 사용합니다.
+Windows 테스트 빌드는 `Investigation prototype Windows`의 Actions 아티팩트로 제공합니다. `SecurityLab-proto-X.Y.Z.exe`만 실행하면 됩니다. 더미 환경·사건 자료·한국어 폰트를 EXE에 포함하며 기존 맵·웹·가이드는 포함하지 않습니다. 이 빌드는 OpenGL 호환 렌더러를 사용합니다.
 
-배포는 [SecurityLab-proto-0.1.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-proto-0.1.0)입니다. 제목·태그·EXE·ZIP은 `SecurityLab-proto-X.Y.Z` 형식을 사용합니다. Pre-release로 게시하고 정식 Latest를 바꾸지 않습니다. 검증된 Windows 빌드를 재사용하고 EXE·EXE만 담은 ZIP·체크섬을 제공합니다. 수정 배포는 `0.1.1`, 다음 기능 배포는 `0.2.0`으로 올립니다.
+배포는 [SecurityLab-proto-0.1.1](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-proto-0.1.1)입니다. 제목·태그·EXE·ZIP은 `SecurityLab-proto-X.Y.Z` 형식을 사용합니다. Pre-release로 게시하고 정식 Latest를 바꾸지 않습니다. 검증된 Windows 빌드를 재사용하고 EXE·EXE만 담은 ZIP·체크섬을 제공합니다. 다음 수정 배포는 `0.1.2`, 기능 배포는 `0.2.0`으로 올립니다.
 
-이 브랜치의 `.github/workflows/godot-prototype.yml`을 변경하면 빌드를 실행합니다. 일반 개발 push에서는 빠른 검사만 유지합니다. 같은 커밋은 Actions에서 재실행할 수 있습니다. 로컬 Windows 빌드 명령은 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로"`입니다.
+버전은 `godot/prototype/version.json`에서 관리합니다. 버전 파일이나 `.github/workflows/godot-prototype.yml`을 변경하면 Windows 빌드를 실행합니다. 검증한 빌드 참조로 사전 릴리즈를 게시하며 빌드를 반복하지 않습니다. “커밋” 요청은 GitHub 반영과 릴리즈를 포함합니다. 로컬 Windows 빌드는 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로" --rendered-check`입니다.
 
 - WASD·마우스: 이동·시점, Shift: 달리기, C: 앉기, Space: 점프.
 - E: 외관 확인. 원본 기록을 확보하지 않습니다.
@@ -25,8 +25,6 @@ NPC 대화는 화면 아래 대화창을 사용합니다. 대화 중 이동·시
 터미널은 현장 장비에서 열고 해당 장비의 명령과 원본을 조회합니다. `pwd`, `ls`, `cat 파일명`과 기존 점검·복구 명령을 사용합니다. 명령 설명, 입력 이력, 자동완성, 출력 복사·지우기, 장비별 출력 보존을 지원합니다. 실행 중지와 업무 종료에는 확인 창이 있습니다.
 
 첫날 안내는 보안팀장 인계 → 서버 담당자 → 서버 기준 상태 → 프로젝트 담당자 → 원본 파일 → 정비 담당자 → 승인 범위 → 업무 종료 순서입니다. 현재 기록과 수행 상태로 다음 목표를 계산하며, 기존 저장을 계속 사용할 수 있습니다.
-
-이 UI 개선은 현재 브랜치 소스에 반영되어 있습니다. 위의 `SecurityLab-proto-0.1.0` EXE는 개선 전 빌드입니다.
 
 기존 학습 게임은 다음처럼 엽니다.
 
@@ -77,7 +75,7 @@ python scripts/prototype-test.py --godot "C:/path/to/Godot_v4.7.2-stable_win64_c
 
 UI 개선 후 Linux에서 시나리오 8개·444개 검증과 실제 렌더링 장면 검사를 통과했습니다. 첫날 안내 완주, 대화창·메신저 분리, 카메라 복원, 명령 자동완성·이력, 파일 조회 권한, 상호작용 안내와 저장을 확인했습니다.
 
-Windows 프로토타입 0.1.0 빌드 `1339e19`에서 시나리오 8개·433개 검증과 더미 장면 검사가 통과했습니다. EXE만 있는 폴더에서도 headless 실행·상호작용·이동·저장 검사를 두 번 통과했습니다. 실제 화면·마우스 조작의 사용성은 직접 플레이로 확인합니다.
+Windows 빌드는 시나리오·더미 장면 검사 후 EXE만 별도 폴더로 옮겨 실행·저장·재실행을 확인합니다. 실제 렌더링으로 첫 화면·대화·터미널·메신저·노트·이동을 검사하고 화면 6개를 Actions 아티팩트에 보관합니다. 수동 플레이의 사용성 검토는 별도로 진행합니다.
 
 프로토타입 전용 빌드는 임시 프로젝트에서 규칙·더미 장면을 검사합니다. 내보내기 후 임시 소스를 삭제하고 EXE만 별도 폴더로 복사해 검증합니다.
 
