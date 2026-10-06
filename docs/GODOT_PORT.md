@@ -25,6 +25,10 @@ The normal release export is not code signed. Its size is about 247 MB, includin
 the engine and imported assets; the EXE is distributed through the separate
 `SecurityLab-Native-Windows-x64` Actions artifact rather than committed to Git.
 The existing web Windows artifact/release path is retained.
+The build helper resolves Windows PATH symlinks to the installed engine and
+uses its adjacent `*_console.exe` wrapper for captured output and exit status.
+Both build checks and scene smoke use that same console entry point; the player
+EXE remains a normal graphical application.
 
 Forward+ is the default renderer. For machines that cannot initialize it, Godot's
 Compatibility renderer can be selected with the fixed engine argument

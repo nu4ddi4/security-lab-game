@@ -3,6 +3,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Push-Location $repoRoot
 try {
+    $Godot = & (Join-Path $PSScriptRoot 'godot-console.ps1') -Godot $Godot
+    Write-Host "Godot CLI: $Godot"
     $version = & $Godot --version
     if ($LASTEXITCODE -ne 0 -or $version -notmatch '^4\.7\.2\.stable') { throw "Use tested Godot 4.7.2 stable: $version" }
     & $Godot --headless --editor --path godot --import
