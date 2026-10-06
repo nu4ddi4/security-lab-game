@@ -1,0 +1,28 @@
+name: Verified Inno Setup 6.7.3
+description: Install the pinned signed compiler used by native package tests
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      id: inno-cache
+      with:
+        path: ${{ runner.temp }}/securitylab-inno-6.7.3
+        key: securitylab-inno-6.7.3-${{ runner.os }}
+    - name: Install pinned compiler
+      if: steps.inno-cache.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        $compilerRoot = Join-Path $env:RUNNER_TEMP 'securitylab-inno-6.7.3'
+        $compilerSetup = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+        Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $compilerSetup
+        if ((Get-FileHash -LiteralPath $compilerSetup).Hash -ne '9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732') { throw 'Pinned Inno SHA-256 mismatch' }
+        $signature = Get-AuthenticodeSignature -LiteralPath $compilerSetup
+        if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Pyrsys') { throw 'Inno publisher verification failed' }
+        $setupProcess = Start-Process -FilePath $compilerSetup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER','/NOICONS',('/DIR="'+$compilerRoot+'"')) -WindowStyle Hidden -Wait -PassThru
+        if ($setupProcess.ExitCode -ne 0) { throw 'Inno installation failed' }
+    - name: Expose compiler
+      shell: pwsh
+      run: |
+        $compilerPath = Join-Path $env:RUNNER_TEMP 'securitylab-inno-6.7.3/ISCC.exe'
+        if (-not (Test-Path -LiteralPath $compilerPath)) { throw 'Inno compiler missing' }
+        "SECURITY_LAB_ISCC=$compilerPath" >> $env:GITHUB_ENV

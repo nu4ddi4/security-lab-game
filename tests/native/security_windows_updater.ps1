@@ -51,8 +51,8 @@ function Compile-Setup([string]$App,[string]$Label) {
     Copy-Item -LiteralPath $App -Destination (Join-Path $payload 'SecurityLab.exe')
     Write-UpdateJson (Join-Path $payload 'build_info.json') $newBuild
     Write-UpdateJson (Join-Path $payload 'securitylab.install.json') $sourceMarker
-    & $Iscc /Qp ('/DSourceDirectory='+$payload) ('/DOutputDirectory='+$output) '/DChannel=dev' '/DAppVersion=0.7.1-dev.1' '/DBinaryVersion=0.7.1.0' (Join-Path $repoRoot 'installer/SecurityLab.iss') | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Real Inno fixture compilation failed' }
+    $compilerOutput = @(& $Iscc /Qp ('/DSourceDirectory='+$payload) ('/DOutputDirectory='+$output) '/DChannel=dev' '/DAppVersion=0.7.1-dev.1' '/DBinaryVersion=0.7.1.0' (Join-Path $repoRoot 'installer/SecurityLab.iss') 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw ('Real Inno fixture compilation failed: '+($compilerOutput -join "`n")) }
     Join-Path $output 'SecurityLabSetup.exe'
 }
 $successSetup=Compile-Setup $newStub 'healthy-package'

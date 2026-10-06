@@ -106,6 +106,8 @@ Existing scoped Test and native Windows EXE exports remain. New updater policy
 checks are added to the fast native job. The dedicated Native update package job
 builds SecurityLabSetup.exe, update.json and build_info.json and exercises the
 Windows/loopback tests. Feature-branch pushes and default manual runs produce
+CI uses pinned Inno 6.7.3 after SHA-256 and publisher verification, rather than
+the runner's unrelated compiler installation.
 artifacts only. They do not publish to any live channel.
 
 Publication requires the original repository, godot-port or a `native-CHANNEL-vVERSION`

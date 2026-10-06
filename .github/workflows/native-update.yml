@@ -48,6 +48,7 @@ jobs:
       - uses: ./.github/actions/godot-setup
         with:
           export: 'true'
+      - uses: ./.github/actions/inno-setup
       - uses: actions/cache@v4
         with:
           path: .git/lfs/objects
@@ -67,7 +68,7 @@ jobs:
         run: |
           python scripts/ci-godot-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./tests/native/security_windows_updater.ps1
+          ./tests/native/security_windows_updater.ps1 -Iscc $env:SECURITY_LAB_ISCC
           python scripts/godot-update-network-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build SecurityLabSetup and channel metadata
@@ -76,7 +77,7 @@ jobs:
           NATIVE_CHANNEL: ${{ steps.select.outputs.channel }}
           NATIVE_VERSION: ${{ steps.select.outputs.version }}
         run: |
-          ./scripts/godot-update-build.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE -Channel $env:NATIVE_CHANNEL -Version $env:NATIVE_VERSION -Commit $env:GITHUB_SHA
+          ./scripts/godot-update-build.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE -Iscc $env:SECURITY_LAB_ISCC -Channel $env:NATIVE_CHANNEL -Version $env:NATIVE_VERSION -Commit $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & $env:SECURITY_LAB_GODOT_CONSOLE --headless --path godot -- --qa
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
