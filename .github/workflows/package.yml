@@ -1,11 +1,6 @@
 name: Package executable
 on:
   workflow_call:
-    inputs:
-      runner:
-        required: false
-        default: windows-latest
-        type: string
   workflow_dispatch:
 permissions:
   contents: read

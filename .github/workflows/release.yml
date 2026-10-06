@@ -1,110 +1,68 @@
 name: Publish verified portable
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'v*'
-    paths:
-      - docs/RELEASE.md
+  workflow_run:
+    workflows: ['Test', 'Package executable']
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       run_id:
-        description: Successful Windows package run ID
+        description: Successful Test or Package executable run on the current main commit
         required: true
         type: string
       tag:
-        description: Release tag matching package.json, such as v0.2.0
+        description: Version tag matching that commit, such as v0.7.1
         required: true
         type: string
 permissions:
   contents: read
+  actions: read
+concurrency:
+  group: publish-portable
+  cancel-in-progress: false
 jobs:
-  prepare:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    outputs:
-      publish: ${{ steps.version.outputs.publish }}
-      tag: ${{ steps.version.outputs.tag }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          lfs: true
-      - name: Check release version
-        id: version
-        run: |
-          python3 - <<'PY'
-          import json, os, re, subprocess
-          from pathlib import Path
-          version = json.loads(Path('package.json').read_text())['version']
-          assert re.fullmatch(r'\d+\.\d+\.\d+', version)
-          tag = 'v' + version
-          publish = True
-          if os.environ['GITHUB_REF_TYPE'] == 'tag':
-              assert os.environ['GITHUB_REF_NAME'] == tag, 'Tag must match package.json'
-          else:
-              event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
-              previous = json.loads(subprocess.check_output(['git', 'show', event['before'] + ':package.json']))['version']
-              publish = tuple(map(int, version.split('.'))) > tuple(map(int, previous.split('.')))
-              if version == previous:
-                  # A failed package run creates no tag. Publish the corrected
-                  # build with the same still-unreleased version.
-                  publish = subprocess.run(['git', 'show-ref', '--verify', '--quiet', 'refs/tags/' + tag]).returncode == 1
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f'publish={str(publish).lower()}\ntag={tag}\n')
-          PY
-  package:
-    needs: prepare
-    if: needs.prepare.outputs.publish == 'true'
-    uses: ./.github/workflows/package.yml
-    with:
-      runner: windows-latest
   release:
-    needs: [prepare, package]
-    if: ${{ always() && ((github.event_name == 'push' && needs.package.result == 'success') || github.event_name == 'workflow_dispatch') }}
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch'))
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       actions: read
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Verify package run
-        # Downloaded release assets are verified below; this checkout only
-        # provides release scripts and does not need the authoring LFS files.
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Select an existing verified build
         id: package
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ inputs.run_id || github.run_id }}
-          RELEASE_TAG: ${{ inputs.tag || needs.prepare.outputs.tag }}
-        run: |
-          python3 - <<'PY'
-          import json, os, re, subprocess
-          from pathlib import Path
-          repo = os.environ['GITHUB_REPOSITORY']
-          run_id = os.environ['RUN_ID']
-          assert run_id.isdecimal()
-          tag = os.environ['RELEASE_TAG']
-          assert re.fullmatch(r'v\d+\.\d+\.\d+', tag), 'Use a stable version tag such as v0.2.0'
-          version = json.loads(Path('package.json').read_text())['version']
-          assert tag == 'v' + version, 'Release tag must match package.json'
-          sha = os.environ['GITHUB_SHA']
-          if os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch':
-              run = json.loads(subprocess.check_output(['gh', 'api', f'repos/{repo}/actions/runs/{run_id}']))
-              assert run['conclusion'] == 'success' and run['path'] == '.github/workflows/package.yml'
-              assert run['head_sha'] == sha, 'Package and release must use the same commit'
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f'sha={sha}\nrun_id={run_id}\ntag={tag}\n')
-          PY
-      - uses: actions/download-artifact@v4
+          RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: python3 scripts/ci_release.py
+      - name: Check out the verified commit
+        if: steps.package.outputs.publish == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.package.outputs.sha }}
+      - name: Download its Windows executable
+        if: steps.package.outputs.publish == 'true'
+        uses: actions/download-artifact@v4
         with:
           name: SecurityLab-Windows-X64
           path: portable
           run-id: ${{ steps.package.outputs.run_id }}
           github-token: ${{ github.token }}
       - name: Assemble release archives
+        if: steps.package.outputs.publish == 'true'
         run: python3 scripts/assemble_release.py
       - name: Publish portable release
+        if: steps.package.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ steps.package.outputs.sha }}
