@@ -3,6 +3,10 @@ description: Core checks, standalone EXE, one Chrome scene startup, artifact
 runs:
   using: composite
   steps:
+    - uses: actions/cache@v4
+      with:
+        path: .git/lfs/objects
+        key: web-lfs-${{ hashFiles('assets/models/security_lab.glb') }}
     - name: Fetch runtime GLB only
       shell: pwsh
       run: git lfs pull --include="assets/models/security_lab.glb" --exclude=""
@@ -41,7 +45,7 @@ runs:
         name: SecurityLab-Windows-X64
         path: dist/SecurityLab.exe
         if-no-files-found: error
-        retention-days: 90
+        retention-days: 14
     - name: Upload diagnostics
       if: failure()
       uses: actions/upload-artifact@v4

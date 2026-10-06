@@ -1,0 +1,61 @@
+name: Godot Native Windows
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require a native project on the selected branch
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'godot/project.godot')) { throw 'Select a branch containing the Godot project.' }
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs/objects
+          key: native-lfs-${{ hashFiles('godot/assets/models/*.glb', 'assets/models/security_lab.glb') }}
+      - name: Fetch native and baseline runtime
+        shell: pwsh
+        run: git lfs pull --include="godot/assets/models/Interior_07_Godot.glb,assets/models/security_lab.glb" --exclude=""
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: ./.github/actions/godot-setup
+        with:
+          export: 'true'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            godot/.godot
+            godot/assets/models/Interior_07_Godot_*.jpg
+            godot/assets/models/Interior_07_Godot_*.png
+          key: native-import-4.7.2-${{ runner.os }}-${{ hashFiles('godot/assets/**', 'godot/project.godot') }}
+          restore-keys: native-import-4.7.2-${{ runner.os }}-
+      - name: Build and validate native EXE
+        shell: pwsh
+        run: ./scripts/godot-build.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE
+      - name: Native scene binding smoke
+        shell: pwsh
+        run: |
+          & $env:SECURITY_LAB_GODOT_CONSOLE --headless --path godot -- --qa
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Investigation prototype
+        shell: pwsh
+        run: |
+          if (Test-Path 'godot/prototype/main.tscn') {
+            python scripts/prototype-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecurityLab-Native-Windows-x64
+          path: godot/builds/Windows/SecurityLab.exe
+          if-no-files-found: error
+          retention-days: 14
