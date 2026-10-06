@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import subprocess
 
 SPEC = importlib.util.spec_from_file_location('native_release', Path(__file__).parents[2] / 'scripts/godot-update-release.py')
 release = importlib.util.module_from_spec(SPEC)
@@ -11,6 +12,11 @@ SPEC.loader.exec_module(release)
 
 
 class NativeUpdates(unittest.TestCase):
+    def test_installer_is_in_repository(self):
+        root = Path(__file__).parents[2]
+        tracked = subprocess.check_output(['git', 'ls-files', 'installer/SecurityLab.iss'], cwd=root, text=True)
+        self.assertEqual(tracked.strip(), 'installer/SecurityLab.iss')
+        self.assertTrue((root / tracked.strip()).is_file())
     def test_channel_order(self):
         self.assertGreater(release.version_key('0.7.1-dev.10'), release.version_key('0.7.1-dev.9'))
         self.assertGreater(release.version_key('0.8.0'), release.version_key('0.7.9'))

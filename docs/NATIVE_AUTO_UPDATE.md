@@ -24,9 +24,9 @@ GitHub asset redirects are followed explicitly through its HTTPS asset hosts.
 
 `godot/resources/build_info.json` is baked into the PCK and also installed next
 to SecurityLab.exe. Both identities must match. The source build is dev/OFF;
-Preferences are also channel-specific; enabling stable never opts beta/dev in.
 the package builder creates stable/ON or beta/dev/OFF metadata before exporting
 and restores source files afterwards. Never reuse an EXE with another build_info.
+Preferences are also channel-specific; enabling stable never opts beta/dev in.
 
 - Runtime: `godot/scripts/update_policy.gd`, `update_manager.gd`.
 - Worker: `godot/resources/native_update_helper.ps1`.
@@ -106,9 +106,9 @@ Existing scoped Test and native Windows EXE exports remain. New updater policy
 checks are added to the fast native job. The dedicated Native update package job
 builds SecurityLabSetup.exe, update.json and build_info.json and exercises the
 Windows/loopback tests. Feature-branch pushes and default manual runs produce
+artifacts only. They do not publish to any live channel.
 CI uses pinned Inno 6.7.3 after SHA-256 and publisher verification, rather than
 the runner's unrelated compiler installation.
-artifacts only. They do not publish to any live channel.
 
 Publication requires the original repository, godot-port or a `native-CHANNEL-vVERSION`
 tag, and a commit contained in godot-port. A successful package precedes publish.
