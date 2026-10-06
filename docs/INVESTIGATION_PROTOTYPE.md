@@ -10,6 +10,8 @@ Godot **4.7.2 stable**에서 `godot/project.godot`을 열고 F5를 누릅니다.
 
 Windows 테스트 빌드는 `Investigation prototype Windows`의 Actions 아티팩트로 제공합니다. `SecurityLab-Prototype-0.1.0-커밋-Windows-x64.exe`만 실행하면 됩니다. 더미 환경·사건 자료·한국어 폰트를 EXE에 포함하며 기존 맵·웹·가이드는 포함하지 않습니다. 이 빌드는 OpenGL 호환 렌더러를 사용합니다.
 
+베타 배포는 [Security Lab Prototype 0.1.0-beta.1](https://github.com/nu4ddi4/security-lab-game/releases/tag/prototype-v0.1.0-beta.1)입니다. `prototype-v` 태그와 Pre-release 표시를 사용하며 정식 Latest를 바꾸지 않습니다. 검증된 Windows 빌드를 재사용하고 EXE·EXE만 담은 ZIP·체크섬을 제공합니다.
+
 이 브랜치의 `.github/workflows/godot-prototype.yml`을 변경하면 빌드를 실행합니다. 일반 개발 push에서는 빠른 검사만 유지합니다. 같은 커밋은 Actions에서 재실행할 수 있습니다. 로컬 Windows 빌드 명령은 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로"`입니다.
 
 - WASD·마우스: 이동·시점, Shift: 달리기, C: 앉기, Space: 점프.
