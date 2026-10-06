@@ -1,5 +1,6 @@
 class_name LabUI
 extends CanvasLayer
+signal quit_requested
 
 signal resume_requested
 signal reset_position_requested
@@ -215,7 +216,7 @@ func setup(manager: LabMissions, actor: LabPlayer, load_status: String):
 	button(actions,"출입구로 복귀",func(): reset_position_requested.emit(); close_tool())
 	button(actions,"진행 가져오기",show_import)
 	button(actions,"미션 초기화",func(): missions.reset_mission(); terminal.clear(); refresh())
-	button(actions,"종료",func(): save_requested.emit(); get_tree().quit())
+	button(actions,"종료",func(): quit_requested.emit())
 	missions.state_changed.connect(refresh)
 	missions.observation.connect(show_observation)
 	refresh()

@@ -95,6 +95,14 @@ func show_menu():
 	var sfx = slider(body,"환경음 / 효과음",values.sfx,0,1,.05)
 	var sensitivity = slider(body,"마우스 감도",values.sensitivity,.0005,.004,.0001)
 	var fov = slider(body,"시야각",values.fov,60,90,1)
+	if game.updater!=null and not game.updater.info.is_empty():
+		game.ui.label(body,"업데이트 · %s · %s"%[game.updater.info.channel,game.updater.info.version],18)
+		var automatic = CheckBox.new()
+		automatic.text = "시작할 때 내 채널의 업데이트 확인 / 다운로드"
+		automatic.button_pressed = game.updater.enabled
+		automatic.toggled.connect(game.updater.set_enabled)
+		body.add_child(automatic)
+		if game.updater.state=="ready": game.ui.button(body,"진행을 저장하고 업데이트 설치",game.updater.install)
 	game.ui.button(body,"적용하고 저장",func():
 		values = {"resolution":resolution.selected,"fullscreen":fullscreen.button_pressed,"vsync":vsync.button_pressed,"quality":quality.selected,"master":master.value,"sfx":sfx.value,"sensitivity":sensitivity.value,"fov":fov.value}
 		apply()

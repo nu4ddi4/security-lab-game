@@ -11,6 +11,7 @@ var startup_usec = Time.get_ticks_usec()
 var loaded_ms = 0.0
 var qa_mode = false
 var settings: LabSettings
+var updater: LabUpdater
 
 func _ready():
 	for argument in OS.get_cmdline_user_args():
@@ -50,6 +51,7 @@ func _ready():
 	player.pause_requested.connect(ui.pause)
 	ui.reset_position_requested.connect(player.respawn)
 	ui.save_requested.connect(save_now)
+	ui.quit_requested.connect(request_quit)
 	ui.import_requested.connect(import_progress)
 	save_timer = Timer.new()
 	save_timer.one_shot = true
@@ -57,6 +59,12 @@ func _ready():
 	save_timer.timeout.connect(save_now)
 	add_child(save_timer)
 	missions.state_changed.connect(func(): save_timer.start())
+	if not qa_mode:
+		updater = LabUpdater.new()
+		updater.name = "NativeUpdater"
+		add_child(updater)
+		updater.status_changed.connect(func(message): ui.toast.text = message)
+		updater.setup(self)
 	loaded_ms = (Time.get_ticks_usec()-startup_usec)/1000.0
 	print("NATIVE_READY ",JSON.stringify({"godot":Engine.get_version_info().string,"load_ms":loaded_ms,"functional":world.protected_nodes.size(),"colliders":world.collider_count,"doors":world.doors.size(),"devices":world.devices.size(),"screens":equipment.screen_bindings,"leds":equipment.leds.size(),"renderer":RenderingServer.get_current_rendering_method()}))
 	if qa_mode and "--qa-manual" not in OS.get_cmdline_user_args():
@@ -95,7 +103,15 @@ func setup_input():
 
 func _notification(what):
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and missions != null:
-		saves.save(missions)
-		get_tree().quit()
+		request_quit()
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and ui != null and not qa_mode:
 		ui.open_tool("Notes")
+
+func request_quit():
+	if updater!=null and updater.enabled and updater.install_on_exit and updater.state=="ready":
+		updater.install(); return
+	if updater!=null and updater.state=="preparing": return
+	if missions!=null and not saves.save(missions):
+		if ui!=null: ui.toast.text = saves.error_message
+		return
+	get_tree().quit()
