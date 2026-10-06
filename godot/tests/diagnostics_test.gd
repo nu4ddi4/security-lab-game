@@ -96,7 +96,7 @@ func _initialize():
 	write(diagnostics.log_directory.path_join("godot.log"),"X".repeat(100000)+"\n"+logs)
 	check(diagnostics.recent_logs()[0].tail_truncated,"Large log uses bounded tail")
 	check(not diagnostics.safe_path("//server/private"),"UNC paths rejected")
-	var updater_dir = diagnostics.update_directory.path_join("12345678-1234-1234-1234-123456789012")
+	var updater_dir = diagnostics.update_directory.path_join("12345678901234567890123456789012")
 	write(updater_dir.path_join("result.json"),JSON.stringify({"state":"rolled_back","version":"0.7.1","token":"secret","backup":"C:/Users/Alice","error":"password=private"}))
 	var updater = diagnostics.updater_summary()
 	check(updater.available and updater.recent_result.state == "rolled_back","Optional updater result detected")

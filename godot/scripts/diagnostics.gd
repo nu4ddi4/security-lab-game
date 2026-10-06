@@ -179,7 +179,7 @@ func updater_summary() -> Dictionary:
 	if directory == null: return result
 	var candidates = []
 	var regex = RegEx.new()
-	regex.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+	regex.compile("^[0-9a-f]{32}$")
 	for name in directory.get_directories():
 		if regex.search(name) == null: continue
 		var path = update_directory.path_join(name).path_join("result.json")

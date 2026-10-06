@@ -62,7 +62,7 @@ free-form 문장은 **redaction 후에도 포함하지 않습니다**. 오류/�
 파일이 없거나 읽을 수 없으면 상태를 남기고 나머지 패키지를 생성합니다.
 
 이 기준선에는 updater가 아직 없습니다. 향후 `game.updater`의 상태·enabled·build만 읽을 수 있으며,
-기존 updater의 GUID stage 폴더 중 최근 `result.json`을 읽어 `installed`, `rolled_back`,
+기존 updater의 32자리 hex stage 폴더 중 최근 `result.json`을 읽어 `installed`, `rolled_back`,
 `recovery_required`, `cancelled`, `verifying_startup`만 남깁니다.
 URL/token/PID/backup 경로/error 문장/transaction/설치 프로그램은 포함하지 않습니다.
 updater 메서드를 호출하거나 상태를 바꾸지 않습니다.
