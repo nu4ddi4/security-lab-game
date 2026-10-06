@@ -13,6 +13,7 @@
     "test": "node --test --test-isolation=none tests/engine.test.js tests/scene.test.js",
     "test:e2e": "playwright test",
     "test:server": "node scripts/test-server.js",
+    "test:prototype": "python scripts/prototype-test.py",
     "check": "npm test && npm run test:server && npm run test:e2e",
     "vendor": "node scripts/vendor-three.js"
   },

@@ -2,9 +2,9 @@ name: Godot Native Windows
 on:
   workflow_dispatch:
   push:
-    paths: ['godot/**', 'scripts/godot-*', '.github/workflows/godot-native.yml']
+    paths: ['godot/**', 'scripts/godot-*', 'scripts/prototype-*', '.github/workflows/godot-native.yml']
   pull_request:
-    paths: ['godot/**', 'scripts/godot-*', '.github/workflows/godot-native.yml']
+    paths: ['godot/**', 'scripts/godot-*', 'scripts/prototype-*', '.github/workflows/godot-native.yml']
 permissions:
   contents: read
 concurrency:
@@ -53,6 +53,9 @@ jobs:
         run: |
           & $env:SECURITY_LAB_GODOT_CONSOLE --headless --path godot -- --qa
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Investigation prototype scenarios and dummy scene
+        shell: pwsh
+        run: python scripts/prototype-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
       - uses: actions/upload-artifact@v4
         with:
           name: SecurityLab-Native-Windows-x64

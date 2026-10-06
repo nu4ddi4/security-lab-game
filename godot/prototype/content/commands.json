@@ -1,0 +1,256 @@
+[
+  {
+    "text": "help",
+    "devices": [
+      "control_console",
+      "server_console",
+      "project_pc",
+      "maintenance_terminal",
+      "approval_archive",
+      "briefing_board"
+    ],
+    "action": "help",
+    "args": {}
+  },
+  {
+    "text": "status",
+    "devices": [
+      "control_console",
+      "server_console",
+      "project_pc",
+      "maintenance_terminal",
+      "approval_archive",
+      "briefing_board"
+    ],
+    "action": "status",
+    "args": {}
+  },
+  {
+    "text": "logs tasks",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "tasks"
+    }
+  },
+  {
+    "text": "inspect T-17",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "task17"
+    }
+  },
+  {
+    "text": "inspect T-19",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "task19"
+    }
+  },
+  {
+    "text": "logs access --task T-17",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "access"
+    }
+  },
+  {
+    "text": "inspect staging",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "staging"
+    }
+  },
+  {
+    "text": "logs backups",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "backup"
+    }
+  },
+  {
+    "text": "inspect backups",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "backup"
+    }
+  },
+  {
+    "text": "inspect account",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "account"
+    }
+  },
+  {
+    "text": "backup disable B-05",
+    "devices": [
+      "server_console"
+    ],
+    "action": "backup_disable",
+    "args": {}
+  },
+  {
+    "text": "backup enable B-05",
+    "devices": [
+      "server_console"
+    ],
+    "action": "backup_enable",
+    "args": {}
+  },
+  {
+    "text": "repair index",
+    "devices": [
+      "server_console"
+    ],
+    "action": "index_repair",
+    "args": {}
+  },
+  {
+    "text": "snapshot T-17",
+    "devices": [
+      "server_console"
+    ],
+    "action": "snapshot",
+    "args": {}
+  },
+  {
+    "text": "pause T-17",
+    "devices": [
+      "server_console"
+    ],
+    "action": "pause",
+    "args": {}
+  },
+  {
+    "text": "verify service",
+    "devices": [
+      "server_console"
+    ],
+    "action": "verify_service",
+    "args": {}
+  },
+  {
+    "text": "inspect files",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "files"
+    }
+  },
+  {
+    "text": "search LUMEN",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "search"
+    }
+  },
+  {
+    "text": "logs indexing",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "index"
+    }
+  },
+  {
+    "text": "logs deployments",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "normal_jobs"
+    }
+  },
+  {
+    "text": "verify search",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "verify_search",
+    "args": {}
+  },
+  {
+    "text": "inspect W-218",
+    "devices": [
+      "control_console",
+      "approval_archive",
+      "maintenance_terminal"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "approval"
+    }
+  },
+  {
+    "text": "logs submissions",
+    "devices": [
+      "control_console",
+      "maintenance_terminal"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "submissions"
+    }
+  },
+  {
+    "text": "inspect PKG-218-R2",
+    "devices": [
+      "control_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "package"
+    }
+  },
+  {
+    "text": "inspect assignment",
+    "devices": [
+      "maintenance_terminal"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "approval"
+    }
+  },
+  {
+    "text": "inspect checklist",
+    "devices": [
+      "briefing_board",
+      "control_console"
+    ],
+    "action": "checklist",
+    "args": {}
+  }
+]

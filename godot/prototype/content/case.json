@@ -1,0 +1,90 @@
+{
+  "caseId": "residual-permissions",
+  "contentVersion": "prototype-1",
+  "contractVersion": 1,
+  "schemaVersion": 1,
+  "title": "잔여 권한",
+  "devices": {
+    "control_console": {
+      "label": "관제 단말",
+      "zone": "관제실",
+      "description": "승인 범위와 중앙 감사 기록을 확인하는 단말입니다."
+    },
+    "server_console": {
+      "label": "서버 단말",
+      "zone": "서버실",
+      "description": "서비스·백업·자동 작업을 확인하는 단말입니다."
+    },
+    "project_pc": {
+      "label": "업무 PC",
+      "zone": "업무 구역",
+      "description": "LUMEN 원본 자료와 검색 상태를 확인하는 PC입니다."
+    },
+    "maintenance_terminal": {
+      "label": "유지보수 단말",
+      "zone": "업무 구역",
+      "description": "장비 배정과 정비 업무를 확인하는 임시 단말입니다."
+    },
+    "approval_archive": {
+      "label": "승인서 보관함",
+      "zone": "관제실",
+      "description": "보존된 유지보수 승인서를 조회합니다."
+    },
+    "briefing_board": {
+      "label": "인계 게시판",
+      "zone": "공용 구역",
+      "description": "오늘의 점검과 운영 업무를 확인합니다."
+    }
+  },
+  "npcs": {
+    "oh": {
+      "name": "오세진",
+      "role": "보안팀장"
+    },
+    "park": {
+      "name": "박도윤",
+      "role": "서버 운영"
+    },
+    "han": {
+      "name": "한지우",
+      "role": "프로젝트 개발"
+    },
+    "seo": {
+      "name": "서유진",
+      "role": "협력업체 정비"
+    }
+  },
+  "documents": [
+    "LUMEN/design-private.pdf",
+    "LUMEN/pricing-internal.xlsx",
+    "LUMEN/release-draft.txt",
+    "LUMEN/contracts-internal.pdf",
+    "LUMEN/architecture-private.pdf",
+    "LUMEN/forecast-internal.xlsx"
+  ],
+  "tasks": {
+    "T-17": {
+      "label": "자료 색인 점검",
+      "created": {
+        "dayOffset": -14,
+        "minute": 900
+      },
+      "modified": {
+        "dayOffset": -1,
+        "minute": 995
+      },
+      "account": "svc_release"
+    },
+    "T-19": {
+      "label": "정비 결과 전달",
+      "created": {
+        "dayOffset": -1,
+        "minute": 995
+      },
+      "scheduled": {
+        "dayOffset": 7,
+        "minute": 1050
+      }
+    }
+  }
+}

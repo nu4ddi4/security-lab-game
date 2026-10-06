@@ -1,5 +1,9 @@
 # Security Lab native companion
 
+This prototype branch starts the dummy investigation scene by default. See
+[Investigation prototype](INVESTIGATION_PROTOTYPE.md). Use `--legacy` to run the
+native learning game described below; the existing `--qa` checks still select it.
+
 The native project lives in `godot/`, beside the unchanged web v0.7.0 runtime.
 Baseline: upstream main `6e6580e`. Tested engine: **Godot 4.7.2 stable,
 official ed1daf0bf**, standard GDScript edition. Windows x64 export templates
