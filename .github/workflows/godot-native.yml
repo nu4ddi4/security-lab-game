@@ -30,14 +30,21 @@ jobs:
           version: 4.7.2
           use-dotnet: false
           include-templates: true
+      - name: Select Windows console executable
+        shell: pwsh
+        run: |
+          # setup-godot creates a hard-link alias to the GUI binary on Windows.
+          # Use the installed wrapper directly; a hard link has no target path.
+          $godotConsole = Join-Path $env:USERPROFILE 'godot/Godot_v4.7.2-stable_win64_console.exe'
+          if (-not (Test-Path -LiteralPath $godotConsole -PathType Leaf)) { throw "Godot console wrapper missing: $godotConsole" }
+          "SECURITY_LAB_GODOT_CONSOLE=$godotConsole" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Validate authored baseline and build native EXE
         shell: pwsh
-        run: ./scripts/godot-build.ps1 -Godot godot
+        run: ./scripts/godot-build.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE
       - name: Native scene binding smoke
         shell: pwsh
         run: |
-          $godotConsole = ./scripts/godot-console.ps1 -Godot godot
-          & $godotConsole --headless --path godot -- --qa
+          & $env:SECURITY_LAB_GODOT_CONSOLE --headless --path godot -- --qa
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:

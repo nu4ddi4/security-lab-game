@@ -29,6 +29,10 @@ The build helper resolves Windows PATH symlinks to the installed engine and
 uses its adjacent `*_console.exe` wrapper for captured output and exit status.
 Both build checks and scene smoke use that same console entry point; the player
 EXE remains a normal graphical application.
+The setup action creates a hard-link GUI alias on Windows, so CI explicitly
+selects `Godot_v4.7.2-stable_win64_console.exe` from its installation directory.
+Hard-link aliases without a companion wrapper fail with a useful message instead
+of silently starting the GUI binary.
 
 Forward+ is the default renderer. For machines that cannot initialize it, Godot's
 Compatibility renderer can be selected with the fixed engine argument
