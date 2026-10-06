@@ -24,6 +24,7 @@ GitHub asset redirects are followed explicitly through its HTTPS asset hosts.
 
 `godot/resources/build_info.json` is baked into the PCK and also installed next
 to SecurityLab.exe. Both identities must match. The source build is dev/OFF;
+Preferences are also channel-specific; enabling stable never opts beta/dev in.
 the package builder creates stable/ON or beta/dev/OFF metadata before exporting
 and restores source files afterwards. Never reuse an EXE with another build_info.
 
@@ -91,7 +92,7 @@ python scripts/godot-update-network-test.py --godot <Godot-4.7.2-console>
 ./scripts/godot-update-build.ps1 -Godot <Godot-4.7.2-console> -Iscc <ISCC.exe> -Channel dev -Version 0.7.1-dev.1
 ```
 
-Local checks: 452 existing native assertions; 87 updater policy assertions;
+Local checks: 452 existing native assertions; 90 updater policy assertions;
 47 Windows checks using real Inno fixtures (including install/startup rollback,
 quoted Korean/metacharacter paths, file pinning, saves, junctions and a second
 instance); 13 real HTTPRequest scenarios on loopback, including save failure,

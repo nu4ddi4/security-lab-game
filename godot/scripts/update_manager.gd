@@ -18,7 +18,7 @@ var http: HTTPRequest
 var install_on_exit = false
 var helper_pid = -1
 var preparing_dialog: AcceptDialog
-var settings_path = "user://update-settings.json"
+var settings_path = Policy.preference_path("dev")
 
 func executable_path() -> String:
 	return OS.get_executable_path()
@@ -28,6 +28,7 @@ func setup(host: Node):
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string("res://resources/build_info.json"))
 	if not parsed is Dictionary or not Policy.build_valid(parsed): return
 	info = parsed
+	settings_path = Policy.preference_path(info.channel)
 	health_acknowledgement()
 	var arguments = OS.get_cmdline_user_args()
 	local_test = "--allow-local-update-url" in arguments

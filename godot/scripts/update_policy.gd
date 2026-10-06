@@ -10,6 +10,9 @@ const MAX_INSTALLER_BYTES = 536870912
 static func manifest_url(channel: String) -> String:
 	return REPOSITORY+"native-channel-"+channel+"/update.json" if channel in CHANNELS else ""
 
+static func preference_path(channel: String) -> String:
+	return "user://update-settings-"+channel+".json" if channel in CHANNELS else ""
+
 static func enabled_for(build: Dictionary, arguments: PackedStringArray, preference, windows: bool) -> bool:
 	if not windows or "--disable-updates" in arguments: return false
 	if "--force-update-check" in arguments: return true

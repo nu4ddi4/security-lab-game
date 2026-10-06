@@ -15,6 +15,7 @@ func _init():
 	for channel in Policy.CHANNELS:
 		var build = {"schema":1,"app_id":Policy.APP_ID,"platform":Policy.PLATFORM,"install_layout":1,"channel":channel,"version":"0.7.1" if channel=="stable" else "0.7.1-"+channel+".1","commit":"a".repeat(40),"updates_default":channel=="stable","manifest_url":Policy.manifest_url(channel)}
 		expect(Policy.build_valid(build),channel+" baked identity")
+		expect(Policy.preference_path(channel)=="user://update-settings-"+channel+".json",channel+" isolated preference")
 		expect(Policy.enabled_for(build,[],null,true)==(channel=="stable"),channel+" default")
 		expect(not Policy.enabled_for(build,["--force-update-check","--disable-updates"],null,true),"disable wins")
 		expect(Policy.enabled_for(build,["--force-update-check"],null,true),"forced check")
