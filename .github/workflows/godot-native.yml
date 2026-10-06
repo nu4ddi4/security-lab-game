@@ -62,12 +62,7 @@ jobs:
           }
       - name: Exported native diagnostics ZIP smoke
         shell: pwsh
-        run: |
-          $log = & './godot/builds/Windows/SecurityLab.exe' --headless -- --qa-diagnostics 2>&1
-          $log | Write-Output
-          if ($LASTEXITCODE -ne 0 -or ($log | Select-String 'SCRIPT ERROR:|ERROR:')) { throw 'Exported diagnostics failed' }
-          $result = $log | Where-Object { $_ -like 'DIAGNOSTICS_REVIEW *' } | Select-Object -Last 1
-          if (-not $result -or -not (($result.ToString().Substring(19) | ConvertFrom-Json).passed)) { throw 'Diagnostics result missing or failed' }
+        run: ./scripts/godot-diagnostics-export-test.ps1 -Headless
       - uses: actions/upload-artifact@v4
         id: native-artifact
         with:

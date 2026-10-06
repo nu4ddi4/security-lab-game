@@ -269,7 +269,7 @@ func create_package(destination = "") -> Dictionary:
 		return package_failure("ZIP 저장에 실패했습니다 · "+error_string(error))
 	last_package = ProjectSettings.globalize_path(path)
 	add_event("package_created")
-	return {"ok":true,"file":last_package,"message":"지원 패키지 생성 완료\n"+serializer.text(last_package)}
+	return {"ok":true,"file":last_package,"message":"지원 패키지 생성 완료\n"+serializer.display_path(last_package)}
 
 func package_failure(message: String) -> Dictionary:
 	add_event("package_failed")

@@ -20,6 +20,8 @@ func run(game: Node):
 		if argument.begins_with("--qa-output="): directory = argument.trim_prefix("--qa-output=")
 	DirAccess.make_dir_recursive_absolute(directory)
 	await get_tree().process_frame
+	check(game.qa_mode and game.saves.directory == "user://qa","Review uses isolated QA save directory")
+	check(game.diagnostics.data_directory == "user://qa/diagnostics","Review uses isolated QA diagnostic marker and packages")
 	game.ui.pause()
 	game.settings.show_menu()
 	await get_tree().process_frame

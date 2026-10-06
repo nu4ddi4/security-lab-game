@@ -34,6 +34,8 @@ func _initialize():
 	var serializer = Serializer.new()
 	serializer.profile = "C:/Users/Alice"
 	serializer.private_terms.assign(["Alice","WORKSTATION-PRIVATE","CORPDOMAIN"])
+	check(serializer.display_path("C:/Users/Alice/AppData/qa/diagnostics/file.zip") == "%USERPROFILE%/AppData/qa/diagnostics/file.zip","UI path preserves the exact anonymized suffix")
+	check(serializer.display_path("D:/Support/file.zip") == "D:/Support/file.zip","UI custom drive destination remains findable")
 	for raw in ["C:\\Users\\Alice\\AppData\\Roaming\\test.log","c:/users/ALICE/AppData/test.log","D:/Users/홍길동/AppData/test.log","/home/alice/private/file","/Users/Bob/private/file"]:
 		var clean = serializer.text(raw)
 		check(clean.contains("%USERPROFILE%"),"Profile path anonymized")

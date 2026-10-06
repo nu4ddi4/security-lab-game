@@ -18,10 +18,7 @@ func replace_pattern(text: String, pattern: String, replacement: String) -> Stri
 	return regex.sub(text,replacement,true)
 
 func text(value: String) -> String:
-	var result = value.left(2048).replace("\\","/")
-	if not profile.is_empty(): result = replace_pattern(result,"(?i)"+escape_regex(profile),"%USERPROFILE%")
-	result = replace_pattern(result,"(?i)[a-z]:/users/[^/\\s\"<>]+","%USERPROFILE%")
-	result = replace_pattern(result,"(?i)/(?:home|Users)/[^/\\s\"<>]+","%USERPROFILE%")
+	var result = display_path(value.left(2048))
 	result = replace_pattern(result,"(?i)Bearer\\s+[^\\s]+","[credential redacted]")
 	result = replace_pattern(result,"(?i)(?:authorization|password|passwd|token|secret|api[_-]?key|cookie)\\s*[:=]\\s*[^\\r\\n;]+","[credential redacted]")
 	result = replace_pattern(result,"(?i)[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}","[email redacted]")
@@ -34,6 +31,14 @@ func text(value: String) -> String:
 	for term in private_terms:
 		result = replace_pattern(result,"(?i)(?<![\\p{L}\\p{N}_])"+escape_regex(term)+"(?![\\p{L}\\p{N}_])","[identity redacted]")
 	return result
+
+func display_path(value: String) -> String:
+	# UI-only destination label. Preserve the actual suffix and non-profile
+	# drive locations so users can find the file. Never placed in the ZIP.
+	var result = value.replace("\\","/")
+	if not profile.is_empty(): result = replace_pattern(result,"(?i)"+escape_regex(profile),"%USERPROFILE%")
+	result = replace_pattern(result,"(?i)[a-z]:/users/[^/\\s\"<>]+","%USERPROFILE%")
+	return replace_pattern(result,"(?i)/(?:home|Users)/[^/\\s\"<>]+","%USERPROFILE%")
 
 func escape_regex(value: String) -> String:
 	var result = ""

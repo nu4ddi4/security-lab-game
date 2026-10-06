@@ -81,7 +81,7 @@ python scripts/ci-godot-test.py --godot <Godot-4.7.2-console.exe>
 ./scripts/godot-diagnostics-windows-test.ps1 -Godot <Godot-4.7.2-console.exe>
 python -m unittest discover -s tests/ci
 ./scripts/godot-build.ps1 -Godot <Godot-4.7.2-console.exe>
-./godot/builds/Windows/SecurityLab.exe --headless -- --qa-diagnostics
+./scripts/godot-diagnostics-export-test.ps1 -Headless
 ```
 
 `diagnostics_test.gd`는 redaction·프로필 익명화·JSON·고정 ZIP 구조·실제 저장 검증·누락/손상/대용량 파일·
@@ -90,7 +90,7 @@ Windows harness는 새 fixture 폴더에만 쓰기 거부 ACL과 junction을 설
 빠른 CI는 작은 임시 프로젝트에서 같은 검사와 기존 Native 452 assertions를 실행합니다.
 Windows CI는 내보낸 EXE에서 설정 버튼, 실제 ZIP, 내장 commit, 저장 상태 보존까지 확인합니다.
 
-화면/클립보드 확인은 Windows에서 `SecurityLab.exe -- --qa-diagnostics --qa-output=<폴더>`로 실행합니다.
+화면/클립보드 확인은 Windows에서 `./scripts/godot-diagnostics-export-test.ps1 -Output <폴더>`로 실행합니다.
 설정 창 PNG, 복사 결과, 생성 ZIP, `review.json`을 남깁니다. `--qa-ux`는 기존 네 미션 흐름 검사입니다.
 
 ## 한계
