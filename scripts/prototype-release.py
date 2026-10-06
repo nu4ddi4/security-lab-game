@@ -16,9 +16,13 @@ def main():
     repository = os.environ['GITHUB_REPOSITORY']
     run_id = os.environ['PROTOTYPE_RUN_ID']
     sha = os.environ['PROTOTYPE_BUILD_SHA']
+    tag_sha = os.environ['GITHUB_SHA']
     version = os.environ['PROTOTYPE_VERSION']
     if not run_id.isdecimal() or not re.fullmatch(r'[0-9a-f]{40}', sha):
         raise ValueError('Invalid verified build reference')
+    if (not re.fullmatch(r'[0-9a-f]{40}', tag_sha)
+            or subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != tag_sha):
+        raise ValueError('Expected the current publication commit')
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
         raise ValueError('Use a prototype version in X.Y.Z form')
     configured_version = json.loads(Path('godot/prototype/version.json').read_text(encoding='utf-8'))['version']
@@ -55,11 +59,11 @@ def main():
         if not release.get('prerelease') or release.get('draft'):
             raise ValueError('Only a published prototype prerelease can be updated')
         original_ref = github(prefix + '/git/ref/tags/' + release['tag_name'])
-        if original_ref['object']['sha'] != sha:
-            raise ValueError('Existing prototype release points to another build')
+        if original_ref['object']['sha'] != tag_sha:
+            raise ValueError('Existing prototype release points to another publication commit')
     reference = github(prefix + '/git/ref/tags/' + tag, missing_ok=True)
-    if reference and reference['object']['sha'] != sha:
-        raise ValueError('Prototype tag already points to another build')
+    if reference and reference['object']['sha'] != tag_sha:
+        raise ValueError('Prototype tag already points to another publication commit')
     with tempfile.TemporaryDirectory(prefix='prototype-beta-') as temporary:
         directory = Path(temporary)
         download = directory / 'download'
@@ -80,10 +84,12 @@ def main():
                                 for path in [exe, archive]), encoding='utf-8')
         notes = directory / 'release-notes.md'
         notes.write_text(Path('docs/PROTOTYPE_RELEASE_NOTES.md').read_text(encoding='utf-8'), encoding='utf-8')
+        # GITHUB_TOKEN can create a tag at this workflow's own commit. The
+        # ancestry and source diff checks above ensure it matches the tested build.
+        if reference is None:
+            subprocess.run(['gh', 'api', '--method', 'POST', prefix + '/git/refs',
+                            '-f', 'ref=refs/tags/' + tag, '-f', 'sha=' + tag_sha, '--silent'], check=True)
         if release:
-            if reference is None:
-                subprocess.run(['gh', 'api', '--method', 'POST', prefix + '/git/refs',
-                                '-f', 'ref=refs/tags/' + tag, '-f', 'sha=' + sha, '--silent'], check=True)
             subprocess.run(['gh', 'release', 'upload', release['tag_name'], str(exe), str(archive), str(sums),
                             '--repo', repository, '--clobber'], check=True)
             payload = directory / 'release-update.json'
@@ -104,7 +110,7 @@ def main():
                                         prefix + '/releases/assets/' + str(item['id']), '--silent'], check=True)
         else:
             subprocess.run(['gh', 'release', 'create', tag, str(exe), str(archive), str(sums),
-                            '--repo', repository, '--target', sha, '--prerelease', '--latest=false',
+                            '--repo', repository, '--target', tag_sha, '--verify-tag', '--prerelease', '--latest=false',
                             '--title', tag, '--notes-file', str(notes)], check=True)
     release = github(prefix + '/releases/tags/' + tag)
     if (not release.get('prerelease') or release.get('draft')
