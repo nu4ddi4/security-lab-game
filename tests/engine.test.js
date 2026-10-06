@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState, progress, runCommand, answerFeedback, applyAnswer, applyPort, applyLogin, canRestoreFiles, restoreFile, nextMission, resetMission, score, sha256, accepted, loginSimulation, nextAction, validateMissionDefinitions } from '../src/engine.js';
 import { MISSIONS, ORIGINAL_FILES, MISSION_INDEX } from '../src/missions.js';
-import {inspectDevice,worldDevices,stage,continueWithout3D,worldAction} from '../src/engine.js';
+import {inspectDevice,worldDevices,stage,continueWithout3D,worldAction,equipmentStatus} from '../src/engine.js';
 import { loadGame, saveGame, SAVE_KEY, createSaveSession, CURRENT_SAVE_KEY, BACKUP_KEY, exportGame, importGame } from '../src/storage.js';
 
 async function tutorial(state) {
@@ -561,4 +561,15 @@ test('concise field findings preserve login changes, separate baseline and hashe
  assert.equal(worldAction(s).device,'INTERACT_FileCabinet');await inspectDevice(s,'INTERACT_FileCabinet');assert.equal(worldAction(s).device,'INTERACT_AdminPC');
  const hash=await inspectDevice(s,'INTERACT_AdminPC');assert.equal(hash.findings.length,3);assert.match(hash.text,/budget.csv · 승인 기준과 불일치/);
  restoreFile(s,'budget.csv');const restored=await inspectDevice(s,'INTERACT_AdminPC');assert.match(restored.text,/불일치 → 승인 기준과 일치/);
+});
+
+
+test('equipment telemetry is read-only, shows real partial defense and does not turn a pending hash into a match',async()=>{
+ const s=initialState();await tutorial(s);const before=structuredClone(s);let d=equipmentStatus(s);assert.equal(d.ports[443],true);assert.equal(d.ports[8080],true);assert.deepEqual(s,before);
+ d.ports[443]=false;assert.equal(s.ports[443],true);
+ await inspectDevice(s,'INTERACT_ServerRack');applyPort(s,443,false);applyPort(s,8080,false);d=equipmentStatus(s);assert.equal(d.ports[443],false);assert.equal(d.ports[8080],false);assert.equal(d.verified,false);
+ applyPort(s,443,true);applyAnswer(s,1);await inspectDevice(s,'INTERACT_ServerRack');await runCommand(s,'verify');nextMission(s);await login(s);
+ await inspectDevice(s,'INTERACT_FileCabinet');await inspectDevice(s,'INTERACT_AdminPC');assert.equal(equipmentStatus(s).hashes.find(r=>r.name==='budget.csv').matches,false);
+ restoreFile(s,'budget.csv');d=equipmentStatus(s);assert.equal(d.restored,true);assert.deepEqual(d.hashes,[]);assert.equal(d.rechecked,false);
+ await inspectDevice(s,'INTERACT_AdminPC');assert.ok(equipmentStatus(s).hashes.every(r=>r.matches));
 });

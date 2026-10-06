@@ -36,6 +36,7 @@ OPTIONAL_FILES = {
     'src/player3d.js': 'text/javascript; charset=utf-8',
     'src/interaction3d.js': 'text/javascript; charset=utf-8',
     'src/scene3d.js': 'text/javascript; charset=utf-8',
+    'src/device-visuals.js': 'text/javascript; charset=utf-8',
     'src/world-status.js': 'text/javascript; charset=utf-8',
     'src/batch3d.js': 'text/javascript; charset=utf-8',
     'src/city3d.js': 'text/javascript; charset=utf-8',

@@ -6,6 +6,7 @@ import { Player } from './player3d.js';
 import { Interaction } from './interaction3d.js';
 import { observeMission, requestTool,requestInspection,observeDevice } from '/src/labbridge.js';
 import {DEVICES} from './devices.js';
+import {createDeviceVisuals} from './device-visuals.js';
 import {createWorldStatus} from './world-status.js';
 import { batchStatic, isSoftwareRenderer } from './batch3d.js';
 import { createCity, refineGlass, restoreCityEnvironment, CITY_SUN } from './city3d.js';
@@ -23,7 +24,7 @@ let softwareRenderer = false, redraw = true, environmentTarget;
 let city, visibility, upscaler, preset='quality', optimization=true, debug=false, gpuName=null;
 let loadStarted=0, loadTimeMs=0, glbLoadMs=0, renderTimeMs=0, averageFrameMs=0;
 let keyboardCaptured=false,keyboardCapturePromise;
-let worldStatus,deviceObservation=null;
+let worldStatus,deviceObservation=null,equipmentVisuals=null;
 let onboardingSeen=false,onboardingUntil=0,wayfindingAt=0;
 const guidePosition=new THREE.Vector3(),guideDirection=new THREE.Vector3();
 function releaseKeyboard() {navigator.keyboard?.unlock?.();keyboardCaptured=false;}
@@ -180,19 +181,19 @@ async function ensureRenderer(token, signal) {
   gpuName=gpu?graphicsContext.getParameter(gpu.UNMASKED_RENDERER_WEBGL):'Unavailable';
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 1.02;
   renderer.shadowMap.enabled = !softwareRenderer;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.shadowMap.autoUpdate = false;
   scene = new THREE.Scene();
   rebuildEnvironment();
-  scene.environmentIntensity = .32;
+  scene.environmentIntensity = .25;
   scene.background = new THREE.Color('#667b99');
   camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, .05, 1100);
-  scene.add(new THREE.HemisphereLight(0xe2e8ed, 0x3d444b, .85));
-  scene.add(new THREE.AmbientLight(0xdfe4e7, .24));
-  const light = new THREE.DirectionalLight(0xfff3e6, 1.35);
-  light.position.set(-6, 3.1, 5);
+  scene.add(new THREE.HemisphereLight(0xe2e8ed, 0x3d444b, .42));
+  scene.add(new THREE.AmbientLight(0xdfe4e7, .10));
+  const light = new THREE.DirectionalLight(0xfff3e6, .86);
+  light.position.set(-5, 14, 3);
   light.target.position.set(0, 0, 0);
   // Furniture is stationary. Bake this one practical shadow map at install/
   // context restoration; moving glass doors are deliberately excluded.
@@ -200,13 +201,14 @@ async function ensureRenderer(token, signal) {
   Object.assign(light.shadow.camera,{left:-15,right:15,top:13,bottom:-13,near:.1,far:35});
   light.shadow.bias=-.00015;light.shadow.normalBias=.025;
   scene.add(light, light.target);
-  const sunset=new THREE.DirectionalLight(0xffb16b,.75);sunset.position.copy(CITY_SUN).multiplyScalar(100);scene.add(sunset);
+  const sunset=new THREE.DirectionalLight(0xffb16b,.30);sunset.position.copy(CITY_SUN).multiplyScalar(100);scene.add(sunset);
   // Bounded practical fills establish office/network/server identity without
   // extra scene passes or shadow maps. The sunset/exterior pipeline is unchanged.
   for(const [color,intensity,distance,position] of [
-    [0xe9edf0,12,9,[0,3.10,5]],
-    [0xd9e6f1,11,7,[7,3.08,2]],
-    [0xc9ddf2,15,9,[-7,3.12,-6]],
+    [0xe9edf0,10,10,[-1,3.10,5]],
+    [0xd9e6f1,10,7,[7,3.08,2]],
+    [0xc9ddf2,13,9,[-7,3.12,-6]],
+    [0xdde6ea,3.8,5,[-5,2.9,3]],
   ]) {const fill=new THREE.PointLight(color,intensity,distance,2);fill.position.set(...position);scene.add(fill);}
   upscaler=new Upscaler(renderer);
   resize();
@@ -266,9 +268,9 @@ async function installModel(gltf) {
       // makes feet, cabinets and desks meet the floor, without dynamic SSAO.
       material.onBeforeCompile=shader=>{
         shader.fragmentShader=shader.fragmentShader.replace('#include <aomap_fragment>',
-          '#include <aomap_fragment>\n#ifdef USE_AOMAP\nreflectedLight.directDiffuse *= mix(1.0, ambientOcclusion, 0.72);\n#endif');
+          '#include <aomap_fragment>\n#ifdef USE_AOMAP\nreflectedLight.directDiffuse *= mix(1.0, ambientOcclusion, 0.85);\n#endif');
       };
-      material.customProgramCacheKey=()=> 'interior-static-contact-v1';
+      material.customProgramCacheKey=()=> 'interior-static-contact-v2';
       material.needsUpdate=true;
     }
   });
@@ -287,9 +289,11 @@ async function installModel(gltf) {
   const spawnObject = loaded.getObjectByName('SPAWN_Player');
   if (!spawnObject) throw new Error('실습실의 시작 위치를 읽을 수 없습니다.');
   const spawn = spawnObject.getWorldPosition(new THREE.Vector3());
+  const nextEquipment=createDeviceVisuals(loaded);nextEquipment.update(mission?.equipment);
   batchStatic(loaded);
   player?.dispose();
   worldStatus?.dispose();worldStatus=null;
+  equipmentVisuals?.dispose();equipmentVisuals=nextEquipment;
   if (model) { scene.remove(model); clearResources(model); }
   model = loaded;
   scene.add(model);
@@ -536,7 +540,7 @@ export function get3DDiagnostics() {
     fullscreen: Boolean(document.fullscreenElement), keyboardCaptured,
     yaw: direction ? Math.atan2(-direction.x, -direction.z) : 0, pitch: direction ? Math.asin(direction.y) : 0,
     target: interaction?.target?.name ?? null,
-    statusPanels:worldStatus?.count??0,
+    statusPanels:worldStatus?.count??0, liveScreens:equipmentVisuals?.screens??0, liveIndicators:equipmentVisuals?.indicators??0, displayTextures:equipmentVisuals?.textures??0, printedPanels:equipmentVisuals?.printedPanels??0,
     doors: interaction?.doors.map(door => ({ name: door.object.name, angle: door.angle, target: door.target, pivot: door.object.position.toArray() })) ?? [],
     colliders: player?.boxes.length ?? 0, drawCalls: renderer?.info.render.calls ?? 0,
     triangles: renderer?.info.render.triangles ?? 0, fps, frameTimeMs:averageFrameMs,renderTimeMs, renderer: rendererVersion, softwareRenderer,
@@ -564,6 +568,7 @@ export function init3D() {
       $('hud-mission').textContent = (status.missionId || status.id) === 'tutorial' ? 'CASE 001 / 조사 준비' : `CASE 001 / MISSION ${String(status.active).padStart(2, '0')}`;
       $('tool-close').disabled = toolsOpen && busy();
       if (toolsOpen) $('lab-tools').setAttribute('aria-busy', String(busy()));
+      if(equipmentVisuals?.update(status.equipment)){upscaler?.reset();redraw=true;}
       if(worldStatus?.update(status.devices)){upscaler?.reset();redraw=true;}
     });
     observeDevice(result=>{
