@@ -25,6 +25,17 @@ The normal release export is not code signed. Its size is about 247 MB, includin
 the engine and imported assets; the EXE is distributed through the separate
 `SecurityLab-Native-Windows-x64` Actions artifact rather than committed to Git.
 The existing web Windows artifact/release path is retained.
+
+Native visual refinement derives the decoration from that same web source using
+`scripts/godot-assets.mjs` and `scripts/godot-layout.mjs`. It rotates all 26 long
+spacebars toward the operator, seats loose props on actual wood surfaces, separates
+mugs/headsets from laptops, attaches front labels, and brings all 26 chairs closer.
+The JSON layout records matching runtime collision offsets without modifying the
+protected collider nodes/geometry. The authored Blend and web GLB are preserved.
+`godot-asset-test.mjs` checks actual spacebar geometry and the original 101 protected
+interfaces/98 indexed surfaces; the scene smoke checks visible chair/collider alignment.
+The native city now follows the web layout/material families with anti-aliased
+facades, roofs, balconies/fins, river, roads and a window envelope, using MultiMeshes.
 The build helper resolves Windows PATH symlinks to the installed engine and
 uses its adjacent `*_console.exe` wrapper for captured output and exit status.
 Both build checks and scene smoke use that same console entry point; the player
@@ -67,7 +78,8 @@ executes an OS shell or sends player-supplied targets to a network service.
 ## Assets and protected interfaces
 
 `Security_Lab_Interior_07.blend` remains the authoring master. The native GLB is
-derived from the shipped v0.7.0 base geometry using offline lossless decompression:
+derived from the shipped v0.7.0 base geometry using offline lossless decompression
+and native decorative placement corrections; protected indexed geometry is exact:
 
 ```powershell
 npm ci
@@ -75,7 +87,8 @@ node scripts/godot-assets.mjs
 node scripts/godot-asset-test.mjs
 ```
 
-The native source is **63,300,876 bytes**. It does not require a browser meshopt
+The corrected native source is **63,302,692 bytes** (original: 63,300,876 bytes).
+It does not require a browser meshopt
 decoder. Browser LOD selection, temporal resolve and batching are not run in
 Godot; the importer generates native mesh LOD. Native texture import uses VRAM
 compression and mipmaps. The existing 1K–2K assets, credits and Korean Noto font
@@ -189,8 +202,8 @@ EXE play test. Cold launch-to-first-frame, total process RAM, broad hardware
 coverage and native CI duration have not been measured yet.
 
 Remaining limitations: some printed boards/rack LCDs retain static source
-graphics; city geometry is a native reconstruction rather than an exact shader
-port; no GI/SSR or automatic renderer/settings recovery UI. Forward+ shutdown
+graphics; native city shading can differ from the web renderer's tone mapping;
+no GI/SSR or automatic renderer/settings recovery UI. Forward+ shutdown
 logs reported seven texture RIDs, and the headless scene smoke reported six
 ObjectDB instances at exit. Those cleanup warnings have not been resolved or
 proven to indicate an in-session memory increase. Broader Windows hardware and

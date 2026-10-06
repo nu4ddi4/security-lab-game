@@ -15,6 +15,13 @@ func run(root: Node):
 	check(game.player.global_position.y >= 0 and game.player.camera.global_position.y >= 1.6,"Initial view is above the floor at authored foot-level spawn")
 	check(game.equipment.screen_bindings > 0,"Actual monitor surfaces bound")
 	check(game.equipment.leds.size() > 0,"Actual server LED materials bound")
+	for chair in game.world.layout.chairs:
+		var visual = game.world.model.find_child(chair.name,true,false)
+		var collider = game.world.protected_nodes[chair.collider].get_node("NativeCollision")
+		var shape = collider.get_child(0)
+		var center = collider.to_global(shape.position)
+		var visible_center = game.world.node_bounds(visual).get_center()
+		check(Vector2(center.x-visible_center.x,center.z-visible_center.z).length()<.10,chair.name+" visual and collision remain aligned")
 	var m = game.missions
 	m.inspect("INTERACT_AdminPC")
 	m.apply_answer(0)

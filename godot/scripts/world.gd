@@ -11,6 +11,7 @@ var player: LabPlayer
 var missions: LabMissions
 var meshes: Array[MeshInstance3D] = []
 var functional: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/functional.json"))
+var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/native-layout.json"))
 
 func setup(manager: LabMissions, actor: LabPlayer):
 	missions = manager
@@ -25,6 +26,9 @@ func setup(manager: LabMissions, actor: LabPlayer):
 			var body = StaticBody3D.new()
 			body.name = "NativeCollision"
 			body.collision_layer = 5
+			for chair in layout.chairs:
+				if chair.collider == id:
+					body.position = node.global_basis.inverse() * Vector3(chair.shift_world[0],chair.shift_world[1],chair.shift_world[2])
 			if "Upper" in id and "Partition" in id or id in ["COLLIDER_West_Window"]: body.collision_layer = 1
 			node.add_child(body)
 			box_collision(body, node.mesh.get_aabb())
