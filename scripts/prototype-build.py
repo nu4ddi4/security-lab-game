@@ -158,8 +158,10 @@ def main():
         print('Exported beta diagnostics, save and update identity passed.')
         if args.rendered_check:
             captures = output.parent / 'ui'
+            # CI uses a software GPU: cold shader setup and all landscape /
+            # portrait captures can exceed three minutes with the furnished map.
             run([str(executable), '--audio-driver', 'Dummy', '--', '--prototype-smoke',
-                 '--prototype-capture-dir=' + str(captures)], directory, 'INVESTIGATION_SMOKE', timeout=180)
+                 '--prototype-capture-dir=' + str(captures)], directory, 'INVESTIGATION_SMOKE', timeout=300)
             expected = ['01-briefing', '02-dialogue', '03-terminal', '04-messenger', '05-notes', '06-field', '07-settings']
             if any(not (captures / (name + '.png')).is_file() for name in expected):
                 raise SystemExit('Exported Windows UI captures are incomplete.')

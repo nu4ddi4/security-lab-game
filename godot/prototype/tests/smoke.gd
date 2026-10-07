@@ -317,13 +317,17 @@ func focus_checks(game, failures: Array):
 		failures.append("Losing focus releases the cursor and freezes movement")
 	game.player._notification(NOTIFICATION_APPLICATION_FOCUS_IN)
 	game.player.restore_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	if Input.mouse_mode != Input.MOUSE_MODE_VISIBLE or not game.player.input_blocked():
-		failures.append("Focus return and editor restoration leave the cursor free")
-	var click = InputEventMouseButton.new()
-	click.button_index = MOUSE_BUTTON_LEFT
-	click.pressed = true
-	game.player._unhandled_input(click)
-	if game.player.input_blocked(): failures.append("A field click resumes gameplay after focus return")
+	if OS.has_feature("mobile"):
+		if Input.mouse_mode != Input.MOUSE_MODE_VISIBLE or game.player.input_blocked():
+			failures.append("Mobile focus return restores input without capturing the cursor")
+	else:
+		if Input.mouse_mode != Input.MOUSE_MODE_VISIBLE or not game.player.input_blocked():
+			failures.append("Focus return and editor restoration leave the cursor free")
+		var click = InputEventMouseButton.new()
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = true
+		game.player._unhandled_input(click)
+		if game.player.input_blocked(): failures.append("A field click resumes gameplay after focus return")
 	game.controls.set_touch(original_touch)
 
 func interaction_checks(game, failures: Array):

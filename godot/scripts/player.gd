@@ -41,7 +41,7 @@ func _notification(what):
 		if capture_suspended: Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func restore_mouse_mode(mode):
-	Input.mouse_mode = mode if application_focused and not capture_suspended else Input.MOUSE_MODE_VISIBLE
+	Input.mouse_mode = mode if application_focused and not capture_suspended and not touch_controls_enabled and not OS.has_feature("mobile") else Input.MOUSE_MODE_VISIBLE
 
 func _unhandled_input(event):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed and enabled and application_focused and capture_suspended and not settings_input_blocked:
