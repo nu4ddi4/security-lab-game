@@ -70,8 +70,10 @@ static func trusted_manifest(url: String, channel: String, local_test: bool, app
 
 static func trusted_installer(url: String, version: String, channel: String, source: String, local_test: bool, app_id: String = APP_ID) -> bool:
 	if not clean_url(url): return false
-	var tag = "SecurityLab-beta-"+version.split("-")[0] if app_id=="security-lab-beta" else "native-"+channel+"-v"+version
+	var tag = "SecurityLab-"+version if app_id=="security-lab-beta" else "native-"+channel+"-v"+version
 	if url==REPOSITORY+tag+"/SecurityLabSetup.exe": return true
+	# Existing beta.1 installations still recognize their immutable legacy payload.
+	if app_id=="security-lab-beta" and channel=="beta" and version.ends_with("-beta.1") and url==REPOSITORY+"SecurityLab-beta-"+version.split("-")[0]+"/SecurityLabSetup.exe": return true
 	var origin = local_origin(source) if local_test else ""
 	return origin!="" and url==origin+"/"+channel+"/SecurityLabSetup.exe"
 

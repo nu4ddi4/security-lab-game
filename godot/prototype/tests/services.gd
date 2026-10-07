@@ -47,7 +47,7 @@ func run():
 	check(zip.open(diagnostics.last_package)==OK,"Support ZIP opens")
 	var report = zip.read_file("diagnostics.json").get_string_from_utf8()
 	var identity = JSON.parse_string(zip.read_file("build_info.json").get_string_from_utf8())
-	check(identity.app_id=="security-lab-beta" and identity.channel=="beta","Support ZIP records beta product and channel")
+	check(identity.app_id=="security-lab-beta" and identity.channel in ["beta","stable"],"Support ZIP records beta product and channel")
 	check(not report.contains(host.state.memo) and not report.contains("transaction.json"),"Support ZIP omits memo and updater transaction")
 	check(FileAccess.get_file_as_string(host.store.directory.path_join("save.json"))==before,"Diagnostics never mutate investigation save")
 	var log = diagnostics.serializer.log_summary('PROTOTYPE_READY {"devices":6,"npcs":4,"isolatedSave":"private-directory"}\nSCRIPT ERROR: Invalid access private-memo\n          at: refresh (res://prototype/scripts/ui.gd:42)')

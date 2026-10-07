@@ -37,18 +37,19 @@ class PolicyTests(unittest.TestCase):
                 os.chdir(previous)
             self.assertEqual(paths, ['README.md'])
 
-    def test_workflow_contract_keeps_integration_fast_and_publication_explicit(self):
+    def test_release_requires_successful_checks_and_both_platforms(self):
         ci = (ROOT / '.github/workflows/ci.yml').read_text()
-        self.assertIn('branches: [beta]', ci)
         self.assertIn('branches: [main]', ci)
+        self.assertNotIn('  push:', ci)
         self.assertIn('  test:', ci)
-        self.assertNotIn('windows-latest', ci)
-        self.assertIn('  workflow_call:', ci)
-        for file in ['godot-prototype.yml', 'godot-prototype-release.yml']:
-            workflow = (ROOT / '.github/workflows' / file).read_text()
-            self.assertIn('  workflow_dispatch:', workflow)
-            self.assertNotIn('  push:', workflow)
-        self.assertIn("github.ref == 'refs/heads/beta'", (ROOT / '.github/workflows/godot-prototype-release.yml').read_text())
+        workflow = (ROOT / '.github/workflows/godot-prototype.yml').read_text()
+        self.assertIn('branches: [main, beta]', workflow)
+        self.assertIn('needs: [quick, version, prototype, android]', workflow)
+        self.assertIn("needs.prototype.result == 'success'", workflow)
+        self.assertIn("needs.android.result == 'success'", workflow)
+        self.assertIn('Require private Android signing', workflow)
+        self.assertIn('cancel-in-progress: false', workflow)
+        self.assertNotIn('  pull_request:', workflow)
 
 
 if __name__ == '__main__':

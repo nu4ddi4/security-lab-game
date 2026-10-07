@@ -1,5 +1,7 @@
-name: Godot platform validation
+name: Build, test and release
 on:
+  push:
+    branches: [main, beta]
   workflow_dispatch:
     inputs:
       platforms:
@@ -7,19 +9,48 @@ on:
         type: choice
         options: [all, windows, android]
         default: all
+      publish:
+        description: Publish after successful validation (main/beta only)
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
   group: prototype-windows-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   quick:
     uses: ./.github/workflows/ci.yml
-  prototype:
+    with:
+      force_runtime: true
+  version:
     needs: quick
-    if: inputs.platforms != 'android'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.prepare.outputs.version }}
+      published: ${{ steps.prepare.outputs.published }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Allocate release version
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/prepare-release.py
+      - name: Require private Android signing before a main release
+        if: github.ref == 'refs/heads/main'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          python3 -c "import sys; sys.path.insert(0, 'scripts'); import importlib.util; s=importlib.util.spec_from_file_location('android', 'scripts/prototype-android-build.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.require_private_signing()"
+  prototype:
+    needs: [quick, version]
+    if: needs.version.outputs.published != 'true' && (github.event_name == 'push' || inputs.platforms != 'android')
     runs-on: windows-latest
     timeout-minutes: 20
+    env:
+      SECURITY_LAB_RELEASE_VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - name: Fetch the verified detailed office asset
@@ -30,18 +61,12 @@ jobs:
       - uses: ./.github/actions/godot-setup
         with:
           export: 'true'
-      - name: Read prototype version
-        id: version
-        shell: pwsh
-        run: |
-          $version = (Get-Content godot/prototype/version.json -Raw | ConvertFrom-Json).version
-          "version=$version" >> $env:GITHUB_OUTPUT
       - name: Reuse the same verified Windows build
         id: windows_cache
         uses: actions/cache@v4
         with:
           path: prototype-dist
-          key: beta-windows-4.7.2-${{ github.sha }}
+          key: release-windows-v2-4.7.2-${{ github.sha }}-${{ needs.version.outputs.version }}
       - name: Export and check standalone prototype
         if: steps.windows_cache.outputs.cache-hit != 'true'
         shell: pwsh
@@ -54,15 +79,14 @@ jobs:
         run: |
           python scripts/beta-installer-build.py --iscc $env:SECURITY_LAB_ISCC
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./tests/native/security_windows_updater.ps1 -Beta -Iscc $env:SECURITY_LAB_ISCC -Results prototype-dist/beta-windows-updater.json
+          ./tests/native/security_windows_updater.ps1 -Channel $(if ($env:SECURITY_LAB_RELEASE_VERSION.Contains("-beta.")) {"beta"} else {"stable"}) -Beta -Iscc $env:SECURITY_LAB_ISCC -Results prototype-dist/beta-windows-updater.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/godot-update-network-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         id: artifact
         with:
-          name: SecurityLab-beta-${{ steps.version.outputs.version }}-Windows-x64
+          name: SecurityLab-${{ needs.version.outputs.version }}-Windows-x64
           path: |
             prototype-dist/*.exe
             prototype-dist/*.json
@@ -74,14 +98,19 @@ jobs:
         shell: pwsh
         env:
           ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
-          PROTOTYPE_VERSION: ${{ steps.version.outputs.version }}
+          PROTOTYPE_VERSION: ${{ needs.version.outputs.version }}
         run: |
-          "[SecurityLab-beta-$env:PROTOTYPE_VERSION]($env:ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+          "[SecurityLab-$env:PROTOTYPE_VERSION]($env:ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
   android:
-    needs: quick
-    if: inputs.platforms != 'windows'
+    needs: [quick, version]
+    if: needs.version.outputs.published != 'true' && (github.event_name == 'push' || inputs.platforms != 'windows')
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      SECURITY_LAB_RELEASE_VERSION: ${{ needs.version.outputs.version }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
     steps:
       - uses: actions/checkout@v4
       - name: Fetch the verified detailed office asset
@@ -120,12 +149,9 @@ jobs:
           emulator-options: -no-window -gpu swangle -no-snapshot -wipe-data -partition-size 6144 -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: python3 scripts/prototype-android-test.py
-      - name: Read prototype version
-        id: version
-        run: python3 -c 'import json,os; print("version="+json.load(open("godot/prototype/version.json"))["version"],file=open(os.environ["GITHUB_OUTPUT"],"a"))'
       - uses: actions/upload-artifact@v4
         with:
-          name: SecurityLab-beta-${{ steps.version.outputs.version }}-Android
+          name: SecurityLab-${{ needs.version.outputs.version }}-Android
           path: prototype-android-dist/*
           if-no-files-found: error
           retention-days: 14
@@ -141,3 +167,24 @@ jobs:
             prototype-android-dist/ui/*.png
           if-no-files-found: ignore
           retention-days: 14
+  release:
+    needs: [quick, version, prototype, android]
+    if: >-
+      always() && needs.quick.result == 'success' && needs.version.result == 'success' &&
+      (github.event_name == 'push' || inputs.publish) &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta') &&
+      (needs.version.outputs.published == 'true' ||
+       (needs.prototype.result == 'success' &&
+        needs.android.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SECURITY_LAB_RELEASE_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish verified files and then update channel
+        run: python3 scripts/prototype-release.py

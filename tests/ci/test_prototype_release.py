@@ -16,13 +16,13 @@ spec.loader.exec_module(android)
 
 class PrototypeReleaseTests(unittest.TestCase):
     def setUp(self):
-        self.sha, self.repo, self.version = 'a' * 40, 'owner/game', '0.2.0'
+        self.sha, self.repo, self.version = 'a' * 40, 'owner/game', '0.2.0-beta.1'
         self.run = {'status':'completed', 'conclusion':'success', 'head_sha':self.sha,
                     'head_branch':'beta',
                     'head_repository':{'full_name':self.repo},
                     'path':'.github/workflows/godot-prototype.yml', 'event':'push'}
         self.jobs = [{'name':name, 'conclusion':'success'} for name in ['quick / test','prototype','android']]
-        self.artifacts = [{'name':'SecurityLab-beta-0.2.0-' + platform, 'expired':False,
+        self.artifacts = [{'name':'SecurityLab-0.2.0-beta.1-' + platform, 'expired':False,
                            'size_in_bytes':42, 'workflow_run':{'head_sha':self.sha}}
                           for platform in ['Windows-x64','Android']]
 
@@ -49,14 +49,38 @@ class PrototypeReleaseTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ValueError): self.validate(run=dict(self.run,**{field:value}))
 
     def test_android_version_codes_increase_at_each_semantic_boundary(self):
-        versions = ['0.2.0','0.2.1','0.2.999','0.3.0','0.999.999','1.0.0']
+        versions = ['0.2.0-beta.1','0.2.0-beta.2','0.2.0','0.2.1-beta.1','0.2.1','0.2.999','0.3.0','0.999.999','1.0.0']
         codes = [android.version_code(version) for version in versions]
         self.assertEqual(sorted(set(codes)),codes)
-        for version in ['0.0.0','0.1.1000','-1.0.0']:
+        for version in ['0.1.1000','-1.0.0','0.8.0-beta.999','3.0.0']:
             with self.subTest(version=version), self.assertRaises(ValueError): android.version_code(version)
+
+    def test_main_requires_both_platforms(self):
+        run = dict(self.run, head_branch='main')
+        artifacts = [dict(a, name=a['name'].replace('-beta.1', '')) for a in self.artifacts]
+        self.assertEqual(set(release.validate_build(run, self.jobs, artifacts, self.repo, self.sha, '0.2.0')), {'Windows-x64','Android'})
+        with self.assertRaises(ValueError):
+            release.validate_build(run, self.jobs[:2], artifacts, self.repo, self.sha, '0.2.0')
+
+    def test_version_allocation_and_retry_identity(self):
+        from release_version import next_version, identity
+        existing = [{'tag_name': 'SecurityLab-0.8.0-beta.1'}, {'tag_name':'SecurityLab-0.8.0'}]
+        self.assertEqual(next_version('0.8.0', 'beta', existing), '0.8.0-beta.2')
+        self.assertEqual(next_version('0.8.0', 'main', existing), '0.8.1')
+        self.assertEqual(next_version('0.9.0', 'main', existing), '0.9.0')
+        self.assertEqual(identity('0.8.0', self.sha)['channel'], 'stable')
+
+    def test_stable_android_never_falls_back_to_public_test_keys(self):
+        import os
+        from unittest.mock import patch
+        with patch.dict(os.environ, {}, clear=True), self.assertRaises(ValueError):
+            android.require_private_signing()
+        preset = android.preset('0.8.0', Path('/private/release.keystore'), alias='release', password='fixture')
+        self.assertIn('keystore/release_user="release"', preset)
+        self.assertNotIn('androiddebugkey', preset)
 
     def test_beta_channel_version_order(self):
         self.assertLess(release.version_key('0.3.0-beta.1'), release.version_key('0.3.1-beta.1'))
         self.assertLess(release.version_key('0.3.0-beta.1'), release.version_key('0.3.0-beta.2'))
-        for version in ['0.3.0', '0.3.0-dev.1', 'invalid']:
+        for version in ['0.3.0-dev.1', 'invalid']:
             with self.subTest(version=version), self.assertRaises(ValueError): release.version_key(version)

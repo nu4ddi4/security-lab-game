@@ -40,8 +40,15 @@ def launch():
     adb('shell', 'am', 'start', '-W', '-n', component)
 
 
+def app_file(path, binary=False):
+    from release_version import build_version, channel
+    if channel(build_version(Path('godot'))) == 'stable':
+        return adb('exec-out', 'cat', '/data/data/' + PACKAGE + '/' + path, binary=binary)
+    return adb('exec-out', 'run-as', PACKAGE, 'cat', path, binary=binary)
+
+
 def read_save():
-    text = adb('shell', 'run-as', PACKAGE, 'cat', 'files/investigation/save.json')
+    text = app_file('files/investigation/save.json')
     return json.loads(text)
 
 
@@ -78,8 +85,13 @@ def main():
     args = parser.parse_args()
     directory = Path(args.directory)
     metadata = json.loads(Path('godot/prototype/version.json').read_text())
-    stem = 'SecurityLab-beta-' + metadata['version']
+    from release_version import build_version, tag
+    stem = tag(build_version(Path('godot')))
     apk, qa = directory / (stem + '.apk'), directory / (stem + '-qa.apk')
+    from release_version import channel
+    if channel(build_version(Path('godot'))) == 'stable':
+        # AOSP test emulator only: inspect release saves without making the APK debuggable.
+        adb('root')
     adb('wait-for-device')
     # Keep software-rendered CI frames representative but affordable. Gameplay
     # uses the real office and the same scaled touch coordinates at this size.
@@ -109,7 +121,7 @@ def main():
     captures = directory / 'ui'
     captures.mkdir(exist_ok=True)
     for name in ['01-briefing','02-dialogue','03-terminal','04-messenger','05-notes','06-field','07-settings']:
-        data = adb('exec-out', 'run-as', PACKAGE, 'cat', 'files/qa-ui/' + name + '.png', binary=True)
+        data = app_file('files/qa-ui/' + name + '.png', binary=True)
         if not data.startswith(b'\x89PNG\r\n\x1a\n'):
             raise ValueError('Missing Android rendered UI capture: ' + name)
         (captures / (name + '.png')).write_bytes(data)

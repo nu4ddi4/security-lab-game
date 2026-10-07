@@ -1,30 +1,34 @@
-"""Publish the verified Windows and Android prototype builds together."""
+"""Publish only artifacts that passed this commit's platform validation."""
 import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import subprocess
 import tempfile
 import zipfile
 
 from github_release import github
+from release_version import PRODUCT, REPOSITORY, channel, parts, tag
 
 
 def validate_build(run, jobs, artifacts, repository, sha, version):
-    if (run.get('status') != 'completed' or run.get('conclusion') != 'success'
-            or run.get('head_sha') != sha
-            or run.get('head_branch') != 'beta'
+    branch = 'beta' if channel(version) == 'beta' else 'main'
+    status_ok = (run.get('status') == 'completed' and run.get('conclusion') == 'success') or (
+        run.get('status') == 'in_progress' and run.get('conclusion') is None)
+    if (not status_ok or run.get('head_sha') != sha or run.get('head_branch') != branch
             or run.get('head_repository', {}).get('full_name') != repository
             or run.get('path') != '.github/workflows/godot-prototype.yml'
             or run.get('event') not in {'push', 'workflow_dispatch'}):
-        raise ValueError('Expected successful Windows and Android builds from this branch')
-    if not {'quick / test', 'prototype', 'android'} <= {job['name'] for job in jobs if job.get('conclusion') == 'success'}:
-        raise ValueError('Quick rules, Windows and Android execution checks must all succeed')
+        raise ValueError('Expected successful platform validation from this commit and branch')
+    platforms = ['Windows-x64', 'Android']
+    successful = {job['name'] for job in jobs if job.get('conclusion') == 'success'}
+    required = {'quick / test', 'prototype', 'android'}
+    if not required <= successful:
+        raise ValueError('Quick checks and all release platform checks must succeed')
     selected = {}
-    for platform in ['Windows-x64', 'Android']:
-        name = 'SecurityLab-beta-' + version + '-' + platform
+    for platform in platforms:
+        name = tag(version) + '-' + platform
         matching = [item for item in artifacts if item['name'] == name]
         if (len(matching) != 1 or matching[0].get('expired') is not False
                 or matching[0].get('size_in_bytes', 0) <= 0
@@ -43,148 +47,133 @@ def verified_file(directory, name):
 
 
 def version_key(version):
-    match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)-beta\.(\d+)', version)
-    if not match:
-        raise ValueError('Invalid beta channel version')
-    return tuple(map(int, match.groups()))
+    return parts(version)[:3] + (0 if parts(version)[3] else 1, parts(version)[3])
 
 
-def publish_channel(repository, tag_sha, manifest_file):
-    """Move only the beta product channel after its version payload is published."""
-    alias = 'beta-channel-beta'
-    prefix = 'repos/' + repository
+def publish_channel(repository, sha, manifest_file):
     manifest = json.loads(manifest_file.read_text(encoding='utf-8'))
+    release_channel = channel(manifest['version'])
+    alias = 'beta-channel-' + release_channel
+    prefix = 'repos/' + repository
     previous_release = github(prefix + '/releases/tags/' + alias, missing_ok=True)
     if previous_release:
-        with tempfile.TemporaryDirectory(prefix='beta-channel-') as temporary:
+        with tempfile.TemporaryDirectory(prefix='update-channel-') as temporary:
             subprocess.run(['gh', 'release', 'download', alias, '--repo', repository,
                             '--pattern', 'update.json', '--dir', temporary], check=True)
             previous = json.loads((Path(temporary)/'update.json').read_text(encoding='utf-8'))
-        if previous.get('app_id') != 'security-lab-beta' or previous.get('channel') != 'beta':
-            raise ValueError('Foreign beta channel metadata')
+        if previous.get('app_id') != PRODUCT or previous.get('channel') != release_channel:
+            raise ValueError('Foreign update channel metadata')
         if previous == manifest:
             return
         if version_key(previous['version']) >= version_key(manifest['version']):
-            raise ValueError('Beta channel cannot replace or move behind its current version')
+            raise ValueError('Update channel cannot replace or move behind its current version')
     else:
         subprocess.run(['gh', 'release', 'create', alias, '--repo', repository,
-                        '--target', tag_sha, '--prerelease', '--latest=false',
-                        '--title', 'Security Lab Beta update channel',
-                        '--notes', 'Beta channel metadata. Installers are published in version releases.'], check=True)
+                        '--target', sha, '--prerelease', '--latest=false',
+                        '--title', 'Security Lab ' + release_channel + ' update channel',
+                        '--notes', 'Update metadata; installers are in version releases.'], check=True)
     subprocess.run(['gh', 'release', 'upload', alias, str(manifest_file), '--repo', repository, '--clobber'], check=True)
+
+
+def find_release(prefix, release_tag):
+    published = github(prefix + '/releases/tags/' + release_tag, missing_ok=True)
+    if published:
+        return published
+    # Draft tags may not exist until publication.
+    return next((r for r in github(prefix + '/releases?per_page=100') if r['tag_name'] == release_tag), None)
 
 
 def main():
     repository = os.environ['GITHUB_REPOSITORY']
-    run_id = os.environ['PROTOTYPE_RUN_ID']
-    sha = os.environ['PROTOTYPE_BUILD_SHA']
-    tag_sha = os.environ['GITHUB_SHA']
-    version = os.environ['PROTOTYPE_VERSION']
-    if not run_id.isdecimal() or not re.fullmatch(r'[0-9a-f]{40}', sha):
-        raise ValueError('Invalid verified build reference')
-    if (not re.fullmatch(r'[0-9a-f]{40}', tag_sha)
-            or subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != tag_sha):
-        raise ValueError('Expected the current publication commit')
-    if not re.fullmatch(r'\d+\.\d+\.\d+', version):
-        raise ValueError('Use a prototype version in X.Y.Z form')
-    metadata = json.loads(Path('godot/prototype/version.json').read_text(encoding='utf-8'))
-    if repository != 'nu4ddi4/security-lab-game' or os.environ.get('GITHUB_REF') != 'refs/heads/beta':
-        raise ValueError('Beta publication requires the original beta branch')
-    if metadata.get('tag_prefix') != 'SecurityLab-beta-':
-        raise ValueError('Expected beta product metadata')
-    if version != metadata['version'] or metadata.get('prerelease') is not True:
-        raise ValueError('Release version/channel differs from the prototype build')
+    sha = os.environ['GITHUB_SHA']
+    run_id = os.environ['GITHUB_RUN_ID']
+    version = os.environ['SECURITY_LAB_RELEASE_VERSION']
+    release_tag = tag(version)
+    branch = 'beta' if channel(version) == 'beta' else 'main'
+    if repository != REPOSITORY or os.environ['GITHUB_REF'] != 'refs/heads/' + branch:
+        raise ValueError('Publication requires the original main/beta branch')
+    if subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != sha:
+        raise ValueError('Publication checkout must match the tested commit')
     prefix = 'repos/' + repository
-    run = github(prefix + '/actions/runs/' + run_id)
-    jobs = github(prefix + '/actions/runs/' + run_id + '/jobs?per_page=100')['jobs']
-    artifacts = github(prefix + '/actions/runs/' + run_id + '/artifacts?per_page=100')['artifacts']
-    selected = validate_build(run, jobs, artifacts, repository, sha, version)
-    subprocess.run(['git', 'merge-base', '--is-ancestor', sha, 'HEAD'], check=True)
-    subprocess.run(['git', 'diff', '--quiet', sha, 'HEAD', '--', 'godot',
-                    'scripts/prototype-build.py', 'scripts/prototype-android-build.py',
-                    'scripts/prototype-android-test.py', 'scripts/beta-installer-build.py',
-                    'tests/native', 'installer', '.github/workflows/godot-prototype.yml'], check=True)
-    tag = 'SecurityLab-beta-' + version
-    release = github(prefix + '/releases/tags/' + tag, missing_ok=True)
-    reference = github(prefix + '/git/ref/tags/' + tag, missing_ok=True)
-    if reference and reference['object']['sha'] != tag_sha:
-        raise ValueError('Prototype tag points to another publication commit')
-    if release and (not release.get('prerelease') or release.get('draft')):
-        raise ValueError('Only a published prototype prerelease can be updated')
-    with tempfile.TemporaryDirectory(prefix='prototype-release-') as temporary:
+    reference = github(prefix + '/git/ref/tags/' + release_tag, missing_ok=True)
+    if reference and reference['object']['sha'] != sha:
+        raise ValueError('Release tag belongs to another commit')
+    release = find_release(prefix, release_tag)
+    if release and (release.get('target_commitish') != sha or release.get('prerelease') != (branch == 'beta')):
+        raise ValueError('Existing version belongs to a different commit or channel')
+    with tempfile.TemporaryDirectory(prefix='verified-release-') as temporary:
         directory = Path(temporary)
+        if release and not release['draft']:
+            # Recover a failed channel update without rebuilding or replacing a published payload.
+            subprocess.run(['gh', 'release', 'download', release_tag, '--repo', repository,
+                            '--pattern', 'update.json', '--dir', temporary], check=True)
+            manifest = json.loads((directory/'update.json').read_text())
+            if manifest.get('commit') != sha or manifest.get('version') != version or manifest.get('app_id') != PRODUCT:
+                raise ValueError('Published update manifest differs from the verified commit')
+            publish_channel(repository, sha, directory/'update.json')
+            print(release['html_url'])
+            return
+        run = github(prefix + '/actions/runs/' + run_id)
+        jobs = github(prefix + '/actions/runs/' + run_id + '/jobs?per_page=100')['jobs']
+        artifacts = github(prefix + '/actions/runs/' + run_id + '/artifacts?per_page=100')['artifacts']
+        selected = validate_build(run, jobs, artifacts, repository, sha, version)
         files = []
-        for platform, extension in [('Windows-x64', '.exe'), ('Android', '.apk')]:
+        for platform, artifact in selected.items():
             download = directory / platform
             subprocess.run(['gh', 'run', 'download', run_id, '--repo', repository,
-                            '--name', selected[platform]['name'], '--dir', str(download)], check=True)
-            original = verified_file(download, tag + extension)
+                            '--name', artifact['name'], '--dir', str(download)], check=True)
+            original = verified_file(download, release_tag + ('.apk' if platform == 'Android' else '.exe'))
             if platform == 'Android':
-                report = json.loads((download / 'android-smoke.json').read_text(encoding='utf-8'))
+                report = json.loads((download / 'android-smoke.json').read_text())
                 if not all(report.get(field) is True for field in ['passed','mobile','touchDefault','keyboardDetected']):
-                    raise ValueError('Downloaded Android test report does not confirm mobile input checks')
+                    raise ValueError('Android report does not confirm mobile input checks')
             destination = directory / original.name
             shutil.copyfile(original, destination)
             files.append(destination)
         windows = directory / 'Windows-x64'
-        updater_report = json.loads((windows/'beta-windows-updater.json').read_text(encoding='utf-8-sig'))
-        if updater_report.get('product')!='security-lab-beta' or updater_report.get('passed') is not True:
-            raise ValueError('Beta Windows installation and rollback checks must pass')
-        installer = verified_file(windows,'SecurityLabSetup.exe')
+        report = json.loads((windows/'beta-windows-updater.json').read_text(encoding='utf-8-sig'))
+        if report.get('product') != PRODUCT or report.get('channel') != channel(version) or report.get('passed') is not True:
+            raise ValueError('Windows installation and rollback checks must pass')
+        installer = verified_file(windows, 'SecurityLabSetup.exe')
         manifest = json.loads((windows/'update.json').read_text())
         identity = json.loads((windows/'build_info.json').read_text())
-        if (manifest.get('app_id')!='security-lab-beta' or manifest.get('commit')!=sha
-                or manifest.get('channel')!='beta' or manifest.get('version')!=version+'-beta.1'
-                or manifest.get('sha256')!=hashlib.sha256(installer.read_bytes()).hexdigest()
-                or manifest.get('size')!=installer.stat().st_size
-                or manifest.get('exe_sha256')!=hashlib.sha256(files[0].read_bytes()).hexdigest()
-                or identity.get('commit')!=sha or identity.get('app_id')!='security-lab-beta'
-                or manifest.get('installer_url')!='https://github.com/'+repository+'/releases/download/'+tag+'/SecurityLabSetup.exe'):
-            raise ValueError('Beta installer/manifest differs from the verified Windows build')
-        for name in ['SecurityLabSetup.exe','update.json','build_info.json']:
+        if (manifest.get('app_id') != PRODUCT or manifest.get('commit') != sha
+                or manifest.get('channel') != channel(version) or manifest.get('version') != version
+                or manifest.get('sha256') != hashlib.sha256(installer.read_bytes()).hexdigest()
+                or manifest.get('size') != installer.stat().st_size
+                or manifest.get('exe_sha256') != hashlib.sha256(files[0].read_bytes()).hexdigest()
+                or identity.get('commit') != sha or identity.get('version') != version
+                or identity.get('channel') != channel(version) or identity.get('app_id') != PRODUCT
+                or manifest.get('installer_url') != 'https://github.com/'+repository+'/releases/download/'+release_tag+'/SecurityLabSetup.exe'):
+            raise ValueError('Installer and manifest differ from the verified Windows build')
+        for name in ['SecurityLabSetup.exe', 'update.json', 'build_info.json']:
             destination = directory/name
-            shutil.copyfile(windows/name,destination)
+            shutil.copyfile(windows/name, destination)
             files.append(destination)
-        exe = files[0]
-        archive = exe.with_suffix('.zip')
+        archive = files[0].with_suffix('.zip')
         with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as bundle:
-            bundle.write(exe, exe.name)
+            bundle.write(files[0], files[0].name)
         files.append(archive)
         sums = directory / 'SHA256SUMS.txt'
-        sums.write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest() + '  ' + path.name + '\n'
-                                for path in files), encoding='utf-8')
+        sums.write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.name+'\n' for path in files))
         files.append(sums)
-        notes = directory / 'release-notes.md'
-        notes.write_text(Path('docs/PROTOTYPE_RELEASE_NOTES.md').read_text(encoding='utf-8'), encoding='utf-8')
-        # The publication commit must match the tested game/build sources. Tagging
-        # this workflow's own commit also works with the scoped GITHUB_TOKEN.
-        if reference is None:
-            subprocess.run(['gh', 'api', '--method', 'POST', prefix + '/git/refs',
-                            '-f', 'ref=refs/tags/' + tag, '-f', 'sha=' + tag_sha, '--silent'], check=True)
-        if release:
-            subprocess.run(['gh', 'release', 'upload', tag, *map(str, files),
-                            '--repo', repository, '--clobber'], check=True)
-        else:
-            subprocess.run(['gh', 'release', 'create', tag, *map(str, files),
-                            '--repo', repository, '--target', tag_sha, '--verify-tag', '--prerelease', '--latest=false',
-                            '--title', tag, '--notes-file', str(notes)], check=True)
-        published = github(prefix + '/releases/tags/' + tag)
-        if not {path.name for path in files} <= {asset['name'] for asset in published['assets']
-                                               if asset.get('state')=='uploaded' and asset.get('size',0)>0}:
-            raise ValueError('Beta payload upload is incomplete; channel remains unchanged')
-        publish_channel(repository, tag_sha, directory/'update.json')
-    release = github(prefix + '/releases/tags/' + tag)
-    if (not release.get('prerelease') or release.get('draft')
-            or release.get('tag_name') != tag or release.get('name') != tag):
-        raise ValueError('Expected a published prototype prerelease')
-    expected = {tag + '.exe', tag + '.zip', tag + '.apk', 'SecurityLabSetup.exe', 'update.json', 'build_info.json', 'SHA256SUMS.txt'}
-    uploaded = {item['name'] for item in release['assets']
-                if item.get('state') == 'uploaded' and item.get('size', 0) > 0}
-    if not expected <= uploaded:
-        raise ValueError('The prototype release is missing an uploaded file')
-    print(release['html_url'])
-    with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
-        summary.write('[' + tag + '](' + release['html_url'] + ')\n')
+        if not release:
+            subprocess.run(['gh','release','create',release_tag,'--repo',repository,'--target',sha,
+                            '--draft','--title',release_tag,'--notes','Built and verified by Codex automation. Commit: '+sha], check=True)
+        # Only drafts can be retried/replaced. A published version is immutable.
+        subprocess.run(['gh','release','upload',release_tag,*map(str,files),'--repo',repository,'--clobber'], check=True)
+        uploaded = find_release(prefix, release_tag)
+        expected = {path.name: path.stat().st_size for path in files}
+        actual = {asset['name']:asset['size'] for asset in uploaded['assets'] if asset.get('state')=='uploaded'}
+        if any(actual.get(name) != size for name,size in expected.items()):
+            raise ValueError('Upload is incomplete; release remains draft and channel unchanged')
+        subprocess.run(['gh','release','edit',release_tag,'--repo',repository,'--draft=false',
+                        '--prerelease='+str(branch=='beta').lower(),'--latest='+str(branch=='main').lower()], check=True)
+        publish_channel(repository, sha, directory/'update.json')
+        published = github(prefix+'/releases/tags/'+release_tag)
+        print(published['html_url'])
+        with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as output:
+            output.write('['+release_tag+']('+published['html_url']+')\n')
 
 
 if __name__ == '__main__':
