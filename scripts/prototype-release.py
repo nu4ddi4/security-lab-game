@@ -56,7 +56,7 @@ def publish_channel(repository, sha, manifest_file):
     alias = 'beta-channel-' + release_channel
     prefix = 'repos/' + repository
     previous_release = github(prefix + '/releases/tags/' + alias, missing_ok=True)
-    if previous_release:
+    if previous_release and any(a['name'] == 'update.json' for a in previous_release.get('assets', [])):
         with tempfile.TemporaryDirectory(prefix='update-channel-') as temporary:
             subprocess.run(['gh', 'release', 'download', alias, '--repo', repository,
                             '--pattern', 'update.json', '--dir', temporary], check=True)
@@ -67,7 +67,7 @@ def publish_channel(repository, sha, manifest_file):
             return
         if version_key(previous['version']) >= version_key(manifest['version']):
             raise ValueError('Update channel cannot replace or move behind its current version')
-    else:
+    elif not previous_release:
         subprocess.run(['gh', 'release', 'create', alias, '--repo', repository,
                         '--target', sha, '--prerelease', '--latest=false',
                         '--title', 'Security Lab ' + release_channel + ' update channel',

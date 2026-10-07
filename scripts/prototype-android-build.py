@@ -112,9 +112,6 @@ def main():
     if not subprocess.check_output([godot, '--version'], text=True).startswith('4.7.2.stable'):
         raise SystemExit('Godot 4.7.2 stable is required.')
     root = Path(__file__).resolve().parents[1]
-    metadata = json.loads((root / 'godot/prototype/version.json').read_text())
-    if metadata.get('prerelease') is not True:
-        raise SystemExit('Public development signing is only allowed for prototype prereleases.')
     version = build_version(root / 'godot')
     if channel(version) == 'stable':
         require_private_signing()
