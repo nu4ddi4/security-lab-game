@@ -1,50 +1,32 @@
 # 검사와 빌드
 
-## 실행 범위
-
-| 변경·이벤트 | 실행 |
+| 시점 | 검사 |
 | --- | --- |
-| 일반 문서·AGENTS | CI 정책 검사와 필수 `test` 판정 |
-| 개발 브랜치 push | 변경한 웹 또는 Godot의 빠른 검사 |
-| Draft PR | 빠른 검사 |
-| 일반 PR·main push·beta의 런타임 변경 push | 빠른 검사 후 해당 런타임의 Windows EXE 빌드·검사 |
-| Windows 패키지 수동 실행 | 선택한 브랜치의 웹 또는 Godot EXE 빌드 |
-| 프로토타입 버전·입력·UI·앱 생명주기·빌드 변경 | Windows EXE·Android APK 빌드와 실행 검사 |
+| 작업 중 | 수정 영역의 로컬 검사만: `rules`, `services`, `scene` |
+| 개발 브랜치 push·beta 대상 PR | 자동 검사 없음. 필요한 로컬 결과를 PR에 기록 |
+| beta 통합 push | 빠른 전체 검사와 CI 정책. 성공한 동일 입력은 캐시 재사용 |
+| main 대상 PR | 보호 규칙의 `test`. 빠른 검사와 기존 검증 결과 재사용 |
+| main 병합 직후 | 같은 내용을 다시 빌드·검사하지 않음 |
+| 큰 화면·모바일·패키징 변경 또는 릴리스 | `Godot platform validation` 수동 실행 |
 
-웹은 unit·서버 검사, Godot는 기존 Native 규칙·저장과 프로토타입 시나리오·더미 장면을 검사합니다. 빠른 Godot 검사는 임시 프로젝트에 필요한 스크립트·JSON·폰트만 복사해 큰 GLB와 내보내기 템플릿을 가져오지 않습니다.
+기본 CI는 Linux의 `test` 작업 하나다. 큰 GLB·LFS·내보내기 템플릿·Chrome·npm·Android 에뮬레이터를 받지 않는다. 임시 프로젝트에 현재 조사 스크립트·콘텐츠·필요한 폰트만 복사해 사건·저장·진단·업데이트 정책·입력·더미 장면을 검사한다. 문서·Blender 원본만 바뀌면 게임 실행을 생략한다. 실행 실패나 오류 출력·성공 표식 누락은 실패로 처리하며, 성공한 전체 검사만 콘텐츠 해시별 캐시에 남긴다. 캐시를 읽을 수 없는 브랜치·변경된 입력은 검사를 실행한다.
 
-필수 검사 이름은 `test`로 유지합니다. 선택된 검사·Windows 빌드가 실패하거나 예상과 다르게 건너뛰면 `test`도 실패합니다. 문서 PR에도 결과를 반환합니다. push와 PR은 별도 실행 그룹을 사용해 필수 검사를 서로 취소하지 않습니다. beta의 Godot 변경은 기존 Native 패키지 검사도 실행합니다. 그 외 개발 push에서는 Windows 전체 빌드를 실행하지 않습니다.
-
-공통 설정·미분류 런타임 파일은 보수적으로 검사합니다. 소스 Blend만 바뀌면 실행 검사를 생략하고, 내보낸 GLB가 바뀌면 관련 검사를 실행합니다. `docs/RELEASE.md`는 main에서 미출시 버전의 재빌드를 요청할 수 있는 배포 문서입니다.
-
-## 릴리즈
-
-`package.json`·잠금 파일의 버전과 `docs/RELEASE.md`를 갱신해 PR을 병합합니다. main의 `Test`가 성공하면 릴리즈 작업은 그 실행의 **같은 커밋**에서 만든 `SecurityLab-Windows-X64`를 다운로드합니다. Windows 빌드를 다시 실행하지 않습니다.
-
-릴리즈 작업은 저장소·main·실행 종류·성공 상태·Windows 작업·아티팩트 만료·커밋을 검증합니다. PR·fork 실행이나 다른 커밋의 파일은 배포하지 않습니다. 이미 게시한 버전은 건너뜁니다. 선택한 커밋의 릴리즈 안내와 버전을 사용합니다.
-
-수동 릴리즈에는 현재 main 커밋의 성공한 `Test` 또는 `Package executable` 실행 ID와 버전 태그를 입력합니다. 태그 push만으로 새 패키지를 만들지 않습니다. Godot 네이티브 EXE는 기존처럼 Actions 아티팩트로 제공하며, 이 작업은 웹 릴리즈를 게시합니다.
-
-통합 프로토타입은 `beta`에서 `Investigation beta builds`의 Windows·Android 검사가 성공한 같은 SHA의 EXE·APK를 `SecurityLab-beta-X.Y.Z` 사전 릴리즈로 게시합니다. EXE 전용 ZIP·Inno 설치 파일·manifest·빌드 메타데이터·체크섬을 함께 제공합니다. Windows는 내보낸 EXE 안의 진단·저장·업데이트 식별과 실제 Inno 설치/실패 복구, 동의 전 다운로드 차단 및 알림 취소를 검사합니다. 채널 metadata는 버전별 배포 파일이 모두 게시된 뒤 `beta-channel-beta`에 반영합니다. main과 정식 Latest는 바꾸지 않습니다. Android는 설치·렌더링·터치와 키보드·저장·덮어 설치·재실행을 에뮬레이터에서 검사합니다. 동일 소스의 검증된 Windows 빌드는 캐시로 재사용합니다.
-
-## 보관과 브랜치 정리
-
-- 개발 EXE 아티팩트는 **14일**, 실패 진단은 **7일** 보관합니다. 릴리즈 다운로드는 GitHub Releases에 남습니다.
-- LFS와 Godot 가져오기 캐시를 재사용합니다. Windows Godot 콘솔 실행 파일 복구는 유지합니다.
-- main의 `Test`가 성공하면 보호되지 않은 `codex/` 브랜치 중 커밋 전체가 main에 포함된 브랜치를 정리합니다. `main`, `godot-port`, `work`와 미병합 브랜치는 보존합니다.
-- 삭제 직전에 브랜치가 변경됐으면 Git lease가 삭제를 거부합니다. 저장소 관리자 설정을 변경하지 않고 같은 자동 정리를 수행합니다.
-
-## 로컬 확인
+## 로컬
 
 ```sh
-python -m unittest discover -s tests/ci
-actionlint
+python scripts/prototype-test.py --godot /path/to/Godot-4.7.2 --suite rules
+python scripts/prototype-test.py --godot /path/to/Godot-4.7.2 --suite services
+python scripts/prototype-test.py --godot /path/to/Godot-4.7.2 --suite scene
 ```
 
-Godot 브랜치에서는 다음 검사도 실행할 수 있습니다.
+`--suite all`은 위 검사를 모두 실행한다. 수정 영역만 먼저 확인하고 큰 구조 변경·베타 통합 때 전체 검사를 한 번 확인한다. 동일 코드로 통과한 CI가 있으면 로컬에서 다시 실행하지 않는다. 화면·입력을 바꿨으면 해당 동작만 실제 화면으로 확인한다.
 
-```sh
-python scripts/ci-godot-test.py --godot /path/to/Godot-4.7.2
-```
+CI 설정은 `python -m unittest discover -s tests/ci`와 actionlint로 검증한다. 사무실 보호 노드·충돌 지오메트리를 바꾸면 `node scripts/godot-asset-test.mjs`를 실행한다. 이 제작 도구는 Node 표준 모듈만 사용한다.
 
-릴리스 게시는 `Publish verified portable`의 수동 실행으로만 진행한다. main 병합·Test 성공만으로 릴리스를 자동 게시하지 않는다. 명시적 배포 요청 시 검증된 main 실행 ID와 해당 버전 태그를 입력하여 기존 artifact를 재사용한다.
+## 플랫폼과 배포
+
+Actions의 `Godot platform validation`을 검사할 브랜치에서 수동 실행한다. 전체 검증은 Windows와 Android를 병렬로 빌드한다. 플랫폼 하나만 바뀌거나 실패했으면 `platforms=windows` 또는 `android`로 그쪽만 검사한다. 공유 빠른 검사에 통과해야 플랫폼 검사를 시작하며 성공한 동일 입력은 캐시로 재사용한다.  Windows 동의 전 다운로드 차단·Inno 설치·실패 복구, Android 설치·터치/키보드·백그라운드 저장·덮어 설치·재실행을 확인한다. 소스 단계의 빠른 시나리오를 두 플랫폼에서 반복하지 않고, 내보낸 실제 앱의 동작을 검사한다. 플랫폼 작업은 릴리스나 큰 플랫폼 변경에만 필요하다.
+
+명시적 베타 배포는 검증된 **beta 브랜치**의 빠른 검사·Windows·Android가 모두 성공한 전체 실행 ID·빌드 SHA로 `Publish verified beta`를 수동 실행한다. 같은 소스·버전·체크섬의 EXE·ZIP·설치 파일·APK를 게시하고 마지막에 업데이트 채널을 반영한다. 커밋 문구·태그·통합 성공만으로 게시하지 않는다. 기존 릴리스는 변경하지 않는다. 정식 Android 배포에는 비공개 서명이 필요하다.
+
+검증 아티팩트는 14일 보관한다. `main`과 `beta`는 유지하고 통합을 마친 작업 브랜치는 작업자가 삭제한다. 이전 웹 버전과 제작 기록은 Git 태그·커밋에서 찾는다.

@@ -29,13 +29,7 @@ var events: Array = []
 
 func setup(root: Node):
 	game = root
-	if not supported(): return
-	save_directory = game.saves.directory
-	if game.qa_mode:
-		data_directory = "user://qa/diagnostics"
-		log_directory = "user://qa/diagnostics-logs"
-		update_directory = "user://qa/diagnostics-updates"
-	begin_session()
+	if supported(): begin_session()
 
 func mark_ready():
 	if not supported(): return
@@ -74,7 +68,7 @@ func read_json(path: String, maximum = MAX_JSON) -> Dictionary:
 	return {"status":"ok","data":parser.data}
 
 func build_info() -> Dictionary:
-	var source = read_json("res://resources/build_info.json")
+	var source = read_json("res://prototype/build_info.json")
 	var raw = source.get("data",{})
 	if not raw.has("version"): raw.version = ProjectSettings.get_setting("application/config/version","unknown")
 	return serializer.build(raw)
@@ -112,20 +106,8 @@ func add_event(code: String):
 	if events.size() > 32: events.pop_front()
 
 func save_validation() -> Dictionary:
-	var result = {}
-	for name in ["progress.json","progress.backup.json"]:
-		var path = save_directory.path_join(name)
-		var loaded = read_json(path,131072)
-		var status = loaded.status
-		if status == "ok":
-			# Decode into an isolated mission manager: never mutate game state,
-			# backups, error_message or progress while collecting diagnostics.
-			var store = preload("res://scripts/save_manager.gd").new()
-			var probe = preload("res://scripts/missions.gd").new()
-			status = "valid" if store.decode(JSON.stringify(loaded.data),probe) else "invalid"
-			probe.free()
-		result[name] = {"status":status}
-	return result
+	# The game adapter validates its own save codec.
+	return {}
 
 func recent_logs() -> Array:
 	var reports: Array = []
@@ -196,22 +178,7 @@ func updater_summary() -> Dictionary:
 	return result
 
 func runtime_summary() -> Dictionary:
-	if game == null: return {"available":false}
-	var summary = {"available":true,"uptime_ms":Time.get_ticks_msec(),"scene":"native_lab","paused":get_tree().paused,"load_ms":game.loaded_ms}
-	if game.missions != null:
-		summary.mission = serializer.enum_value(game.missions.mission().id,["tutorial","services","login","integrity"])
-		summary.verified = game.missions.progress().verified
-		summary.stage = serializer.enum_value(game.missions.stage(),["준비","조사","취약 상태 확인","방어 적용","장비 재확인 필요","검증 완료"])
-	if game.world != null:
-		summary.interaction_anchors = game.world.protected_nodes.size()
-		summary.colliders = game.world.collider_count
-		summary.doors = game.world.doors.size()
-		summary.devices = game.world.devices.size()
-	if game.player != null:
-		summary.player_enabled = game.player.enabled
-		summary.on_floor = game.player.is_on_floor()
-	summary.last_frame = {"draw_calls":Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),"triangles":Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),"fps":Performance.get_monitor(Performance.TIME_FPS)}
-	return summary
+	return {"available":false}
 
 func rendering_value(method: String) -> String:
 	if DisplayServer.get_name() == "headless": return "unavailable (headless)"

@@ -1,58 +1,20 @@
-"""Select affected runtimes and preserve the required `test` check."""
-import argparse
+"""Select quick Godot validation; documentation never triggers packaging."""
 import json
 import os
 from pathlib import Path
 import subprocess
 
 
-def classify(paths, has_godot=False, main_push=False):
-    web = godot = False
+def classify(paths):
     for path in paths:
-        if path in {'.github/workflows/ci.yml', '.gitattributes', 'package.json', 'package-lock.json', 'scripts/ci_scope.py'}:
-            web = godot = True
-        elif path.startswith(('godot/', 'installer/', 'tests/native/', 'scripts/godot-', 'scripts/prototype-', 'scripts/beta-', 'scripts/ci-godot-', '.github/actions/godot-setup/', '.github/actions/inno-setup/', '.github/workflows/native-update.yml', '.github/workflows/godot-')):
-            godot = True
-        elif path.startswith('assets/authoring/'):
+        if path.startswith(('docs/', 'assets/authoring/')) or path in {
+            'AGENTS.md', 'README.md', '.gitignore', '.editorconfig', '.gitattributes'}:
             continue
-        elif path.startswith(('src/', 'vendor/', 'tests/browser/', 'tests/server/', 'assets/')) or path in {'index.html', 'run.py', 'launcher.py', 'requirements-build.txt', 'playwright.config.js', 'tests/engine.test.js', 'tests/scene.test.js', 'tests/windows_launcher.ps1'}:
-            web = True
-            godot |= path == 'assets/models/security_lab.glb'
-        elif path.startswith('.github/actions/windows-build/') or path in {'.github/workflows/package.yml', '.github/workflows/release.yml', 'scripts/ci_release.py'}:
-            web = True
-        elif path == 'docs/RELEASE.md':
-            # Permit a corrected, still-unreleased version to rebuild on main.
-            web |= main_push
-        elif path.startswith(('docs/', 'tests/ci/')) or path in {'AGENTS.md', 'README.md', '.gitignore', '.github/workflows/branch-cleanup.yml', 'scripts/ci_branch_cleanup.py'} or path.endswith('.md'):
+        if path.endswith('.md'):
             continue
-        elif path.startswith('scripts/'):
-            web = True
-        else:
-            # Unknown runtime paths must not silently bypass validation.
-            web = godot = True
-    return {'web': web, 'godot': godot and has_godot}
-
-
-def select(paths, event, has_godot):
-    default = event.get('repository', {}).get('default_branch', 'main')
-    main_push = event.get('ref') == 'refs/heads/' + default and 'pull_request' not in event
-    scope = classify(paths, has_godot, main_push)
-    package = main_push or event.get('ref') == 'refs/heads/beta' or ('pull_request' in event and not event['pull_request'].get('draft', False))
-    scope.update({'windows_web': scope['web'] and package, 'windows_godot': scope['godot'] and package})
-    return scope
-
-
-def gate(needs):
-    if needs.get('scope', {}).get('result') != 'success':
-        raise ValueError('Runtime selection did not succeed')
-    selected = needs['scope']['outputs']
-    for job in ['web', 'godot', 'windows_web', 'windows_godot']:
-        result = needs.get(job, {}).get('result')
-        expected = selected.get(job)
-        if expected not in {'true', 'false'}:
-            raise ValueError('Missing selection: ' + job)
-        if result != ('success' if expected == 'true' else 'skipped'):
-            raise ValueError(job + ': ' + str(result))
+        # Unknown paths are checked conservatively, including deleted files.
+        return True
+    return False
 
 
 def changed_paths(event, sha):
@@ -74,19 +36,11 @@ def changed_paths(event, sha):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--gate', action='store_true')
-    args = parser.parse_args()
-    if args.gate:
-        gate(json.loads(os.environ['CI_NEEDS']))
-        print('All selected checks succeeded.')
-        return
     event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text(encoding='utf-8'))
-    scope = select(changed_paths(event, os.environ['GITHUB_SHA']), event, Path('godot/project.godot').exists())
+    runtime = os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch' or classify(changed_paths(event, os.environ['GITHUB_SHA']))
     with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
-        for name, value in scope.items():
-            output.write(name + '=' + str(value).lower() + '\n')
-    print(json.dumps(scope))
+        output.write('runtime=' + str(runtime).lower() + '\n')
+    print(json.dumps({'runtime': runtime}))
 
 
 if __name__ == '__main__':

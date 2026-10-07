@@ -25,10 +25,15 @@ def main():
     rows = []
     with tempfile.TemporaryDirectory(prefix='security-lab-update-http-') as temporary:
         project = Path(temporary)
-        for file in ['scripts/missions.gd', 'scripts/save_manager.gd', 'scripts/update_policy.gd', 'scripts/update_manager.gd', 'resources/build_info.json', 'resources/native_update_helper.ps1', 'resources/definitions.json']:
-            destination = project / file
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(Path('godot') / file, destination)
+        for name in ['scripts', 'resources', 'prototype']:
+            shutil.copytree(Path('godot') / name, project / name, ignore=shutil.ignore_patterns('results'))
+        (project / 'assets/fonts').mkdir(parents=True)
+        shutil.copyfile('godot/assets/fonts/NotoSansKR.ttf', project / 'assets/fonts/NotoSansKR.ttf')
+        identity = {'schema': 1, 'app_id': 'security-lab-beta', 'platform': 'windows-x86_64',
+                    'install_layout': 1, 'channel': 'beta', 'version': '0.8.0-beta.1',
+                    'commit': 'a' * 40, 'updates_default': True,
+                    'manifest_url': 'https://github.com/nu4ddi4/security-lab-game/releases/download/beta-channel-beta/update.json'}
+        (project / 'prototype/build_info.json').write_text(json.dumps(identity), encoding='utf-8')
         shutil.copyfile('tests/native/network_fixture.gd', project / 'fixture.gd')
         (project / 'project.godot').write_text('config_version=5\n[application]\nconfig/name="Security Lab · Native"\n', encoding='utf-8')
         subprocess.run([args.godot, '--headless', '--editor', '--path', str(project), '--import'], check=True, capture_output=True, timeout=30)
@@ -40,12 +45,12 @@ def main():
                     requests.append(self.path)
                     if mode == 'redirect-failure':
                         self.send_response(302); self.send_header('Location', 'https://evil.example/update.json'); self.end_headers(); return
-                    if mode == 'redirect-ready' and self.path == '/dev/update.json':
+                    if mode == 'redirect-ready' and self.path == '/beta/update.json':
                         self.send_response(302); self.send_header('Location', f'http://127.0.0.1:{self.server.server_port}/redirect-manifest'); self.end_headers(); return
-                    if self.path in ['/dev/update.json', '/redirect-manifest']:
-                        manifest = {'schema': 1, 'app_id': 'security-lab-native', 'platform': 'windows-x86_64', 'install_layout': 1, 'channel': 'beta' if mode == 'channel-failure' else 'dev', 'version': '0.7.1-dev.1', 'commit': 'a' * 40, 'sha256': 'b' * 64 if mode == 'hash-failure' else hashlib.sha256(payload).hexdigest(), 'exe_sha256': 'a' * 64, 'size': len(payload) + (1 if mode == 'size-failure' else 0), 'installer_url': f'http://127.0.0.1:{self.server.server_port}/dev/SecurityLabSetup.exe'}
+                    if self.path in ['/beta/update.json', '/redirect-manifest']:
+                        manifest = {'schema': 1, 'app_id': 'security-lab-beta', 'platform': 'windows-x86_64', 'install_layout': 1, 'channel': 'dev' if mode == 'channel-failure' else 'beta', 'version': '0.8.1-beta.1', 'commit': 'a' * 40, 'sha256': 'b' * 64 if mode == 'hash-failure' else hashlib.sha256(payload).hexdigest(), 'exe_sha256': 'a' * 64, 'size': len(payload) + (1 if mode == 'size-failure' else 0), 'installer_url': f'http://127.0.0.1:{self.server.server_port}/beta/SecurityLabSetup.exe'}
                         body = b'x' * 20000 if mode == 'oversized-manifest' else json.dumps(manifest).encode()
-                    elif self.path == '/dev/SecurityLabSetup.exe': body = payload
+                    elif self.path == '/beta/SecurityLabSetup.exe': body = payload
                     else: self.send_error(404); return
                     self.send_response(200); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
 
@@ -53,7 +58,7 @@ def main():
 
             server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
             thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
-            command = [args.godot, '--headless', '--path', str(project), '--script', 'res://fixture.gd', '--', '--force-update-check', f'--update-url=http://127.0.0.1:{server.server_port}/dev/update.json', f'--fixture-mode={mode}']
+            command = [args.godot, '--headless', '--path', str(project), '--script', 'res://fixture.gd', '--', '--force-update-check', f'--update-url=http://127.0.0.1:{server.server_port}/beta/update.json', f'--fixture-mode={mode}']
             if mode != 'no-local-option': command.append('--allow-local-update-url')
             if mode == 'disabled': command.append('--disable-updates')
             try:
@@ -64,9 +69,9 @@ def main():
                 raise SystemExit(run.stdout + run.stderr)
             if mode in ['disabled', 'no-local-option'] and requests:
                 raise SystemExit('Disabled/disallowed updater sent a request')
-            if mode in ['channel-failure', 'no-consent', 'declined', 'dialog-dismiss', 'dialog-close'] and '/dev/SecurityLabSetup.exe' in requests:
+            if mode in ['channel-failure', 'no-consent', 'declined', 'dialog-dismiss', 'dialog-close'] and '/beta/SecurityLabSetup.exe' in requests:
                 raise SystemExit('Unapproved or cross-channel manifest triggered download')
-            if mode in ['ready', 'redirect-ready', 'dialog-confirm'] and requests.count('/dev/SecurityLabSetup.exe') != 1:
+            if mode in ['ready', 'redirect-ready', 'dialog-confirm'] and requests.count('/beta/SecurityLabSetup.exe') != 1:
                 raise SystemExit('Approved update did not download exactly once')
             row = json.loads(lines[-1]); row['requests'] = requests; rows.append(row)
     destination = Path(args.results); destination.parent.mkdir(parents=True, exist_ok=True)

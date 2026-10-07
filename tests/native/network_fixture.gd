@@ -1,9 +1,11 @@
 extends SceneTree
-const Updater = preload("res://scripts/update_manager.gd")
+const Updater = preload("res://prototype/scripts/installer_updates.gd")
 class FixtureUpdater extends Updater:
 	var fixture_exe = ""
 	func executable_path() -> String: return fixture_exe
 	func supported_platform() -> bool: return true
+	func data_directory() -> String: return game.store.directory
+	func pause_for_install(): pass
 	var execute_install = false
 	var install_requested = false
 	func super_install_without_consent(): await super.install()
@@ -17,9 +19,14 @@ class FixtureUI extends Node:
 class FixturePlayer extends Node:
 	var enabled = true
 	func set_enabled(value: bool): enabled = value
+class FixtureControls extends RefCounted:
+	var automatic_updates = true
 class Host extends Node:
-	var missions = LabMissions.new()
-	var saves = LabSave.new()
+	var store = InvestigationStore.new()
+	var content = InvestigationContent.load_case()
+	var state = InvestigationEngine.new(content).create_state()
+	var controls = FixtureControls.new()
+	func save_now() -> bool: return store.save(state,content)
 	var ui: FixtureUI
 	var player: FixturePlayer
 	var settings = null
@@ -34,16 +41,16 @@ func _init(): run.call_deferred()
 func run():
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--fixture-mode="): mode = argument.trim_prefix("--fixture-mode=")
-	host = Host.new(); root.add_child(host); host.add_child(host.missions)
+	host = Host.new(); root.add_child(host)
 	var nonce = Crypto.new().generate_random_bytes(16).hex_encode()
 	original_directory = "user://qa/updater-network/"+nonce
-	host.saves.directory = original_directory
+	host.store.directory = original_directory
 	DirAccess.make_dir_recursive_absolute(original_directory)
 	var install = original_directory.path_join("Install A & B% $ 한")
 	DirAccess.make_dir_recursive_absolute(install)
 	write(install.path_join("SecurityLab.exe"),"fixture executable; never executed")
-	write(install.path_join("build_info.json"),FileAccess.get_file_as_string("res://resources/build_info.json"))
-	write(install.path_join("securitylab.install.json"),JSON.stringify({"app_id":"security-lab-native","channel":"dev","install_layout":1}))
+	write(install.path_join("build_info.json"),FileAccess.get_file_as_string("res://prototype/build_info.json"))
+	write(install.path_join("securitylab.install.json"),JSON.stringify({"app_id":"security-lab-beta","channel":"beta","install_layout":1}))
 	manager = FixtureUpdater.new(); manager.fixture_exe = ProjectSettings.globalize_path(install.path_join("SecurityLab.exe")); root.add_child(manager)
 	manager.status_changed.connect(func(message): failure = message)
 	if mode in ["dialog-dismiss","dialog-close","dialog-confirm"]:
@@ -84,21 +91,19 @@ func run():
 		if success and mode=="helper-launch":
 			manager.execute_install = true
 			await manager.install()
-			var decoded = LabMissions.new()
-			success = manager.state=="failed" and manager.helper_pid>0 and host.saves.decode(FileAccess.get_file_as_string(original_directory.path_join("progress.json")),decoded)
-			decoded.free()
+			success = manager.state=="failed" and manager.helper_pid>0 and host.store.load_state(host.content).has("state")
 		elif success and mode=="save-failure":
 			var invalid = original_directory.path_join("not-a-directory"); write(invalid,"file")
-			host.saves.directory = invalid
+			host.store.directory = invalid
 			manager.execute_install = true
 			await manager.install()
 			success = manager.state=="failed" and manager.helper_pid==-1
 		elif success and mode in ["health-validation","bad-save-health"]:
-			host.saves.save(host.missions)
+			host.save_now()
 			manager.info.version = manager.manifest.version; manager.info.commit = manager.manifest.commit
 			write(install.path_join("build_info.json"),JSON.stringify(manager.info))
-			write(manager.stage.path_join("transaction.json"),JSON.stringify({"schema":1,"token":manager.token,"target":manager.manifest,"data_directory":ProjectSettings.globalize_path(host.saves.directory)}))
-			if mode=="bad-save-health": write(original_directory.path_join("progress.json"),"incompatible save")
+			write(manager.stage.path_join("transaction.json"),JSON.stringify({"schema":1,"token":manager.token,"target":manager.manifest,"data_directory":ProjectSettings.globalize_path(host.store.directory)}))
+			if mode=="bad-save-health": write(original_directory.path_join("save.json"),"incompatible save")
 			manager.acknowledge_health(manager.token)
 			success = FileAccess.file_exists(manager.stage.path_join("health.json"))==(mode=="health-validation")
 	elif mode not in ["no-consent","declined","dialog-dismiss","dialog-close"]: success = manager.state==("disabled" if mode=="disabled" else "failed") and not manager.consent_granted
