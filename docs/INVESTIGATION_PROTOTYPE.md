@@ -32,6 +32,18 @@ NPC 대화는 화면 아래 대화창을 사용합니다. 대화 중 이동·시
 
 첫날 안내는 보안팀장 인계 → 서버 담당자 → 서버 기준 상태 → 프로젝트 담당자 → 원본 파일 → 정비 담당자 → 승인 범위 → 업무 종료 순서입니다. 현재 기록과 수행 상태로 다음 목표를 계산하며, 기존 저장을 계속 사용할 수 있습니다.
 
+### 조사 공간 authoring / runtime
+
+Interior 07의 고품질 사무실과 기존 Native 배치 보정을 그대로 사용합니다. `assets/authoring/Security_Lab_Investigation.blend`의 `Investigation_Environment` 컬렉션을 Interior 07에 Append하여 배치를 편집합니다. 별도 조사 master에는 장비 6개, 인물 4명, 현장 표지와 추가 충돌체만 들어 있습니다. `scripts/export_investigation.py`를 Blender에서 실행하면 `godot/assets/models/Investigation_Environment.glb`만 내보냅니다. 기존 `Interior_07_Godot.glb`를 덮어쓰지 않습니다.
+
+관제석은 감사 단말, 옆 보관함은 승인 범위 원본, 서버 운영 랙은 서비스·백업 단말, 오른쪽 업무석은 LUMEN PC, 네트워크 작업대는 협력업체 정비석, 이동식 게시판은 운영 인계에 대응합니다. 자료실의 기존 가구·보관 자산은 공유 업무 자료 구역으로 유지합니다. 인물은 각 담당 공간에 배치한 CC0 정적 모델입니다. 이동 AI·표정·립싱크는 구현하지 않았습니다.
+
+`INTERACT_Investigation_*`의 glTF extras에 사건의 `logical_id`, `kind`, `target_size`를 기록합니다. `APPROACH_*`, `SPEAKER_*`, `SPAWN_Investigation`에서 접근 시점·대화 초점·초기 위치를 읽습니다. 좌표는 Godot 코드에 중복 작성하지 않습니다. `COLLIDER_Investigation_*`는 추가 가구·인물의 충돌체이며, 기존 보호 노드와 문 Pivot은 보존합니다. 실제 화면을 가리던 세 작업대의 1.5m 충돌 높이만 조사 런타임에서 상판 높이에 맞춥니다. 기존 학습 진입은 그대로입니다.
+
+`prototype/scripts/environment.gd`는 실제 모니터·게시판에 640×360 화면을 연결합니다. 날짜·공개 운영 상태·승인·당일 재검증이 바뀔 때만 갱신하며 저장 불러오기·가져오기·새 조사에서도 다시 계산합니다. 미열람 접근·수집 증거와 행위자를 공개하지 않습니다. 판독·기록 확보·조작은 기존 현장 터미널에서 수행합니다. 화면을 보는 것만으로 증거가 추가되지는 않습니다.
+
+기본 실행에는 더미 상자나 떠 있는 이름표가 없습니다. 빠른 CI의 `--prototype-dummy` 장면은 자산 없이 규칙·입력을 검사하는 전용 fixture로 남깁니다. 실제 자산 접근·문·대화·저장 검사는 기존 상세 장면 smoke와 Windows EXE 내보내기를 재사용합니다.
+
 기존 학습 게임은 다음처럼 엽니다.
 
 ```powershell

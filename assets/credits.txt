@@ -1,5 +1,7 @@
 # Asset credits
 
+- Business Man / Woman Casual — Quaternius, [Business Man](https://poly.pizza/m/JFrLIKqvCH), [Woman Casual](https://poly.pizza/m/jpKRgGDxhk), CC0 1.0. Neutral idle poses baked; workwear colours, badges and role props adapted for the investigation scene.
+
 - Office Chair — CMHT Oculus, [Poly Pizza](https://poly.pizza/m/dCEsSsJJ1Md), [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). 기존 스케일·노멀 조정을 유지하고 패브릭 표현을 보강했습니다. 배포 시 이 크레딧을 유지해야 합니다.
 - [beige_wall_001](https://polyhaven.com/a/beige_wall_001) — Dimitrios Savva / Rico Cilliers, CC0, 2K. 색조 조정.
 - [white_maple_veneer](https://polyhaven.com/a/white_maple_veneer) — Jenelle van Heerden, CC0, 4K.

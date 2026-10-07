@@ -54,7 +54,7 @@ jobs:
           path: .git/lfs/objects
           key: native-lfs-${{ hashFiles('godot/assets/models/*.glb', 'assets/models/security_lab.glb') }}
       - name: Fetch native and baseline runtime
-        run: git lfs pull --include="godot/assets/models/Interior_07_Godot.glb,assets/models/security_lab.glb" --exclude=""
+        run: git lfs pull --include="godot/assets/models/*.glb,assets/models/security_lab.glb" --exclude=""
       - uses: actions/cache@v4
         with:
           path: |

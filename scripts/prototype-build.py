@@ -48,7 +48,7 @@ def stage(source, target):
                 'install_layout': 1, 'updates_default': True,
                 'manifest_url': 'https://github.com/nu4ddi4/security-lab-game/releases/download/beta-channel-beta/update.json'}
     (target / 'prototype/build_info.json').write_text(json.dumps(metadata), encoding='utf-8')
-    for name in ['assets/models/Interior_07_Godot.glb', 'assets/textures/city-sunset.png', 'scripts/player.gd', 'assets/fonts/NotoSansKR.ttf', 'assets/fonts/OFL.txt', 'LICENSES.txt']:
+    for name in ['assets/models/Interior_07_Godot.glb', 'assets/models/Investigation_Environment.glb', 'assets/textures/city-sunset.png', 'scripts/player.gd', 'assets/fonts/NotoSansKR.ttf', 'assets/fonts/OFL.txt', 'LICENSES.txt']:
         destination = target / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / name, destination)

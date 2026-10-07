@@ -184,6 +184,8 @@ func run(game: InvestigationPrototype):
 	if game.player.enabled: failures.append("Tablet freezes movement")
 	if game.detailed_world:
 		game.ui.close()
+		if game.investigation_environment.displays.size()!=6: failures.append("All six authored devices have equipment feedback")
+		if not game.find_children("*","Label3D",true,false).is_empty(): failures.append("Detailed office has no floating prototype labels")
 		for id in game.targets:
 			game.review_target(id)
 			await get_tree().physics_frame
@@ -197,6 +199,16 @@ func run(game: InvestigationPrototype):
 			game.controls._process(0)
 			if game.controls.buttons.tool.visible: failures.append("Doors do not offer investigation commands")
 			game.controls.set_touch(original_touch)
+		# Reuse the completed first-day flow to check real state-driven visuals,
+		# without advancing/saving the player's investigation during this review.
+		var next = game.engine.step(game.state,{"type":"day.end","payload":{"expectedDay":1,"confirmed":true}}).state
+		game.investigation_environment.sync(next)
+		var display = game.investigation_environment.displays.server_console.canvas
+		if not display.rows.has("자료 서비스 지연"): failures.append("Nightly operations change actual equipment feedback")
+		var repaired = game.engine.step(next,game.engine.parse("backup disable B-05","server_console",next)).state
+		game.investigation_environment.sync(repaired)
+		if not display.rows.has("자료 서비스 정상"): failures.append("Recovery clears actual equipment warning")
+		game.investigation_environment.sync(game.state)
 		game.ui.open_tablet()
 	game.save_now()
 	if not game.store.load_state(game.content).has("state"): failures.append("Existing save format accepts the new UI flow")
