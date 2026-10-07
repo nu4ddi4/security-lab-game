@@ -11,6 +11,8 @@ var target: Node
 var enabled = false
 var touch_controls_enabled = false
 var touch_axes = Vector2.ZERO
+var settings_input_blocked = false
+var release_keys: Array = []
 var crouched = false
 var sensitivity = 0.0018
 var body_height = 1.8
@@ -62,11 +64,12 @@ func set_enabled(value: bool):
 		touch_axes = Vector2.ZERO
 
 func look(relative: Vector2):
-	if not enabled: return
+	if not enabled or input_blocked(): return
 	rotate_y(-relative.x * sensitivity)
 	camera.rotation.x = clampf(camera.rotation.x - relative.y * sensitivity, -1.42, 1.42)
 
 func _unhandled_input(event):
+	if input_blocked(): return
 	if event.is_action_pressed("pause"):
 		pause_requested.emit()
 		get_viewport().set_input_as_handled()
@@ -77,7 +80,7 @@ func _unhandled_input(event):
 	if event.is_action_pressed("tool") and target != null: interact()
 
 func interact():
-	if not enabled or target == null: return
+	if not enabled or input_blocked() or target == null: return
 	if target.has_method("open_tool"): tool_requested.emit(target)
 	elif unified_interaction and target.has_method("inspect"): inspect_requested.emit(target)
 
@@ -115,7 +118,7 @@ func update_target():
 
 func _physics_process(delta):
 	update_target()
-	if not enabled: return
+	if not enabled or input_blocked(): velocity = Vector3.ZERO; return
 	var wants_crouch = Input.is_action_pressed("crouch")
 	if crouched and not wants_crouch:
 		var query = PhysicsShapeQueryParameters3D.new()
@@ -149,3 +152,7 @@ func respawn():
 	rotation = Vector3.ZERO
 	camera.rotation = Vector3.ZERO
 	velocity = Vector3.ZERO
+
+func input_blocked() -> bool:
+	release_keys = release_keys.filter(func(key): return Input.is_physical_key_pressed(key))
+	return settings_input_blocked or not release_keys.is_empty()

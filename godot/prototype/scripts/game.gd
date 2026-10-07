@@ -12,6 +12,7 @@ var updates: InvestigationUpdates
 var updater: InvestigationInstallerUpdates
 var diagnostics: InvestigationDiagnostics
 var settings = null
+var bindings = LabInputBindings.new()
 var qa_mode = false
 var world: LabWorld
 var detailed_world = false
@@ -100,6 +101,7 @@ func _ready():
 		updater.setup(self)
 	updates.changed.connect(ui.refresh_settings)
 	controls.changed.connect(ui.refresh_settings)
+	bindings.changed.connect(ui.refresh_input_hints)
 	player.inspect_requested.connect(func(target): target.inspect())
 	player.tool_requested.connect(func(target): _use(target.logical_id,target.kind,true))
 	player.pause_requested.connect(ui.toggle)
@@ -119,7 +121,7 @@ func _ready():
 	print("PROTOTYPE_READY ",JSON.stringify({"day":state.day,"dummy":not detailed_world,"devices":content.case.devices.size(),"npcs":content.case.npcs.size(),"isolatedSave":store.directory}))
 	if DisplayServer.get_name() != "headless": _report_first_frame.call_deferred()
 	if testing:
-		var smoke = load("res://prototype/tests/smoke.gd").new()
+		var smoke = load("res://tests/input_review.gd" if "--prototype-input-review" in OS.get_cmdline_user_args() else "res://prototype/tests/smoke.gd").new()
 		add_child(smoke)
 		smoke.run.call_deferred(self)
 	elif controls.automatic_updates and updater==null: updates.check.call_deferred()
@@ -227,12 +229,10 @@ func _report_first_frame():
 	print("PROTOTYPE_FRAME_READY ",JSON.stringify({"platform":OS.get_name(),"touch":controls.touch_enabled,"first_game_frame_ms":Time.get_ticks_msec()-load_started,"texture_bytes":RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TEXTURE_MEM_USED)}))
 
 func _setup_input():
-	var mapping = {"forward":KEY_W,"back":KEY_S,"left":KEY_A,"right":KEY_D,"sprint":KEY_SHIFT,"crouch":KEY_C,"jump":KEY_SPACE,"inspect":KEY_E,"tool":KEY_F,"pause":KEY_ESCAPE}
-	for action in mapping:
-		if not InputMap.has_action(action): InputMap.add_action(action)
-		var event = InputEventKey.new()
-		event.physical_keycode = mapping[action]
-		InputMap.action_add_event(action,event)
+	if qa_mode: bindings.path = "user://investigation-qa/input_bindings.json"
+	DirAccess.make_dir_recursive_absolute(bindings.path.get_base_dir())
+	bindings.load_profile()
+	if qa_mode: bindings.bindings = LabInputBindings.defaults(); bindings.apply()
 
 func _use(id: String, kind: String, tool: bool):
 	if kind == "npc": ui.open_dialogue(id); return
@@ -323,8 +323,8 @@ func transfer_file(path: String, exporting: bool):
 	ui.notice("사건 진행을 가져왔습니다.")
 
 func _unhandled_input(event):
-	if ui == null: return
-	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_TAB:
+	if ui == null or (player != null and player.input_blocked()): return
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == LabInputBindings.TABLET_KEY:
 		if ui.mode == "field": ui.open_tablet()
 		elif ui.mode == "tablet": ui.close()
 		get_viewport().set_input_as_handled()
