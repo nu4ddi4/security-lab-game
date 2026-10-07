@@ -58,7 +58,7 @@ func _ready():
 	if OS.get_name()=="Windows" and not testing and FileAccess.file_exists(OS.get_executable_path().get_base_dir().path_join("securitylab.install.json")):
 		updater = InvestigationInstallerUpdates.new()
 		add_child(updater)
-		updater.status_changed.connect(func(text): ui.notice(text); ui.refresh_settings())
+		updater.status_changed.connect(func(text): updates.status = text; ui.notice(text); ui.refresh_settings())
 		updater.setup(self)
 	updates.changed.connect(ui.refresh_settings)
 	controls.changed.connect(ui.refresh_settings)

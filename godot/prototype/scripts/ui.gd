@@ -382,8 +382,8 @@ func refresh_settings():
 	update_setting.set_pressed_no_signal(game.controls.automatic_updates)
 	input_status.text = "터치와 키보드를 함께 사용할 수 있습니다." if game.controls.touch_enabled else "키보드·마우스 조작"
 	if game.controls.keyboard_seen: input_status.text += " · 키보드 입력 감지됨"
-	update_status.text = ("업데이트가 있습니다 · "+game.updater.manifest.get("version","") if game.updater.state=="available" else game.updater.state) if game.updater!=null else game.updates.status
-	update_check.disabled = game.updates.busy
+	update_status.text = game.updates.status
+	update_check.disabled = game.updater.state in ["checking","downloading","preparing"] if game.updater!=null else game.updates.busy
 	update_download.visible = game.updater.state in ["available","ready"] if game.updater!=null else not game.updates.download_url.is_empty()
 
 func refresh():

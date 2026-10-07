@@ -124,6 +124,9 @@ def main():
             run([str(executable), '--headless', '--', '--prototype-smoke'],
                 directory, 'INVESTIGATION_SMOKE')
             print('Standalone EXE launch', attempt + 1, 'passed.')
+        run([str(executable), '--headless', '--script', 'res://prototype/tests/services.gd'],
+            directory, 'INVESTIGATION_SERVICES')
+        print('Exported beta diagnostics, save and update identity passed.')
         if args.rendered_check:
             captures = output.parent / 'ui'
             run([str(executable), '--audio-driver', 'Dummy', '--', '--prototype-smoke',
