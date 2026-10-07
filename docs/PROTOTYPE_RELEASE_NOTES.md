@@ -1,11 +1,13 @@
-# SecurityLab-beta-0.3.0
+# SecurityLab-beta-0.4.0
 
-프로토타입의 사건 진행·저장·대화·터미널·메신저를 유지하고 최신 상세 사무실 맵과 도시 외관, 장비·NPC 연결을 통합했습니다. PC 키보드·마우스와 Android 터치·키보드를 함께 지원합니다.
+장비 상호작용과 모바일 조작·화면을 개선한 테스트·안정화용 사전 릴리즈입니다.
 
-- Windows 설정: 진단 정보 복사, 로컬 지원 ZIP, 제한된 로그·저장 검사·종료 표시와 빌드 커밋을 제공합니다. 개인 파일·저장 원문·계정·네트워크 주소는 포함하지 않습니다.
-- 설치형 Windows: 시작 시 버전을 확인하고 새 버전 알림에서 동의한 경우에만 다운로드·저장·설치·재실행합니다. 나중에·창 닫기·일반 종료로는 설치하지 않습니다. 실패 시 설치·조사 저장·백업·입력 설정을 복구합니다.
-- `SecurityLab-beta-0.3.0.exe`는 설치 없이 실행합니다. 자동 설치를 사용하려면 `SecurityLabSetup.exe`로 설치하세요. ZIP에는 같은 EXE 한 개만 들어 있습니다.
-- Android는 `SecurityLab-beta-0.3.0.apk`를 기존 앱 위에 설치합니다. 기존 패키지 ID·개발 서명·저장 위치를 유지합니다.
-- 베타는 테스트·안정화용 사전 릴리즈입니다. 기존 정식 Latest와 main은 유지합니다. 실기기 성능·사용성 및 장기 플레이 확인은 계속 진행합니다.
+- 장비·NPC·문을 F / 상호작용 버튼 하나로 조작합니다. E·살펴보기는 제거했습니다. 상호작용 거리는 3.4m이며 가장자리 조준 여유와 벽 차단을 적용했습니다.
+- 화면 비율·가로/세로 방향·안전 영역에 맞춰 UI를 배치합니다. 모바일은 이동 스틱·시점 쓸기·탭으로 대상 선택·상호작용·내용 스크롤을 사용합니다. 키보드도 함께 사용할 수 있습니다.
+- 먼저 로딩 화면을 표시하고 사무실 자원을 비동기로 읽습니다. 베타 빌드의 텍스처 GPU 압축을 복원하고 단계별 로딩 시간을 기록합니다.
+- 장비 명령 목록은 help를 입력한 뒤 표시합니다. 조사 UI는 4일차 보안팀장의 직접 조사 지시부터 추가합니다. 기존 승인 저장의 권한은 유지합니다.
+- 현재 목표에 밝은 공중 화살표와 바닥 링을 표시합니다. 대화 종료 후 시선을 유지하고 이후 이동·시점 입력을 이어갑니다.
+- Windows 설치형 업데이트는 새 버전 알림에 동의한 경우에만 진행합니다. 실패 복구, 로컬 진단, 기존 조사 저장·입력 설정을 유지합니다.
+- SecurityLab-beta-0.4.0.exe는 설치 없이 실행하며 ZIP에는 같은 EXE 하나를 담습니다. 자동 설치를 사용하려면 SecurityLabSetup.exe로 설치하세요. Android는 SecurityLab-beta-0.4.0.apk를 기존 앱 위에 설치합니다. 패키지 ID·서명을 유지합니다.
 
-Windows·Android [패키지 검증](https://github.com/nu4ddi4/security-lab-game/actions/runs/37588539463)과 기존 Native [회귀 검사](https://github.com/nu4ddi4/security-lab-game/actions/runs/37588965893)를 통과했습니다. 상세 결과와 안정화 후 main 반영 조건은 [검증 기록](https://github.com/nu4ddi4/security-lab-game/blob/beta/docs/BETA_VALIDATION.md)에 남겼습니다.
+검증 범위와 모바일 실기기 추가 측정 계획은 [개선 기록](https://github.com/nu4ddi4/security-lab-game/blob/beta/docs/BETA_UX_MOBILE_PLAN.md)과 [검증 기록](https://github.com/nu4ddi4/security-lab-game/blob/beta/docs/BETA_VALIDATION.md)을 참고하세요.

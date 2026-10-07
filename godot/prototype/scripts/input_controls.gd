@@ -6,9 +6,9 @@ signal changed
 class Stick extends Control:
 	var axes = Vector2.ZERO
 	func _draw():
-		draw_circle(Vector2(90,90),86,Color(.08,.14,.18,.65))
-		draw_arc(Vector2(90,90),86,0,TAU,64,Color(.5,.85,.85,.7),3)
-		draw_circle(Vector2(90,90)+axes*65,30,Color(.5,.85,.85,.8))
+		draw_circle(Vector2(60,60),56,Color(.08,.14,.18,.65))
+		draw_arc(Vector2(60,60),56,0,TAU,64,Color(.5,.85,.85,.7),3)
+		draw_circle(Vector2(60,60)+axes*40,22,Color(.5,.85,.85,.8))
 
 var mobile = OS.has_feature("mobile") or "--mobile-qa" in OS.get_cmdline_user_args()
 var touch_enabled = false
@@ -23,6 +23,8 @@ var move_finger = -1
 var look_finger = -1
 var move_origin = Vector2.ZERO
 var axes = Vector2.ZERO
+var look_position = Vector2.ZERO
+var look_dragged = false
 var config = ConfigFile.new()
 var testing = "--prototype-smoke" in OS.get_cmdline_user_args()
 
@@ -41,11 +43,7 @@ func setup(controller: InvestigationPrototype):
 	stick = Stick.new()
 	stick.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(stick)
-	_add_button("tool","조작",func():
-		var target = game.player.target
-		if target != null: game.player.tool_requested.emit(target))
-	_add_button("inspect","살펴보기",func():
-		if game.player.target != null: game.player.inspect_requested.emit(game.player.target))
+	_add_button("tool","상호작용",func(): game.player.interact())
 	_add_button("jump","점프",Callable(),"jump")
 	_add_button("tablet","휴대 단말",func(): game.ui.open_tablet())
 	apply()
@@ -55,22 +53,22 @@ func _add_button(id: String, text: String, callback: Callable, action = ""):
 	node.visibility_mode = TouchScreenButton.VISIBILITY_ALWAYS
 	node.action = action
 	var shape = RectangleShape2D.new()
-	shape.size = Vector2(164,76)
+	shape.size = Vector2(140,58)
 	node.shape = shape
 	root.add_child(node)
 	var background = Polygon2D.new()
-	background.polygon = PackedVector2Array([Vector2(-82,-38),Vector2(82,-38),Vector2(82,38),Vector2(-82,38)])
+	background.polygon = PackedVector2Array([Vector2(-70,-29),Vector2(70,-29),Vector2(70,29),Vector2(-70,29)])
 	background.color = Color(.08,.2,.24,.8)
 	node.add_child(background)
 	var text_label = Label.new()
 	text_label.text = text
-	text_label.position = Vector2(-82,-38)
-	text_label.size = Vector2(164,76)
+	text_label.position = Vector2(-70,-29)
+	text_label.size = Vector2(140,58)
 	text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	text_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text_label.add_theme_font_override("font",load("res://assets/fonts/NotoSansKR.ttf"))
-	text_label.add_theme_font_size_override("font_size",24)
+	text_label.add_theme_font_size_override("font_size",18)
 	node.add_child(text_label)
 	if callback.is_valid(): node.pressed.connect(callback)
 	buttons[id] = node
@@ -103,7 +101,9 @@ func release_touches():
 	move_finger = -1
 	look_finger = -1
 	axes = Vector2.ZERO
-	if game != null: game.player.touch_axes = Vector2.ZERO
+	if game != null:
+		game.player.touch_axes = Vector2.ZERO
+		game.player.aim_screen_point = Vector2(-1,-1)
 	if stick != null:
 		stick.axes = axes
 		stick.queue_redraw()
@@ -119,6 +119,9 @@ func handle_touch(event: InputEvent) -> bool:
 				_set_axes(Vector2.ZERO)
 				return true
 			if event.index == look_finger:
+				if not look_dragged:
+					game.player.aim_screen_point = look_position
+					game.player.update_target()
 				look_finger = -1
 				return true
 			return false
@@ -127,17 +130,25 @@ func handle_touch(event: InputEvent) -> bool:
 		if event.position.x < size.x*.3 and event.position.y > size.y*.5 and move_finger < 0:
 			move_finger = event.index
 			move_origin = event.position
+			stick.position = move_origin-Vector2(60,60)
 			_set_axes(Vector2.ZERO)
 			return true
 		if event.position.x >= size.x*.3 and look_finger < 0:
 			look_finger = event.index
+			look_position = event.position
+			look_dragged = false
 			return true
 	elif event is InputEventScreenDrag:
 		if event.index == move_finger:
-			_set_axes(((event.position-move_origin)/85.0).limit_length())
+			var movement = ((event.position-move_origin)/56.0).limit_length()
+			_set_axes(Vector2.ZERO if movement.length() < .12 else movement.normalized() * ((movement.length()-.12)/.88))
 			return true
 		if event.index == look_finger:
-			game.player.look(event.relative*1.6)
+			look_position = event.position
+			if event.relative.length() > 0: look_dragged = true
+			game.player.aim_screen_point = Vector2(-1,-1)
+			# A full-width swipe turns 180 degrees on every screen size.
+			game.player.look(event.relative * (PI / maxf(size.x,1) / game.player.sensitivity))
 			return true
 	return false
 
@@ -164,12 +175,12 @@ func _process(_delta):
 	if not root.visible:
 		if move_finger >= 0 or look_finger >= 0: release_touches()
 		return
-	var size = get_viewport().get_visible_rect().size
-	stick.position = Vector2(36,size.y-230)
-	var positions = {"tool":Vector2(size.x-120,size.y-205),"inspect":Vector2(size.x-305,size.y-115),"jump":Vector2(size.x-120,size.y-115),"tablet":Vector2(size.x-120,65)}
+	var safe = game.safe_rect()
+	if move_finger < 0: stick.position = Vector2(safe.position.x+24,safe.end.y-152)
+	var positions = {"tool":Vector2(safe.end.x-94,safe.end.y-145),"jump":Vector2(safe.end.x-94,safe.end.y-69),"tablet":Vector2(safe.end.x-94,safe.position.y+45)}
 	for id in buttons:
 		buttons[id].position = positions[id]
-		button_rects[id] = Rect2(positions[id]-Vector2(82,38),Vector2(164,76))
-	buttons.tool.visible = game.player.target is InvestigationTarget
-	buttons.inspect.visible = game.player.target != null
-	buttons.tool.get_child(1).text = "대화" if game.player.target is InvestigationTarget and game.player.target.kind == "npc" else "조작"
+		button_rects[id] = Rect2(positions[id]-Vector2(70,29),Vector2(140,58))
+	var target = game.player.target
+	buttons.tool.get_child(0).color = Color(.08,.32,.32,.95) if target != null else Color(.08,.12,.16,.55)
+	buttons.tool.get_child(1).text = "상호작용" if target != null else "대상을 가리키세요"

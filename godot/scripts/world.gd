@@ -13,10 +13,10 @@ var meshes: Array[MeshInstance3D] = []
 var functional: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/functional.json"))
 var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/native-layout.json"))
 
-func setup(manager: LabMissions, actor: LabPlayer):
+func setup(manager: LabMissions, actor: LabPlayer, office: PackedScene = null):
 	missions = manager
 	player = actor
-	model = load("res://assets/models/Interior_07_Godot.glb").instantiate()
+	model = (office if office != null else load("res://assets/models/Interior_07_Godot.glb")).instantiate()
 	add_child(model)
 	collect(model)
 	for id in protected_nodes:

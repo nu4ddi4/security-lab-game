@@ -10,6 +10,8 @@
 
 [SecurityLab-beta-0.3.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-beta-0.3.0)에서 Windows EXE·ZIP·설치 파일과 Android APK를 받습니다. 설치형 Windows 업데이트는 알림에 동의한 뒤에만 다운로드·저장·종료·설치·재실행합니다. 설정에서 로컬 진단을 복사하고 지원 ZIP을 만들 수 있습니다.
 
+개발 중인 상호작용·모바일·로딩 변경과 검증 범위는 [개선 기록](docs/BETA_UX_MOBILE_PLAN.md)을 참고하세요.
+
 기존 Godot 학습 게임은 소스에서 `--legacy`로 실행합니다. 아래 릴리즈 안내는 기존 웹 버전입니다.
 
 ## 실행
