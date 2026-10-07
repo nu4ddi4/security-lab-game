@@ -64,8 +64,15 @@ def main():
     adb('install', '-r', str(qa))
     launch()
     result = wait_for('INVESTIGATION_SMOKE')
-    if not result.get('passed') or not result.get('mobile') or not result.get('touchDefault') or not result.get('keyboardDetected'):
+    if result.get('platform') != 'Android' or not result.get('passed') or not result.get('mobile') or not result.get('touchDefault') or not result.get('keyboardDetected'):
         raise ValueError('Android gameplay/input smoke failed: ' + json.dumps(result))
+    captures = directory / 'ui'
+    captures.mkdir(exist_ok=True)
+    for name in ['01-briefing','02-dialogue','03-terminal','04-messenger','05-notes','06-field','07-settings']:
+        data = adb('exec-out', 'run-as', PACKAGE, 'cat', 'files/qa-ui/' + name + '.png', binary=True)
+        if not data.startswith(b'\x89PNG\r\n\x1a\n'):
+            raise ValueError('Missing Android rendered UI capture: ' + name)
+        (captures / (name + '.png')).write_bytes(data)
     if read_save() != original:
         raise ValueError('Android package update changed the real investigation save')
     (directory / 'android-smoke.json').write_text(json.dumps(result), encoding='utf-8')

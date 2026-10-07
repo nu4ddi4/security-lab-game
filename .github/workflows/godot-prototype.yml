@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: ['codex/godot-investigation-prototype']
-    paths: ['.github/workflows/godot-prototype.yml', 'godot/prototype/version.json']
+    paths: ['.github/workflows/godot-prototype.yml', 'godot/prototype/version.json', 'scripts/prototype-android-build.py', 'scripts/prototype-android-test.py']
 permissions:
   contents: read
 concurrency:

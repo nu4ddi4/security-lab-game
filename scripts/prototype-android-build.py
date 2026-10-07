@@ -91,7 +91,7 @@ screen/immersive_mode=true
 permissions/internet=true
 command_line/extra_args="{args}"
 '''.format(code=version_code(version), version=version, package=PACKAGE,
-           keystore=json.dumps(str(keystore)), args='-- --prototype-smoke' if qa else '')
+           keystore=json.dumps(str(keystore)), args='-- --prototype-smoke --prototype-capture-dir=user://qa-ui' if qa else '')
 
 
 def main():
@@ -123,6 +123,7 @@ def main():
         target.mkdir()
         build.stage(root / 'godot', target)
         project = (target / 'project.godot').read_text(encoding='utf-8')
+        project = project.replace('textures/vram_compression/import_etc2_astc=false', 'textures/vram_compression/import_etc2_astc=true')
         project += '\n[input_devices]\npointing/emulate_touch_from_mouse=false\npointing/emulate_mouse_from_touch=true\n'
         project = project.replace('window/stretch/mode="canvas_items"', 'window/stretch/mode="canvas_items"\nwindow/handheld/orientation=0')
         (target / 'project.godot').write_text(project, encoding='utf-8')
