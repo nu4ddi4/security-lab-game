@@ -15,7 +15,9 @@ def run(command, directory, marker=None, timeout=90):
         result = subprocess.run(command, cwd=directory, capture_output=True, text=True,
                                 encoding='utf-8', errors='replace', timeout=timeout)
     except subprocess.TimeoutExpired as error:
-        raise SystemExit('Prototype check timed out: ' + str(command)) from error
+        partial = (error.stdout or b'') + (error.stderr or b'')
+        if isinstance(partial, bytes): partial = partial.decode('utf-8', errors='replace')
+        raise SystemExit('Prototype check timed out: ' + str(command) + '\n' + partial) from error
     output = result.stdout + result.stderr
     if result.returncode or 'SCRIPT ERROR:' in output or 'ERROR:' in output:
         raise SystemExit(output or 'Prototype command failed.')
@@ -157,7 +159,7 @@ def main():
         if args.rendered_check:
             captures = output.parent / 'ui'
             run([str(executable), '--audio-driver', 'Dummy', '--', '--prototype-smoke',
-                 '--prototype-capture-dir=' + str(captures)], directory, 'INVESTIGATION_SMOKE')
+                 '--prototype-capture-dir=' + str(captures)], directory, 'INVESTIGATION_SMOKE', timeout=180)
             expected = ['01-briefing', '02-dialogue', '03-terminal', '04-messenger', '05-notes', '06-field', '07-settings']
             if any(not (captures / (name + '.png')).is_file() for name in expected):
                 raise SystemExit('Exported Windows UI captures are incomplete.')
