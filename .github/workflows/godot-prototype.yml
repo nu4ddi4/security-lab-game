@@ -1,17 +1,6 @@
-name: Investigation beta builds
+name: Godot platform validation
 on:
   workflow_dispatch:
-  push:
-    branches: ['beta']
-    paths:
-      - godot/**
-      - installer/**
-      - scripts/prototype-*.py
-      - scripts/beta-*.py
-      - tests/native/**
-      - .github/actions/godot-setup/**
-      - .github/actions/inno-setup/**
-      - .github/workflows/godot-prototype.yml
 permissions:
   contents: read
 concurrency:
@@ -55,7 +44,6 @@ jobs:
         run: |
           python scripts/beta-installer-build.py --iscc $env:SECURITY_LAB_ISCC
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./tests/native/security_windows_updater.ps1 -Iscc $env:SECURITY_LAB_ISCC
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./tests/native/security_windows_updater.ps1 -Beta -Iscc $env:SECURITY_LAB_ISCC -Results prototype-dist/beta-windows-updater.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

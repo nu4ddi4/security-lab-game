@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import zipfile
 
-from ci_release import github
+from github_release import github
 
 
 def validate_build(run, jobs, artifacts, repository, sha, version):

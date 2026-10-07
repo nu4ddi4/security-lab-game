@@ -1,6 +1,7 @@
-param([string]$Godot = 'godot')
+param([string]$Godot = 'godot', [string]$Project = 'godot')
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$projectRoot = [IO.Path]::GetFullPath($Project, $repoRoot)
 $Godot = & (Join-Path $PSScriptRoot 'godot-console.ps1') -Godot $Godot
 $fixtureRoot = Join-Path $repoRoot ('godot/builds/diagnostics-test-' + [guid]::NewGuid().ToString())
 $denied = Join-Path $fixtureRoot 'denied'
@@ -16,7 +17,7 @@ try {
     & icacls $denied /deny ($sid + ':(W)') | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Cannot set test-only denied destination' }
     $aclChanged = $true
-    $log = & $Godot --headless --path (Join-Path $repoRoot 'godot') --script res://tests/diagnostics_test.gd -- "--diagnostics-denied=$denied" "--diagnostics-link=$link" 2>&1
+    $log = & $Godot --headless --path $projectRoot --script res://tests/diagnostics_test.gd -- "--diagnostics-denied=$denied" "--diagnostics-link=$link" 2>&1
     $log | Write-Output
     if ($LASTEXITCODE -ne 0 -or ($log | Select-String 'SCRIPT ERROR:|ERROR:')) { throw 'Windows diagnostic boundary tests failed' }
     $result = $log | Where-Object { $_ -like 'NATIVE_DIAGNOSTICS *' } | Select-Object -Last 1

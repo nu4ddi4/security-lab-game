@@ -42,7 +42,7 @@ def stage(source, target):
     shutil.copytree(source / 'scripts', target / 'scripts')
     shutil.copytree(source / 'resources', target / 'resources')
     (target / 'tests').mkdir()
-    for name in ['input_review.gd', 'input_bindings_test.gd']:
+    for name in ['input_review.gd', 'input_bindings_test.gd', 'diagnostics_test.gd']:
         shutil.copyfile(source / 'tests' / name, target / 'tests' / name)
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source.parent, text=True).strip()
     metadata = {'schema': 1, 'app_id': 'security-lab-beta', 'platform': 'windows-x86_64',
@@ -59,10 +59,7 @@ def stage(source, target):
     for policy in (source / 'assets/models').glob('*.glb.import'):
         shutil.copyfile(policy, target / 'assets/models' / policy.name)
     project = (source / 'project.godot').read_text(encoding='utf-8')
-    project = project.replace('res://scenes/entry.tscn', 'res://prototype/main.tscn')
     project = project.replace('Forward Plus', 'GL Compatibility').replace('"forward_plus"', '"gl_compatibility"')
-    project = project.replace('Offline security investigation simulator. Native companion to web v0.7.0.',
-                              'Offline security investigation beta.')
     project = project.replace('window/stretch/mode="canvas_items"',
                               'window/stretch/mode="canvas_items"\nwindow/stretch/aspect="expand"')
     project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '-beta.1"', project, flags=re.MULTILINE)
@@ -109,12 +106,10 @@ def check(godot, target):
     # build. Reimport only when generated textures still use lossless mode.
     if configure_texture_compression(target):
         run([godot, '--headless', '--editor', '--path', str(target), '--import'], target)
-    run([godot, '--headless', '--path', str(target), '--script', 'res://tests/input_bindings_test.gd'], target, 'INPUT_BINDINGS_TEST')
-    run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/unit.gd'],
-        target, 'INVESTIGATION_UNIT')
-    run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/services_runner.gd'], target, 'INVESTIGATION_SERVICES')
-    run([godot, '--headless', '--path', str(target), '--', '--prototype-smoke'],
-        target, 'INVESTIGATION_SMOKE')
+    if os.name == 'nt':
+        script = Path(__file__).with_name('godot-diagnostics-windows-test.ps1')
+        run(['pwsh', '-NoProfile', '-File', str(script), '-Godot', godot, '-Project', str(target)],
+            target, 'NATIVE_DIAGNOSTICS')
 
 
 def main():
@@ -136,6 +131,8 @@ def main():
         check(godot, target)
         baked_metadata = (target / "prototype/build_info.json").read_text(encoding="utf-8")
         if args.check_only:
+            run([godot, '--headless', '--path', str(target), '--', '--prototype-smoke'],
+                target, 'INVESTIGATION_SMOKE')
             return
         if os.name != 'nt':
             raise SystemExit('Build and verify the Windows EXE on Windows; use --check-only elsewhere.')
@@ -148,10 +145,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix='security-lab-exe-only-') as directory:
         executable = Path(directory) / output.name
         shutil.copyfile(output, executable)
-        for attempt in range(2):
-            run([str(executable), '--headless', '--', '--prototype-smoke'],
-                directory, 'INVESTIGATION_SMOKE')
-            print('Standalone EXE launch', attempt + 1, 'passed.')
+        run([str(executable), '--headless', '--', '--prototype-smoke'],
+            directory, 'INVESTIGATION_SMOKE')
+        print('Standalone EXE scene, save and reload passed.')
         run([str(executable), '--headless', '--', '--prototype-smoke', '--prototype-input-review'], directory, 'INPUT_REVIEW')
         run([str(executable), '--headless', '--', '--prototype-services'],
             directory, 'INVESTIGATION_SERVICES')

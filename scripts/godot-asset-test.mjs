@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
 const bytes=fs.readFileSync('godot/assets/models/Interior_07_Godot.glb'),length=bytes.readUInt32LE(12);
 const doc=JSON.parse(bytes.subarray(20,20+length)),binary=bytes.subarray(28+length);
-const baseline=JSON.parse(fs.readFileSync('assets/models/security_lab_runtime_functional.json'));
+const baseline=JSON.parse(fs.readFileSync('godot/tests/fixtures/office-geometry.json'));
 const nodes=doc.nodes.filter(n=>/^(DOOR_|COLLIDER_|INTERACT_|SPAWN_)/.test(n.name)).map(({mesh,children,...n})=>n);
 assert.deepEqual(nodes,baseline.nodes);
 assert.ok(!doc.extensionsRequired?.includes('EXT_meshopt_compression'));

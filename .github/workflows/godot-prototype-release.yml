@@ -1,8 +1,15 @@
 name: Publish verified beta
 on:
-  push:
-    branches: ['beta']
-    paths: ['.github/workflows/godot-prototype-release.yml']
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful beta Windows and Android validation run ID
+        required: true
+        type: string
+      build_sha:
+        description: Full commit SHA verified by that run
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -10,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    if: github.ref == 'refs/heads/beta' && contains(github.event.head_commit.message, 'Publish verified SecurityLab-beta-')
+    if: github.ref == 'refs/heads/beta'
     runs-on: ubuntu-latest
     timeout-minutes: 6
     permissions:
@@ -18,15 +25,14 @@ jobs:
       actions: read
     env:
       GH_TOKEN: ${{ github.token }}
-      PROTOTYPE_RUN_ID: '37600894731'
-      PROTOTYPE_BUILD_SHA: '139af5813237c21a76ce26dfcbae92a41d74e09f'
-      PROTOTYPE_VERSION: '0.4.0'
+      PROTOTYPE_RUN_ID: ${{ inputs.run_id }}
+      PROTOTYPE_BUILD_SHA: ${{ inputs.build_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Read current version
+        run: |
+          python3 -c 'import json,os; f=open(os.environ["GITHUB_ENV"],"a"); f.write("PROTOTYPE_VERSION="+json.load(open("godot/prototype/version.json"))["version"]+"\n"); f.close()'
       - name: Publish verified Windows and Android files
-        run: python scripts/prototype-release.py
+        run: python3 scripts/prototype-release.py

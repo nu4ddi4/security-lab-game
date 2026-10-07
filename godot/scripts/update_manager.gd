@@ -28,15 +28,13 @@ func executable_path() -> String:
 func supported_platform() -> bool:
 	return OS.get_name()=="Windows"
 
-func build_info_path() -> String: return "res://resources/build_info.json"
+func build_info_path() -> String: return "res://prototype/build_info.json"
 func stage_root() -> String: return "user://updates"
 func automatic_check_enabled() -> bool: return true
-func save_progress() -> bool: return game.saves.save(game.missions)
-func data_directory() -> String: return game.saves.directory
-func valid_saved_progress() -> bool:
-	var path = data_directory().path_join("progress.json")
-	return FileAccess.file_exists(path) and game.saves.decode(FileAccess.get_file_as_string(path),game.missions)
-func pause_for_install(): game.ui.pause()
+func save_progress() -> bool: return false
+func data_directory() -> String: return "user://"
+func valid_saved_progress() -> bool: return false
+func pause_for_install(): pass
 
 func setup(host: Node):
 	game = host

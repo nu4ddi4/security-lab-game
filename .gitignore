@@ -1,11 +1,6 @@
-node_modules/
-.npm-cache/
 .cache/
 .pytest_cache/
 .venv/
-.browsers/
-playwright-report/
-test-results/
 .env
 .env.*
 !.env.example
@@ -13,9 +8,6 @@ test-results/
 *.log
 __pycache__/
 *.py[cod]
-/build/
-dist/
-*.spec
 godot/.godot/
 godot/builds/
 godot/tests/results/
@@ -28,3 +20,14 @@ prototype-android-dist/
 *.pfx
 godot/assets/models/Interior_07_Godot_*.jpg
 godot/assets/models/Interior_07_Godot_*.png
+godot/assets/models/Investigation_Environment_*.jpg
+godot/assets/models/Investigation_Environment_*.png
+godot/assets/models/Investigation_Environment_*.jpg.import
+godot/assets/models/Investigation_Environment_*.png.import
+
+# Local caches retained when switching to earlier revisions
+node_modules/
+.npm-cache/
+.browsers/
+playwright-report/
+test-results/

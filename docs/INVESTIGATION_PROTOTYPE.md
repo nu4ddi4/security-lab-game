@@ -2,19 +2,19 @@
 
 브랜치: `beta` · 게임 기반: `codex/godot-investigation-prototype` · 맵·배치: 검증한 `godot-port`.
 
-`beta`는 테스트·안정화 후 main에 병합할 통합 브랜치입니다. 병합 범위와 출처는 [병합 계획](GODOT_BRANCH_MERGE_PLAN.md)을 따릅니다.
+`beta`는 다음 버전의 통합·안정화 브랜치입니다. 작업·검증 절차는 [CI](CI.md)를 따릅니다.
 
-업로드된 `SECURITY_LAB_WEB_PROTOTYPE_PLAN.md`의 최신 본문과 P1~P22를 Godot에 적용합니다. 웹 UI 대신 사무실 3D 환경을 사용하고, 사건 규칙과 콘텐츠는 장면에서 분리합니다.
+사무실 3D 환경에서 사건을 진행하며 규칙·콘텐츠·저장을 장면과 분리합니다.
 
 ## 실행
 
 Godot **4.7.2 stable**에서 `godot/project.godot`을 열고 F5를 누릅니다. 기본 진입은 조사 프로토타입입니다. 새 조사는 회사·담당 업무 설명과 첫날 인계 안내로 시작합니다. 메인 메뉴는 이후 작업입니다.
 
-Windows 테스트 빌드는 `Investigation beta builds`의 Actions 아티팩트로 제공합니다. `SecurityLab-beta-X.Y.Z.exe`만 실행하면 됩니다. 사무실 맵·사건 자료·한국어 폰트를 EXE에 포함합니다. OpenGL 호환 렌더러를 사용합니다.
+Windows 테스트 빌드는 `Godot platform validation`의 Actions 아티팩트로 제공합니다. `SecurityLab-beta-X.Y.Z.exe`만 실행하면 됩니다. 사무실 맵·사건 자료·한국어 폰트를 EXE에 포함합니다. OpenGL 호환 렌더러를 사용합니다.
 
 배포는 [SecurityLab-beta-0.4.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-beta-0.4.0)입니다. 제목·태그·EXE·ZIP은 `SecurityLab-beta-X.Y.Z` 형식을 사용합니다. Pre-release로 게시하고 정식 Latest를 바꾸지 않습니다. 검증된 같은 소스의 EXE·EXE 전용 ZIP·APK·Inno 설치 파일·manifest·빌드 기록·체크섬을 함께 제공합니다. 이전 [SecurityLab-proto-0.2.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-proto-0.2.0)은 보존합니다.
 
-버전은 `godot/prototype/version.json`에서 관리합니다. 버전·빌드 설정·입력·UI·앱 생명주기를 변경하면 Windows·Android 패키지 검사를 실행합니다. 일반 콘텐츠·엔진 수정은 빠른 검사를 사용합니다. 릴리즈는 성공한 같은 소스의 패키지를 재사용합니다. “커밋” 요청은 GitHub 반영과 릴리즈를 포함합니다. 로컬 Windows 빌드는 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로" --rendered-check`입니다.
+버전은 `godot/prototype/version.json`에서 관리합니다. 버전·빌드 설정·입력·UI·앱 생명주기를 변경하면 Windows·Android 패키지 검사를 실행합니다. 일반 콘텐츠·엔진 수정은 빠른 검사를 사용합니다. 릴리즈는 성공한 같은 소스의 패키지를 재사용합니다. 커밋·푸시와 릴리스는 별개이며 명시적 배포 요청에만 게시합니다. 로컬 Windows 빌드는 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로" --rendered-check`입니다.
 
 - WASD·마우스: 이동·시점, Shift: 달리기, C: 앉기, Space: 점프.
 - F / 상호작용: 장비·NPC·문을 한 버튼으로 조작합니다. 3.4m 이내 조준에 작은 여유를 적용하고 벽 너머 대상을 선택하지 않습니다. 장비를 여는 것만으로 원본 기록을 확보하지 않습니다.
@@ -37,17 +37,11 @@ Interior 07의 고품질 사무실과 기존 Native 배치 보정을 그대로 �
 
 관제석은 감사 단말, 옆 보관함은 승인 범위 원본, 서버 운영 랙은 서비스·백업 단말, 오른쪽 업무석은 LUMEN PC, 네트워크 작업대는 협력업체 정비석, 이동식 게시판은 운영 인계에 대응합니다. 자료실의 기존 가구·보관 자산은 공유 업무 자료 구역으로 유지합니다. 인물은 각 담당 공간에 배치한 CC0 정적 모델입니다. 이동 AI·표정·립싱크는 구현하지 않았습니다.
 
-`INTERACT_Investigation_*`의 glTF extras에 사건의 `logical_id`, `kind`, `target_size`를 기록합니다. `APPROACH_*`, `SPEAKER_*`, `SPAWN_Investigation`에서 접근 시점·대화 초점·초기 위치를 읽습니다. 좌표는 Godot 코드에 중복 작성하지 않습니다. `COLLIDER_Investigation_*`는 추가 가구·인물의 충돌체이며, 기존 보호 노드와 문 Pivot은 보존합니다. 실제 화면을 가리던 세 작업대의 1.5m 충돌 높이만 조사 런타임에서 상판 높이에 맞춥니다. 기존 학습 진입은 그대로입니다.
+`INTERACT_Investigation_*`의 glTF extras에 사건의 `logical_id`, `kind`, `target_size`를 기록합니다. `APPROACH_*`, `SPEAKER_*`, `SPAWN_Investigation`에서 접근 시점·대화 초점·초기 위치를 읽습니다. 좌표는 Godot 코드에 중복 작성하지 않습니다. `COLLIDER_Investigation_*`는 추가 가구·인물의 충돌체이며, 기존 보호 노드와 문 Pivot은 보존합니다. 실제 화면을 가리던 세 작업대의 1.5m 충돌 높이만 조사 런타임에서 상판 높이에 맞춥니다. 현재 조사 실행만 유지합니다.
 
 `prototype/scripts/environment.gd`는 실제 모니터·게시판에 640×360 화면을 연결합니다. 날짜·공개 운영 상태·승인·당일 재검증이 바뀔 때만 갱신하며 저장 불러오기·가져오기·새 조사에서도 다시 계산합니다. 미열람 접근·수집 증거와 행위자를 공개하지 않습니다. 판독·기록 확보·조작은 기존 현장 터미널에서 수행합니다. 화면을 보는 것만으로 증거가 추가되지는 않습니다.
 
 기본 실행에는 더미 상자나 떠 있는 이름표가 없습니다. 빠른 CI의 `--prototype-dummy` 장면은 자산 없이 규칙·입력을 검사하는 전용 fixture로 남깁니다. 실제 자산 접근·문·대화·저장 검사는 기존 상세 장면 smoke와 Windows EXE 내보내기를 재사용합니다.
-
-기존 학습 게임은 다음처럼 엽니다.
-
-```powershell
-godot --path godot -- --legacy
-```
 
 ## 구현 범위
 
@@ -78,17 +72,17 @@ godot --path godot -- --legacy
 | `prototype/scripts/game.gd` · `ui.gd` · `target.gd` | 사무실 환경, UI, 논리 장비 ID 연결 |
 | `prototype/tests/scenarios.json` | 엔진 교체 시 재사용할 입력·기대 결과 시나리오 |
 
-`LabPlayer`는 프로토타입의 혼합 입력을 유지하고, `LabWorld`는 맵·문·충돌·외관에 재사용합니다. 기존 `LabMissions`와 학습 저장에는 의존하지 않습니다. 기존 장비 ID를 유지해 사건 엔진과 저장을 그대로 사용합니다. 다른 런타임은 같은 JSON·논리 ID·시나리오를 사용할 수 있습니다.
+`LabPlayer`는 프로토타입의 혼합 입력을 유지하고, `LabWorld`는 맵·문·충돌·외관에 재사용합니다. 구 학습 미션·저장 코드는 제거했습니다. 기존 장비 ID를 유지해 사건 엔진과 저장을 그대로 사용합니다. 다른 런타임은 같은 JSON·논리 ID·시나리오를 사용할 수 있습니다.
 
 저장은 `user://investigation/save.json`이며 기존 `user://progress.json`과 분리됩니다. Windows 기본 위치는 `%APPDATA%/Godot/app_userdata/Security Lab · Native/investigation/`입니다. 최신 이전 저장은 `save.backup.json`에 남깁니다. 손상·미지원 저장은 자동 초기화하지 않습니다. 새 조사나 가져오기로 교체하기 전에 원본을 보존하고, 보존에 실패하면 교체를 중단합니다. 진행 JSON은 256KiB 이하여야 합니다.
 
 ## 검증
 
 ```powershell
-python scripts/prototype-test.py --godot "C:/path/to/Godot_v4.7.2-stable_win64_console.exe"
+python scripts/prototype-test.py --suite all --godot "C:/path/to/Godot_v4.7.2-stable_win64_console.exe"
 ```
 
-새 시나리오 8개와 사무실 장면의 이동·실제 장비 레이캐스트·UI 정지·저장 검사를 실행합니다. 매 시나리오 전이에서 입력 상태 불변성과 저장 복원을 확인합니다. Windows Native CI에도 같은 검사를 연결했습니다.
+새 시나리오 8개와 사무실 장면의 이동·실제 장비 레이캐스트·UI 정지·저장 검사를 실행합니다. 매 시나리오 전이에서 입력 상태 불변성과 저장 복원을 확인합니다. 빠른 CI는 자산 없는 더미 장면을 사용하며 실제 플랫폼 검사는 수동으로 실행합니다.
 
 현재 개발 변경은 Linux에서 시나리오 8개·462개 검증과 실제 렌더링 장면 검사를 통과했습니다. 첫날 안내 완주, 대화 종료 시 시선 유지, help 이후 명령 안내, 조사 지시 시 UI 전환, 터치 선택·스크롤과 네 가지 화면 비율을 확인했습니다. [모바일·로딩 개선 및 검증 범위](BETA_UX_MOBILE_PLAN.md)에 후속 최적화와 이번 변경의 미검증 플랫폼을 기록합니다.
 

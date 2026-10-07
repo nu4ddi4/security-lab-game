@@ -2,19 +2,16 @@ class_name LabWorld
 extends Node3D
 
 var model: Node3D
-var devices: Dictionary = {}
 var doors: Dictionary = {}
 var protected_nodes: Dictionary = {}
 var collider_count = 0
 var environment: WorldEnvironment
 var player: LabPlayer
-var missions: LabMissions
 var meshes: Array[MeshInstance3D] = []
 var functional: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/functional.json"))
 var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/native-layout.json"))
 
-func setup(manager: LabMissions, actor: LabPlayer, office: PackedScene = null):
-	missions = manager
+func setup(actor: LabPlayer, office: PackedScene = null):
 	player = actor
 	model = (office if office != null else load("res://assets/models/Interior_07_Godot.glb")).instantiate()
 	add_child(model)
@@ -40,16 +37,7 @@ func setup(manager: LabMissions, actor: LabPlayer, office: PackedScene = null):
 			var extras = functional[id].extras
 			door.setup(node, extras.collisionBounds, player, extras.openAngleDegrees)
 			doors[id] = door
-		elif id.begins_with("INTERACT_") and manager!=null:
-			var device = LabDevice.new()
-			device.name = "NativeInteraction"
-			node.add_child(device)
-			var bounds = node_bounds(node)
-			# A readable front face is shared by the ray target and field placard.
-			var fronts = {"INTERACT_AdminPC": Vector3(-5,1.8,3.5364), "INTERACT_ServerRack": Vector3(-8,1.6,-4.4238), "INTERACT_Router": Vector3(7,1.45,2.60), "INTERACT_FileCabinet": Vector3(8.5,1.75,-7.3508), "INTERACT_Whiteboard": bounds.get_center()}
-			var center = node.to_local(fronts[id])
-			device.setup(id, manager, AABB(center-Vector3(.36,.21,.055),Vector3(.72,.42,.11)))
-			devices[id] = device
+
 	var floor_body = StaticBody3D.new()
 	floor_body.name = "NativeFloorSupport"
 	floor_body.collision_layer = 5
