@@ -13,6 +13,31 @@ func at(state: Dictionary, path: String):
 	return value
 
 func _initialize():
+	var installed = {"version":"0.2.0","prerelease":true,"tag_prefix":"SecurityLab-proto-"}
+	var candidates = [release_fixture("0.3.0",false),release_fixture("0.2.1",true),release_fixture("0.10.0",true)]
+	check(InvestigationUpdates.select_release(candidates,installed,"Android").version == "0.10.0","Prerelease updates use numeric versions and skip stable releases")
+	installed.prerelease = false
+	check(InvestigationUpdates.select_release(candidates,installed,"Windows").version == "0.3.0","Stable installs never offer prereleases")
+	check(InvestigationUpdates.select_release(candidates,installed,"Android").url.ends_with(".apk"),"Android receives an APK")
+	check(InvestigationUpdates.select_release(candidates,installed,"Windows").url.ends_with(".exe"),"Windows receives an EXE")
+	installed.version = "0.3.0"
+	check(InvestigationUpdates.select_release(candidates,installed,"Windows").is_empty(),"Installed and older releases are never offered")
+	installed.version = "0.2.0"
+	var draft = release_fixture("0.4.0",false)
+	draft.draft = true
+	check(InvestigationUpdates.select_release([draft],installed,"Android").is_empty(),"Draft releases are ignored")
+	var other = release_fixture("0.4.0",false)
+	other.tag_name = "v0.4.0"
+	check(InvestigationUpdates.select_release([other],installed,"Android").is_empty(),"Prototype updates cannot switch to the legacy web game")
+	var bad_release = release_fixture("0.4.0",false)
+	bad_release.assets[0].browser_download_url = "https://example.com/update.apk"
+	check(InvestigationUpdates.select_release([bad_release],installed,"Android").url == "","Update download URLs must belong to this repository and exact asset")
+	var incomplete = release_fixture("0.4.0",false)
+	incomplete.assets = []
+	check(InvestigationUpdates.select_release([release_fixture("0.3.0",false),incomplete],installed,"Android").url == "","Do not offer an older APK when the newest release is incomplete")
+	check(InvestigationUpdates.select_release([null,{},"bad"],installed,"Android").is_empty(),"Malformed release entries are ignored")
+	check(not InvestigationUpdates.newer("0.2.0-beta.1","0.2.0"),"Unexpected version formats are rejected")
+	check(InvestigationUpdates.select_release(candidates,installed,"Linux").url == "","Unavailable platform files are never replaced with Windows assets")
 	var content = InvestigationContent.load_case()
 	check(not content.has("error"),"Content loads")
 	if content.has("error"): quit(1); return
@@ -72,3 +97,10 @@ func _initialize():
 	check(engine.step(original,{"type":"read","deviceId":"project_pc","payload":{"kind":"submissions"}}).code == "WRONG_DEVICE","Direct action still checks device")
 	print("INVESTIGATION_UNIT ",JSON.stringify({"scenarios":fixtures.scenarios.size(),"assertions":checks,"passed":failures.is_empty(),"failures":failures}))
 	quit(0 if failures.is_empty() else 1)
+
+func release_fixture(version: String, prerelease: bool) -> Dictionary:
+	var tag = "SecurityLab-proto-"+version
+	var assets = []
+	for ext in [".apk",".exe"]:
+		assets.append({"name":tag+ext,"state":"uploaded","size":100.0,"browser_download_url":InvestigationUpdates.DOWNLOAD+tag+"/"+tag+ext})
+	return {"tag_name":tag,"prerelease":prerelease,"draft":false,"assets":assets}

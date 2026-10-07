@@ -1,4 +1,4 @@
-"""Publish a verified prototype artifact as a separate, non-latest prerelease."""
+"""Publish the verified Windows and Android prototype builds together."""
 import hashlib
 import json
 import os
@@ -10,6 +10,36 @@ import tempfile
 import zipfile
 
 from ci_release import github
+
+
+def validate_build(run, jobs, artifacts, repository, sha, version):
+    if (run.get('status') != 'completed' or run.get('conclusion') != 'success'
+            or run.get('head_sha') != sha
+            or run.get('head_branch') != 'codex/godot-investigation-prototype'
+            or run.get('head_repository', {}).get('full_name') != repository
+            or run.get('path') != '.github/workflows/godot-prototype.yml'
+            or run.get('event') not in {'push', 'workflow_dispatch'}):
+        raise ValueError('Expected successful Windows and Android builds from this branch')
+    if not {'prototype', 'android'} <= {job['name'] for job in jobs if job.get('conclusion') == 'success'}:
+        raise ValueError('Windows and Android execution checks must both succeed')
+    selected = {}
+    for platform in ['Windows-x64', 'Android']:
+        name = 'SecurityLab-proto-' + version + '-' + platform
+        matching = [item for item in artifacts if item['name'] == name]
+        if (len(matching) != 1 or matching[0].get('expired') is not False
+                or matching[0].get('size_in_bytes', 0) <= 0
+                or matching[0].get('workflow_run', {}).get('head_sha') != sha):
+            raise ValueError('Artifact missing, expired, duplicated or from another commit: ' + platform)
+        selected[platform] = matching[0]
+    return selected
+
+
+def verified_file(directory, name):
+    path = directory / name
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if path.with_suffix('.sha256').read_text(encoding='utf-8').strip() != digest + '  ' + name:
+        raise ValueError('Artifact differs from its verified checksum: ' + name)
+    return path
 
 
 def main():
@@ -25,98 +55,68 @@ def main():
         raise ValueError('Expected the current publication commit')
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
         raise ValueError('Use a prototype version in X.Y.Z form')
-    configured_version = json.loads(Path('godot/prototype/version.json').read_text(encoding='utf-8'))['version']
-    if version != configured_version:
-        raise ValueError('Release version differs from the prototype version')
+    metadata = json.loads(Path('godot/prototype/version.json').read_text(encoding='utf-8'))
+    if version != metadata['version'] or metadata.get('prerelease') is not True:
+        raise ValueError('Release version/channel differs from the prototype build')
     prefix = 'repos/' + repository
     run = github(prefix + '/actions/runs/' + run_id)
-    if (run.get('status') != 'completed' or run.get('conclusion') != 'success'
-            or run.get('head_sha') != sha
-            or run.get('head_branch') != 'codex/godot-investigation-prototype'
-            or run.get('head_repository', {}).get('full_name') != repository
-            or run.get('path') != '.github/workflows/godot-prototype.yml'
-            or run.get('event') not in {'push', 'workflow_dispatch'}):
-        raise ValueError('Expected the successful Windows prototype build from this branch')
-    subprocess.run(['git', 'merge-base', '--is-ancestor', sha, 'HEAD'], check=True)
-    subprocess.run(['git', 'diff', '--quiet', sha, 'HEAD', '--', 'godot', 'scripts/prototype-build.py'], check=True)
     jobs = github(prefix + '/actions/runs/' + run_id + '/jobs?per_page=100')['jobs']
-    if not any(job['name'] == 'prototype' and job.get('conclusion') == 'success' for job in jobs):
-        raise ValueError('Windows EXE verification did not succeed')
     artifacts = github(prefix + '/actions/runs/' + run_id + '/artifacts?per_page=100')['artifacts']
+    selected = validate_build(run, jobs, artifacts, repository, sha, version)
+    subprocess.run(['git', 'merge-base', '--is-ancestor', sha, 'HEAD'], check=True)
+    subprocess.run(['git', 'diff', '--quiet', sha, 'HEAD', '--', 'godot',
+                    'scripts/prototype-build.py', 'scripts/prototype-android-build.py',
+                    'scripts/prototype-android-test.py', '.github/workflows/godot-prototype.yml'], check=True)
     tag = 'SecurityLab-proto-' + version
-    matching = [item for item in artifacts if item['name'] == tag + '-Windows-x64']
-    if (len(matching) != 1 or matching[0].get('expired') is not False
-            or matching[0].get('size_in_bytes', 0) <= 0
-            or matching[0].get('workflow_run', {}).get('head_sha', sha) != sha):
-        raise ValueError('Prototype artifact is missing, expired or from another commit')
     release = github(prefix + '/releases/tags/' + tag, missing_ok=True)
-    migrate = os.environ.get('PROTOTYPE_MIGRATE_FROM_TAG', '')
-    if release is None and migrate:
-        if not re.fullmatch(r'prototype-v\d+\.\d+\.\d+-beta\.\d+', migrate):
-            raise ValueError('Unsupported old prototype tag')
-        release = github(prefix + '/releases/tags/' + migrate)
-    if release:
-        if not release.get('prerelease') or release.get('draft'):
-            raise ValueError('Only a published prototype prerelease can be updated')
-        original_ref = github(prefix + '/git/ref/tags/' + release['tag_name'])
-        if original_ref['object']['sha'] != tag_sha:
-            raise ValueError('Existing prototype release points to another publication commit')
     reference = github(prefix + '/git/ref/tags/' + tag, missing_ok=True)
     if reference and reference['object']['sha'] != tag_sha:
-        raise ValueError('Prototype tag already points to another publication commit')
-    with tempfile.TemporaryDirectory(prefix='prototype-beta-') as temporary:
+        raise ValueError('Prototype tag points to another publication commit')
+    if release and (not release.get('prerelease') or release.get('draft')):
+        raise ValueError('Only a published prototype prerelease can be updated')
+    with tempfile.TemporaryDirectory(prefix='prototype-release-') as temporary:
         directory = Path(temporary)
-        download = directory / 'download'
-        subprocess.run(['gh', 'run', 'download', run_id, '--repo', repository,
-                        '--name', matching[0]['name'], '--dir', str(download)], check=True)
-        original = download / (tag + '.exe')
-        checksum = original.with_suffix('.sha256')
-        digest = hashlib.sha256(original.read_bytes()).hexdigest()
-        if checksum.read_text(encoding='utf-8').strip() != digest + '  ' + original.name:
-            raise ValueError('Downloaded EXE differs from the verified artifact checksum')
-        exe = directory / (tag + '.exe')
-        shutil.copyfile(original, exe)
+        files = []
+        for platform, extension in [('Windows-x64', '.exe'), ('Android', '.apk')]:
+            download = directory / platform
+            subprocess.run(['gh', 'run', 'download', run_id, '--repo', repository,
+                            '--name', selected[platform]['name'], '--dir', str(download)], check=True)
+            original = verified_file(download, tag + extension)
+            if platform == 'Android':
+                report = json.loads((download / 'android-smoke.json').read_text(encoding='utf-8'))
+                if not all(report.get(field) is True for field in ['passed','mobile','touchDefault','keyboardDetected']):
+                    raise ValueError('Downloaded Android test report does not confirm mobile input checks')
+            destination = directory / original.name
+            shutil.copyfile(original, destination)
+            files.append(destination)
+        exe = files[0]
         archive = exe.with_suffix('.zip')
         with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as bundle:
             bundle.write(exe, exe.name)
+        files.append(archive)
         sums = directory / 'SHA256SUMS.txt'
         sums.write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest() + '  ' + path.name + '\n'
-                                for path in [exe, archive]), encoding='utf-8')
+                                for path in files), encoding='utf-8')
+        files.append(sums)
         notes = directory / 'release-notes.md'
         notes.write_text(Path('docs/PROTOTYPE_RELEASE_NOTES.md').read_text(encoding='utf-8'), encoding='utf-8')
-        # GITHUB_TOKEN can create a tag at this workflow's own commit. The
-        # ancestry and source diff checks above ensure it matches the tested build.
+        # The publication commit must match the tested game/build sources. Tagging
+        # this workflow's own commit also works with the scoped GITHUB_TOKEN.
         if reference is None:
             subprocess.run(['gh', 'api', '--method', 'POST', prefix + '/git/refs',
                             '-f', 'ref=refs/tags/' + tag, '-f', 'sha=' + tag_sha, '--silent'], check=True)
         if release:
-            subprocess.run(['gh', 'release', 'upload', release['tag_name'], str(exe), str(archive), str(sums),
+            subprocess.run(['gh', 'release', 'upload', tag, *map(str, files),
                             '--repo', repository, '--clobber'], check=True)
-            payload = directory / 'release-update.json'
-            payload.write_text(json.dumps({'tag_name':tag, 'name':tag, 'prerelease':True,
-                                           'make_latest':'false'}), encoding='utf-8')
-            subprocess.run(['gh', 'api', '--method', 'PATCH', prefix + '/releases/' + str(release['id']),
-                            '--input', str(payload), '--silent'], check=True)
-            updated = github(prefix + '/releases/tags/' + tag)
-            expected = {exe.name, archive.name, sums.name}
-            uploaded = {item['name'] for item in updated['assets'] if item.get('state') == 'uploaded'}
-            if not expected <= uploaded:
-                raise ValueError('Renamed prototype files were not fully uploaded')
-            if migrate:
-                old_stem = 'SecurityLab-Prototype-' + migrate.removeprefix('prototype-v') + '-Windows-x64'
-                for item in updated['assets']:
-                    if item['name'] in {old_stem + '.exe', old_stem + '.zip'}:
-                        subprocess.run(['gh', 'api', '--method', 'DELETE',
-                                        prefix + '/releases/assets/' + str(item['id']), '--silent'], check=True)
         else:
-            subprocess.run(['gh', 'release', 'create', tag, str(exe), str(archive), str(sums),
+            subprocess.run(['gh', 'release', 'create', tag, *map(str, files),
                             '--repo', repository, '--target', tag_sha, '--verify-tag', '--prerelease', '--latest=false',
                             '--title', tag, '--notes-file', str(notes)], check=True)
     release = github(prefix + '/releases/tags/' + tag)
     if (not release.get('prerelease') or release.get('draft')
             or release.get('tag_name') != tag or release.get('name') != tag):
-        raise ValueError('The beta must be a published prerelease')
-    expected = {tag + '.exe', tag + '.zip', 'SHA256SUMS.txt'}
+        raise ValueError('Expected a published prototype prerelease')
+    expected = {tag + '.exe', tag + '.zip', tag + '.apk', 'SHA256SUMS.txt'}
     uploaded = {item['name'] for item in release['assets']
                 if item.get('state') == 'uploaded' and item.get('size', 0) > 0}
     if not expected <= uploaded:

@@ -9,6 +9,8 @@ var ray: RayCast3D
 var shape: CollisionShape3D
 var target: Node
 var enabled = false
+var touch_controls_enabled = false
+var touch_axes = Vector2.ZERO
 var crouched = false
 var sensitivity = 0.0018
 var body_height = 1.8
@@ -41,17 +43,23 @@ func _ready():
 
 func set_enabled(value: bool):
 	enabled = value
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if value else Input.MOUSE_MODE_VISIBLE
-	if not value: velocity = Vector3.ZERO
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if value and not touch_controls_enabled and not OS.has_feature("mobile") else Input.MOUSE_MODE_VISIBLE
+	if not value:
+		velocity = Vector3.ZERO
+		touch_axes = Vector2.ZERO
+
+func look(relative: Vector2):
+	if not enabled: return
+	rotate_y(-relative.x * sensitivity)
+	camera.rotation.x = clampf(camera.rotation.x - relative.y * sensitivity, -1.42, 1.42)
 
 func _unhandled_input(event):
 	if event.is_action_pressed("pause"):
 		pause_requested.emit()
 		get_viewport().set_input_as_handled()
 	if not enabled: return
-	if event is InputEventMouseMotion:
-		rotate_y(-event.relative.x * sensitivity)
-		camera.rotation.x = clampf(camera.rotation.x - event.relative.y * sensitivity, -1.42, 1.42)
+	if event is InputEventMouseMotion and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)):
+		look(event.relative)
 	if event.is_action_pressed("inspect") and target != null: inspect_requested.emit(target)
 	if event.is_action_pressed("tool") and target != null and target.has_method("open_tool"): tool_requested.emit(target)
 
@@ -73,7 +81,7 @@ func _physics_process(delta):
 	shape.shape.height = body_height
 	shape.position.y = body_height / 2.0
 	camera.position.y = lerpf(camera.position.y, 0.95 if crouched else 1.65, 1.0 - exp(-delta * 18.0))
-	var axes = Input.get_vector("left", "right", "forward", "back")
+	var axes = (Input.get_vector("left", "right", "forward", "back") + touch_axes).limit_length()
 	var direction = global_basis * Vector3(axes.x, 0, axes.y)
 	var speed = 1.35 if crouched else 4.2 if Input.is_action_pressed("sprint") else 2.6
 	velocity.x = direction.x * speed

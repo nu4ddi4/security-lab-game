@@ -7,6 +7,8 @@ var state: Dictionary
 var store = InvestigationStore.new()
 var player: LabPlayer
 var ui: InvestigationUI
+var controls: InvestigationControls
+var updates: InvestigationUpdates
 var context = ""
 var blocked_save = false
 var save_timer: Timer
@@ -33,9 +35,16 @@ func _ready():
 	add_child(player)
 	player.global_position = Vector3(-6,.01,5.6)
 	_build_world()
+	controls = InvestigationControls.new()
+	add_child(controls)
+	updates = InvestigationUpdates.new()
+	add_child(updates)
 	ui = InvestigationUI.new()
 	add_child(ui)
 	ui.setup(self)
+	controls.setup(self)
+	updates.changed.connect(ui.refresh_settings)
+	controls.changed.connect(ui.refresh_settings)
 	player.inspect_requested.connect(func(target): target.inspect())
 	player.tool_requested.connect(func(target): _use(target.logical_id,target.kind,true))
 	player.pause_requested.connect(ui.toggle)
@@ -50,6 +59,7 @@ func _ready():
 		var smoke = load("res://prototype/tests/smoke.gd").new()
 		add_child(smoke)
 		smoke.run.call_deferred(self)
+	elif controls.automatic_updates: updates.check.call_deferred()
 
 func _setup_input():
 	var mapping = {"forward":KEY_W,"back":KEY_S,"left":KEY_A,"right":KEY_D,"sprint":KEY_SHIFT,"crouch":KEY_C,"jump":KEY_SPACE,"inspect":KEY_E,"tool":KEY_F,"pause":KEY_ESCAPE}
@@ -142,6 +152,8 @@ func _unhandled_input(event):
 		get_viewport().set_input_as_handled()
 
 func _notification(what):
+	if what in [NOTIFICATION_APPLICATION_PAUSED,NOTIFICATION_APPLICATION_FOCUS_OUT] and ui != null:
+		save_now()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and ui != null:
 		save_now()
 		get_tree().quit()

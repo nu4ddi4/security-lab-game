@@ -53,7 +53,7 @@ name="Windows Prototype"
 platform="Windows Desktop"
 runnable=true
 export_filter="all_resources"
-include_filter="prototype/content/*.json,prototype/tests/*.json,assets/fonts/OFL.txt,LICENSES.txt"
+include_filter="prototype/version.json,prototype/content/*.json,prototype/tests/*.json,assets/fonts/OFL.txt,LICENSES.txt"
 exclude_filter="prototype/tests/results/*"
 export_path=""
 script_export_mode=2
@@ -118,7 +118,7 @@ def main():
             captures = output.parent / 'ui'
             run([str(executable), '--audio-driver', 'Dummy', '--', '--prototype-smoke',
                  '--prototype-capture-dir=' + str(captures)], directory, 'INVESTIGATION_SMOKE')
-            expected = ['01-briefing', '02-dialogue', '03-terminal', '04-messenger', '05-notes', '06-field']
+            expected = ['01-briefing', '02-dialogue', '03-terminal', '04-messenger', '05-notes', '06-field', '07-settings']
             if any(not (captures / (name + '.png')).is_file() for name in expected):
                 raise SystemExit('Exported Windows UI captures are incomplete.')
             print('Rendered Windows EXE UI and interaction passed.')

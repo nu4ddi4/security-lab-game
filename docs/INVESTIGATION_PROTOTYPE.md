@@ -8,17 +8,21 @@
 
 Godot **4.7.2 stable**에서 `godot/project.godot`을 열고 F5를 누릅니다. 기본 진입은 조사 프로토타입입니다. 새 조사는 회사·담당 업무 설명과 첫날 인계 안내로 시작합니다. 메인 메뉴는 이후 작업입니다.
 
-Windows 테스트 빌드는 `Investigation prototype Windows`의 Actions 아티팩트로 제공합니다. `SecurityLab-proto-X.Y.Z.exe`만 실행하면 됩니다. 더미 환경·사건 자료·한국어 폰트를 EXE에 포함하며 기존 맵·웹·가이드는 포함하지 않습니다. 이 빌드는 OpenGL 호환 렌더러를 사용합니다.
+Windows 테스트 빌드는 `Investigation prototype builds`의 Actions 아티팩트로 제공합니다. `SecurityLab-proto-X.Y.Z.exe`만 실행하면 됩니다. 더미 환경·사건 자료·한국어 폰트를 EXE에 포함하며 기존 맵·웹·가이드는 포함하지 않습니다. 이 빌드는 OpenGL 호환 렌더러를 사용합니다.
 
-배포는 [SecurityLab-proto-0.1.1](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-proto-0.1.1)입니다. 제목·태그·EXE·ZIP은 `SecurityLab-proto-X.Y.Z` 형식을 사용합니다. Pre-release로 게시하고 정식 Latest를 바꾸지 않습니다. 검증된 Windows 빌드를 재사용하고 EXE·EXE만 담은 ZIP·체크섬을 제공합니다. 다음 수정 배포는 `0.1.2`, 기능 배포는 `0.2.0`으로 올립니다.
+배포는 [SecurityLab-proto-0.2.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-proto-0.2.0)입니다. 제목·태그·EXE·ZIP은 `SecurityLab-proto-X.Y.Z` 형식을 사용합니다. Pre-release로 게시하고 정식 Latest를 바꾸지 않습니다. 검증된 Windows 빌드를 재사용하고 EXE·EXE만 담은 ZIP·APK·체크섬을 제공합니다. 다음 수정 배포는 `0.2.1`, 기능 배포는 `0.3.0`으로 올립니다.
 
-버전은 `godot/prototype/version.json`에서 관리합니다. 버전 파일이나 `.github/workflows/godot-prototype.yml`을 변경하면 Windows 빌드를 실행합니다. 검증한 빌드 참조로 사전 릴리즈를 게시하며 빌드를 반복하지 않습니다. “커밋” 요청은 GitHub 반영과 릴리즈를 포함합니다. 로컬 Windows 빌드는 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로" --rendered-check`입니다.
+버전은 `godot/prototype/version.json`에서 관리합니다. 버전 파일이나 `.github/workflows/godot-prototype.yml`을 변경하면 Windows·Android 빌드를 실행합니다. 검증한 빌드 참조로 사전 릴리즈를 게시하며 빌드를 반복하지 않습니다. “커밋” 요청은 GitHub 반영과 릴리즈를 포함합니다. 로컬 Windows 빌드는 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로" --rendered-check`입니다.
 
 - WASD·마우스: 이동·시점, Shift: 달리기, C: 앉기, Space: 점프.
 - E: 외관 확인. 원본 기록을 확보하지 않습니다.
 - F: NPC와 현장 대화 또는 장비 조작. 가까이서 바라보는 대상의 안내만 표시합니다.
 - Tab: 현장에서 휴대 단말을 열고 닫습니다. Esc는 열린 화면을 닫거나 현장에서 휴대 단말을 엽니다.
 - 업무 탭: 오늘의 운영 확인, 업무 종료, 진행 내보내기·가져오기.
+
+Android는 APK를 설치해 가로 화면으로 플레이합니다. 왼쪽 영역으로 이동하고 오른쪽 화면을 드래그해 시점을 조작합니다. 가까운 대상에만 대화·조작 버튼이 표시됩니다. 외부 키보드 입력도 함께 사용합니다. PC는 키보드·마우스가 기본이며 휴대 단말의 설정 탭에서 터치를 활성화합니다. Linux 배포는 이후 추가합니다.
+
+설정 탭에서 업데이트를 확인하거나 시작 시 확인을 끌 수 있습니다. 빌드에 기록한 안정·사전 릴리즈 채널의 더 높은 버전만 확인합니다. 게임 명령은 네트워크를 사용하지 않습니다. Android는 새 APK를 덮어 설치하고 Windows는 게임을 닫고 새 EXE를 실행합니다. 게임 저장과 입력 설정은 유지됩니다.
 
 NPC 대화는 화면 아래 대화창을 사용합니다. 대화 중 이동·시점 입력을 멈추고 카메라를 화자 쪽으로 살짝 조정합니다. 대화를 닫으면 원래 시점으로 돌아갑니다. 휴대 단말의 메신저는 연락처별 업무 연락·이전 제출·첨부 이력을 표시합니다.
 
@@ -73,9 +77,13 @@ python scripts/prototype-test.py --godot "C:/path/to/Godot_v4.7.2-stable_win64_c
 
 새 시나리오 8개와 더미 장면의 이동·실제 장비 레이캐스트·UI 정지·저장 검사를 실행합니다. 매 시나리오 전이에서 입력 상태 불변성과 저장 복원을 확인합니다. Windows Native CI에도 같은 검사를 연결했습니다.
 
-UI 개선 후 Linux에서 시나리오 8개·444개 검증과 실제 렌더링 장면 검사를 통과했습니다. 첫날 안내 완주, 대화창·메신저 분리, 카메라 복원, 명령 자동완성·이력, 파일 조회 권한, 상호작용 안내와 저장을 확인했습니다.
+Linux에서 시나리오 8개·456개 검증과 실제 렌더링 장면 검사를 통과했습니다. 첫날 안내 완주, 대화창·메신저 분리, 카메라 복원, 명령 자동완성·이력, 파일 조회 권한, 상호작용 안내와 저장을 확인했습니다.
 
-Windows 빌드는 시나리오·더미 장면 검사 후 EXE만 별도 폴더로 옮겨 실행·저장·재실행을 확인합니다. 실제 렌더링으로 첫 화면·대화·터미널·메신저·노트·이동을 검사하고 화면 6개를 Actions 아티팩트에 보관합니다. 수동 플레이의 사용성 검토는 별도로 진행합니다.
+Windows 빌드는 시나리오·더미 장면 검사 후 EXE만 별도 폴더로 옮겨 실행·저장·재실행을 확인합니다. 실제 렌더링으로 첫 화면·대화·터미널·메신저·노트·이동을 검사하고 화면 7개를 Actions 아티팩트에 보관합니다. 수동 플레이의 사용성 검토는 별도로 진행합니다.
+
+Android 빌드는 ARM64·x86_64를 포함합니다. 에뮬레이터에서 첫 실행·터치와 키보드·저장·동일 패키지 덮어 설치·재실행을 확인합니다. Windows와 Android 검사가 모두 통과한 같은 소스의 파일만 배포합니다. 실제 휴대폰의 화면·키보드·성능은 별도로 확인합니다.
+
+프로토타입 APK는 해시로 고정한 AOSP 공개 개발용 서명을 사용해 버전 간 설치를 유지합니다. 정식 Android 배포에는 별도의 비공개 서명을 사용해야 합니다. Android 패키지 ID는 `com.nu4ddi4.securitylab.prototype`입니다.
 
 프로토타입 전용 빌드는 임시 프로젝트에서 규칙·더미 장면을 검사합니다. 내보내기 후 임시 소스를 삭제하고 EXE만 별도 폴더로 복사해 검증합니다.
 

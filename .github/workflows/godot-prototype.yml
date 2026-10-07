@@ -1,4 +1,4 @@
-name: Investigation prototype Windows
+name: Investigation prototype builds
 on:
   workflow_dispatch:
   push:
@@ -46,3 +46,52 @@ jobs:
           PROTOTYPE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           "[SecurityLab-proto-$env:PROTOTYPE_VERSION]($env:ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: ./.github/actions/godot-setup
+        with:
+          export: 'true'
+      - name: Install Android export tools
+        run: sdkmanager 'platform-tools' 'build-tools;35.0.1' 'platforms;android-35'
+      - name: Export signed APK and matching QA APK
+        run: python3 scripts/prototype-android-build.py
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd
+            ~/.android/adb*
+          key: prototype-android-api29-x64-v1
+      - name: Install, play, update and relaunch on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          target: default
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: python3 scripts/prototype-android-test.py
+      - name: Read prototype version
+        id: version
+        run: python3 -c 'import json,os; print("version="+json.load(open("godot/prototype/version.json"))["version"],file=open(os.environ["GITHUB_OUTPUT"],"a"))'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecurityLab-proto-${{ steps.version.outputs.version }}-Android
+          path: prototype-android-dist/*
+          if-no-files-found: error
+          retention-days: 14

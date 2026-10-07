@@ -25,7 +25,21 @@ func run(game: InvestigationPrototype):
 	await get_tree().physics_frame
 	if not game.player.target is InvestigationTarget or game.player.target.logical_id != "oh": failures.append("First NPC is reachable from spawn")
 	game.ui._process(0)
-	if not game.ui.prompt.text.ends_with("F — 대화"): failures.append("NPC has a contextual interaction hint")
+	if not game.ui.prompt.text.ends_with("대화"): failures.append("NPC has a contextual interaction hint")
+	if game.controls.touch_enabled != game.controls.mobile: failures.append("Mobile defaults to touch and desktop defaults to keyboard")
+	if game.controls.mobile:
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var tap = InputEventScreenTouch.new()
+		tap.index = 7
+		tap.pressed = true
+		tap.position = game.controls.button_rects.tool.get_center()
+		Input.parse_input_event(tap)
+		await get_tree().process_frame
+		if game.ui.mode != "dialogue": failures.append("Actual touch event opens the contextual dialogue button")
+		tap.pressed = false
+		Input.parse_input_event(tap)
+		game.ui.close()
 	var camera_pose = game.player.camera.global_transform
 	game._use("oh","npc",true)
 	await get_tree().create_timer(.3).timeout
@@ -98,6 +112,52 @@ func run(game: InvestigationPrototype):
 	await capture(game,"05-notes")
 	game.ui.close()
 	if not game.player.enabled: failures.append("Closing the UI restores movement")
+	var original_touch = game.controls.touch_enabled
+	game.ui.open_tablet(4)
+	game.ui.touch_setting.button_pressed = true
+	if not game.controls.touch_enabled: failures.append("Settings enable touch without disabling keyboard")
+	await capture(game,"07-settings")
+	game.ui.close()
+	await get_tree().process_frame
+	var dimensions = get_viewport().get_visible_rect().size
+	var touch = InputEventScreenTouch.new()
+	touch.index = 2
+	touch.pressed = true
+	touch.position = Vector2(150,dimensions.y-150)
+	game.controls.handle_touch(touch)
+	var drag = InputEventScreenDrag.new()
+	drag.index = 2
+	drag.position = touch.position+Vector2(0,-85)
+	game.controls.handle_touch(drag)
+	var moved_from = game.player.global_position
+	Input.action_press("forward")
+	await get_tree().create_timer(.2).timeout
+	Input.action_release("forward")
+	var moved = game.player.global_position.distance_to(moved_from)
+	if moved < .2 or moved > .75: failures.append("Touch plus keyboard moves the player without doubling speed")
+	touch.index = 3
+	touch.position = Vector2(dimensions.x*.6,dimensions.y*.5)
+	game.controls.handle_touch(touch)
+	var yaw = game.player.rotation.y
+	drag.index = 3
+	drag.relative = Vector2(70,0)
+	game.controls.handle_touch(drag)
+	if is_equal_approx(yaw,game.player.rotation.y): failures.append("A second finger controls view while the joystick is held")
+	touch.index = 2
+	touch.pressed = false
+	game.controls.handle_touch(touch)
+	if not game.player.touch_axes.is_zero_approx() or game.controls.look_finger != 3: failures.append("Releasing movement leaves the other finger active")
+	var keyboard = InputEventKey.new()
+	keyboard.pressed = true
+	keyboard.physical_keycode = KEY_W
+	game.controls._input(keyboard)
+	if not game.controls.keyboard_seen or not game.controls.touch_enabled: failures.append("Hardware keyboard is detected alongside touch")
+	game.ui.open_tablet()
+	if game.controls.look_finger != -1 or not game.player.touch_axes.is_zero_approx(): failures.append("Opening UI releases all touch state")
+	game.ui.close()
+	game.updates._completed(HTTPRequest.RESULT_CANT_CONNECT,0,PackedStringArray(),PackedByteArray())
+	if game.updates.busy or not game.player.enabled or game.ui.update_download.visible: failures.append("Update failures leave gameplay available and hide stale downloads")
+	game.controls.set_touch(original_touch)
 	game.player.global_position = Vector3(0,.01,7)
 	game.player.camera.rotation = Vector3.ZERO
 	await get_tree().physics_frame
@@ -138,5 +198,8 @@ func run(game: InvestigationPrototype):
 			game.ui.close()
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png(argument.trim_prefix("--prototype-capture="))
-	print("INVESTIGATION_SMOKE ",JSON.stringify({"passed":failures.is_empty(),"failures":failures}))
+	var summary = {"passed":failures.is_empty(),"failures":failures,"platform":OS.get_name(),"mobile":game.controls.mobile,"touchDefault":original_touch,"keyboardDetected":game.controls.keyboard_seen}
+	var report = FileAccess.open("user://prototype-smoke-result.json",FileAccess.WRITE)
+	if report != null: report.store_string(JSON.stringify(summary))
+	print("INVESTIGATION_SMOKE ",JSON.stringify(summary))
 	get_tree().quit(0 if failures.is_empty() else 1)
