@@ -12,18 +12,10 @@ var busy = false
 var request: HTTPRequest
 
 static func version_parts(value: String) -> Array:
-	var pattern = RegEx.new()
-	pattern.compile("^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$")
-	if pattern.search(value) == null: return []
-	return Array(value.split(".")).map(func(part): return int(part))
+	return NativeUpdatePolicy.version_parts(value)
 
 static func newer(a: String, b: String) -> bool:
-	var left = version_parts(a)
-	var right = version_parts(b)
-	if left.is_empty() or right.is_empty(): return false
-	for index in range(3):
-		if left[index] != right[index]: return left[index] > right[index]
-	return false
+	return NativeUpdatePolicy.newer(a,b)
 
 static func select_release(releases: Array, metadata: Dictionary, target: String) -> Dictionary:
 	var best = {}

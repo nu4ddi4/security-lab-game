@@ -49,6 +49,7 @@ def stage(source, target):
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source.parent, text=True).strip()
     metadata = identity(version, commit)
     (target / 'prototype/build_info.json').write_text(json.dumps(metadata), encoding='utf-8')
+    (target / 'prototype/version.json').write_text(json.dumps({'version': version, 'prerelease': metadata['channel'] == 'beta', 'tag_prefix': 'SecurityLab-'}), encoding='utf-8')
     for name in ['assets/models/Interior_07_Godot.glb', 'assets/models/Investigation_Environment.glb', 'assets/textures/city-sunset.png', 'scripts/player.gd', 'assets/fonts/NotoSansKR.ttf', 'assets/fonts/OFL.txt', 'assets/fonts/Gaegu-Regular.ttf', 'assets/fonts/Gaegu-OFL.txt', 'LICENSES.txt']:
         destination = target / name
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -61,7 +62,7 @@ def stage(source, target):
     project = project.replace('Forward Plus', 'GL Compatibility').replace('"forward_plus"', '"gl_compatibility"')
     project = project.replace('window/stretch/mode="canvas_items"',
                               'window/stretch/mode="canvas_items"\nwindow/stretch/aspect="expand"')
-    project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '-beta.1"', project, flags=re.MULTILINE)
+    project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '"', project, flags=re.MULTILINE)
     (target / 'project.godot').write_text(project, encoding='utf-8')
     (target / 'export_presets.cfg').write_text('''[preset.0]
 name="Windows Prototype"

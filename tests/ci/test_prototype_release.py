@@ -79,6 +79,45 @@ class PrototypeReleaseTests(unittest.TestCase):
         self.assertIn('keystore/release_user="release"', preset)
         self.assertNotIn('androiddebugkey', preset)
 
+    def test_failed_run_cannot_create_or_upload_release(self):
+        import os
+        from unittest.mock import patch
+        env = {'GITHUB_REPOSITORY': release.REPOSITORY, 'GITHUB_SHA': self.sha,
+               'GITHUB_REF':'refs/heads/beta', 'GITHUB_RUN_ID':'42',
+               'SECURITY_LAB_RELEASE_VERSION':self.version}
+        def api(path, **kwargs):
+            if path.endswith('/actions/runs/42'): return dict(self.run, conclusion='failure')
+            if '/jobs?' in path: return {'jobs':self.jobs}
+            if '/artifacts?' in path: return {'artifacts':self.artifacts}
+            return None
+        with patch.dict(os.environ, env), patch.object(release, 'find_release', return_value=None), \
+                patch.object(release, 'github', side_effect=api), \
+                patch.object(release.subprocess, 'check_output', return_value=self.sha), \
+                patch.object(release.subprocess, 'run') as mutate, self.assertRaises(ValueError):
+            release.main()
+        mutate.assert_not_called()
+
+    def test_published_retry_only_recovers_update_channel(self):
+        import json
+        import os
+        from unittest.mock import patch
+        env = {'GITHUB_REPOSITORY': release.REPOSITORY, 'GITHUB_SHA': self.sha,
+               'GITHUB_REF':'refs/heads/beta', 'GITHUB_RUN_ID':'42',
+               'SECURITY_LAB_RELEASE_VERSION':self.version}
+        published = {'target_commitish':self.sha,'prerelease':True,'draft':False,'html_url':'https://example.test/release'}
+        def download(command, **kwargs):
+            self.assertEqual(command[:3], ['gh','release','download'])
+            directory = Path(command[command.index('--dir') + 1])
+            (directory / 'update.json').write_text(json.dumps({'commit':self.sha,'version':self.version,'app_id':release.PRODUCT}))
+        with patch.dict(os.environ, env), patch.object(release, 'find_release', return_value=published), \
+                patch.object(release, 'github', return_value=None), \
+                patch.object(release.subprocess, 'check_output', return_value=self.sha), \
+                patch.object(release.subprocess, 'run', side_effect=download) as commands, \
+                patch.object(release, 'publish_channel') as recover:
+            release.main()
+        commands.assert_called_once()
+        recover.assert_called_once()
+
     def test_beta_channel_version_order(self):
         self.assertLess(release.version_key('0.3.0-beta.1'), release.version_key('0.3.1-beta.1'))
         self.assertLess(release.version_key('0.3.0-beta.1'), release.version_key('0.3.0-beta.2'))

@@ -61,6 +61,11 @@ func run():
 	check(Policy.preference_path("beta","security-lab-beta")!=Policy.preference_path("beta"),"Beta and Native preferences are isolated")
 	var manifest = updater.info.duplicate(); manifest.version="0.4.0-beta.1"; manifest.commit="b".repeat(40); manifest.sha256="c".repeat(64); manifest.exe_sha256="d".repeat(64); manifest.size=2048; manifest.installer_url=Policy.REPOSITORY+"SecurityLab-beta-0.4.0/SecurityLabSetup.exe"
 	check(Policy.manifest_valid(manifest,"beta",updater.info.manifest_url,false,"security-lab-beta"),"Beta accepts only its release installer")
+	var sequential = manifest.duplicate(); sequential.version="0.8.0-beta.2"; sequential.installer_url=Policy.REPOSITORY+"SecurityLab-0.8.0-beta.2/SecurityLabSetup.exe"
+	check(Policy.manifest_valid(sequential,"beta",updater.info.manifest_url,false,"security-lab-beta"),"Beta sequence uses its own immutable installer tag")
+	var stable = sequential.duplicate(); stable.channel="stable"; stable.version="0.8.0"; stable.installer_url=Policy.REPOSITORY+"SecurityLab-0.8.0/SecurityLabSetup.exe"
+	check(Policy.manifest_valid(stable,"stable",Policy.manifest_url("stable","security-lab-beta"),false,"security-lab-beta"),"Stable investigation uses a separate update channel")
+	check(not Policy.manifest_valid(stable,"beta",updater.info.manifest_url,false,"security-lab-beta"),"Beta never switches into the stable channel")
 	check(not Policy.manifest_valid(manifest,"beta",Policy.manifest_url("beta"),false),"Native rejects the beta product")
 	var cross = manifest.duplicate(); cross.app_id="security-lab-native"
 	check(not Policy.manifest_valid(cross,"beta",updater.info.manifest_url,false,"security-lab-beta"),"Beta rejects a Native manifest")
