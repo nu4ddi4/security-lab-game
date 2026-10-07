@@ -21,19 +21,33 @@ var context = ""
 var blocked_save = false
 var save_timer: Timer
 var targets = {}
-var dialogue_camera_pose: Transform3D
 var dialogue_camera_fov = 72.0
 var dialogue_camera_active = false
 var dialogue_camera_tween: Tween
+var office_scene: PackedScene
+var loading: CanvasLayer
+var loading_text: Label
+var loading_bar: ProgressBar
+var load_timings = {}
+var load_started = Time.get_ticks_msec()
+var objective_marker: Node3D
+var marker_target = ""
+var marker_phase = 0.0
 
 func _ready():
 	if "--prototype-services" in OS.get_cmdline_user_args():
 		add_child(load("res://prototype/tests/services.gd").new())
 		return
 	if OS.has_feature("Android"): get_tree().quit_on_go_back = false
+	get_window().content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+	get_window().size_changed.connect(_fit_screen)
+	_fit_screen()
+	_show_loading()
+	await _loading_step("업무 자료를 준비하고 있습니다",5)
 	content = InvestigationContent.load_case()
 	if content.has("error"):
 		push_error(content.error)
+		loading_text.text = "업무 자료를 읽지 못했습니다. 게임을 다시 시작해 주세요."
 		return
 	engine = InvestigationEngine.new(content)
 	var testing = "--prototype-smoke" in OS.get_cmdline_user_args()
@@ -44,10 +58,31 @@ func _ready():
 	state = loaded.get("state",engine.create_state())
 	_setup_input()
 	player = LabPlayer.new()
+	player.unified_interaction = true
 	player.name = "Player"
 	add_child(player)
 	player.global_position = Vector3(-6,.01,5.6)
+	if "--prototype-dummy" not in OS.get_cmdline_user_args():
+		var path = "res://assets/models/Interior_07_Godot.glb"
+		var requested = ResourceLoader.load_threaded_request(path,"PackedScene")
+		if requested != OK:
+			loading_text.text = "사무실을 준비하지 못했습니다. 게임을 다시 시작해 주세요."
+			return
+		var progress = []
+		while ResourceLoader.load_threaded_get_status(path,progress) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			await _loading_step("사무실을 불러오고 있습니다",10+progress[0]*55 if not progress.is_empty() else 10)
+		if ResourceLoader.load_threaded_get_status(path) != ResourceLoader.THREAD_LOAD_LOADED:
+			loading_text.text = "사무실을 읽지 못했습니다. 게임을 다시 시작해 주세요."
+			return
+		office_scene = ResourceLoader.load_threaded_get(path)
+	load_timings.resources_ms = Time.get_ticks_msec()-load_started
+	await _loading_step("장비와 출입문을 배치하고 있습니다",70)
+	var world_started = Time.get_ticks_msec()
 	_build_world()
+	office_scene = null
+	load_timings.world_ms = Time.get_ticks_msec()-world_started
+	_build_marker()
+	await _loading_step("화면과 조작을 준비하고 있습니다",90)
 	controls = InvestigationControls.new()
 	add_child(controls)
 	updates = InvestigationUpdates.new()
@@ -80,6 +115,10 @@ func _ready():
 	# Persist a fresh investigation before Android can suspend its render loop.
 	if not loaded.has("state") and not blocked_save: save_now()
 	if blocked_save: ui.notice(loaded.error + "\n새 조사를 시작하기 전 원본을 보존합니다.")
+	await _loading_step("준비 완료",100)
+	load_timings.ready_ms = Time.get_ticks_msec()-load_started
+	print("PROTOTYPE_LOADING ",JSON.stringify(load_timings))
+	loading.queue_free()
 	print("PROTOTYPE_READY ",JSON.stringify({"day":state.day,"dummy":not detailed_world,"devices":content.case.devices.size(),"npcs":content.case.npcs.size(),"isolatedSave":store.directory}))
 	if DisplayServer.get_name() != "headless": _report_first_frame.call_deferred()
 	if testing:
@@ -88,11 +127,107 @@ func _ready():
 		smoke.run.call_deferred(self)
 	elif controls.automatic_updates and updater==null: updates.check.call_deferred()
 
+func _show_loading():
+	loading = CanvasLayer.new()
+	loading.layer = 100
+	add_child(loading)
+	var background = ColorRect.new()
+	background.color = Color(.025,.045,.065)
+	loading.add_child(background)
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var center = CenterContainer.new()
+	background.add_child(center)
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var body = VBoxContainer.new()
+	body.custom_minimum_size.x = 360
+	body.add_theme_constant_override("separation",24)
+	center.add_child(body)
+	loading_text = Label.new()
+	loading_text.add_theme_font_override("font",load("res://assets/fonts/NotoSansKR.ttf"))
+	loading_text.add_theme_font_size_override("font_size",22)
+	loading_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_child(loading_text)
+	loading_bar = ProgressBar.new()
+	loading_bar.custom_minimum_size.y = 16
+	loading_bar.show_percentage = false
+	body.add_child(loading_bar)
+
+func _loading_step(text: String, progress: float):
+	loading_text.text = text
+	loading_bar.value = progress
+	await get_tree().process_frame
+	if DisplayServer.get_name() != "headless": await RenderingServer.frame_post_draw
+	if progress == 5:
+		load_timings.loading_screen_ms = Time.get_ticks_msec()-load_started
+		for argument in OS.get_cmdline_user_args():
+			if argument.begins_with("--prototype-capture-dir=") and DisplayServer.get_name() != "headless":
+				var path = argument.trim_prefix("--prototype-capture-dir=")
+				DirAccess.make_dir_recursive_absolute(path)
+				get_viewport().get_texture().get_image().save_png(path.path_join("00-loading.png"))
+
+func _fit_screen():
+	var size = Vector2(get_window().size)
+	if DisplayServer.get_name() == "headless" and size == Vector2(64,64): size = Vector2(1600,900)
+	var mobile = OS.has_feature("mobile") or "--mobile-qa" in OS.get_cmdline_user_args()
+	var base = 540.0 if mobile else 720.0
+	get_window().content_scale_size = Vector2i(size / maxf(1,minf(size.x,size.y)) * base)
+	if ui != null: ui.fit_screen.call_deferred()
+
+func safe_rect() -> Rect2:
+	var bounds = get_viewport().get_visible_rect()
+	if OS.has_feature("mobile") or "--mobile-qa" in OS.get_cmdline_user_args():
+		var safe = Rect2(DisplayServer.get_display_safe_area())
+		if safe.has_area():
+			var transform = get_viewport().get_final_transform().affine_inverse()
+			return bounds.intersection(Rect2(transform*safe.position,transform.basis_xform(safe.size)))
+	return bounds
+
+func _build_marker():
+	objective_marker = Node3D.new()
+	add_child(objective_marker)
+	var arrow = MeshInstance3D.new()
+	var cone = CylinderMesh.new()
+	cone.top_radius = .14
+	cone.bottom_radius = 0
+	cone.height = .28
+	arrow.mesh = cone
+	var glow = StandardMaterial3D.new()
+	glow.albedo_color = Color(.25,1,.75)
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.emission_enabled = true
+	glow.emission = Color(.25,1,.75)
+	glow.emission_energy_multiplier = 2
+	arrow.material_override = glow
+	arrow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	objective_marker.add_child(arrow)
+	var ring = MeshInstance3D.new()
+	var torus = TorusMesh.new()
+	torus.inner_radius = .35
+	torus.outer_radius = .43
+	torus.rings = 16
+	torus.ring_segments = 8
+	ring.mesh = torus
+	ring.material_override = glow
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	objective_marker.add_child(ring)
+	objective_marker.hide()
+
+func _process(delta):
+	if ui == null or objective_marker == null: return
+	marker_phase += delta
+	marker_target = ui.guide_info().get("target","")
+	objective_marker.visible = targets.has(marker_target) and not state.ended
+	if not objective_marker.visible: return
+	var point = targets[marker_target].global_position
+	objective_marker.global_position = point
+	objective_marker.get_child(0).position.y = .85 + sin(marker_phase*3)*.08
+	objective_marker.get_child(1).position.y = .035 - point.y
+
 func _report_first_frame():
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
-	print("PROTOTYPE_FRAME_READY ",JSON.stringify({"platform":OS.get_name(),"touch":controls.touch_enabled}))
+	print("PROTOTYPE_FRAME_READY ",JSON.stringify({"platform":OS.get_name(),"touch":controls.touch_enabled,"first_game_frame_ms":Time.get_ticks_msec()-load_started,"texture_bytes":RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TEXTURE_MEM_USED)}))
 
 func _setup_input():
 	if qa_mode: bindings.path = "user://investigation-qa/input_bindings.json"
@@ -110,8 +245,7 @@ func _use(id: String, kind: String, tool: bool):
 func frame_speaker(id: String):
 	if not targets.has(id): return
 	if not dialogue_camera_active:
-		dialogue_camera_pose = player.camera.global_transform
-		dialogue_camera_fov = player.camera.fov
+		dialogue_camera_fov = 72.0
 		dialogue_camera_active = true
 	if dialogue_camera_tween != null: dialogue_camera_tween.kill()
 	var head = investigation_environment.speaker_position(id) if detailed_world else targets[id].global_position + Vector3(0,.55,0)
@@ -123,8 +257,13 @@ func frame_speaker(id: String):
 func release_speaker():
 	if not dialogue_camera_active: return
 	if dialogue_camera_tween != null: dialogue_camera_tween.kill()
-	player.camera.global_transform = dialogue_camera_pose
-	player.camera.fov = dialogue_camera_fov
+	# Keep the framed view and synchronize body yaw for subsequent movement.
+	var pose = player.camera.global_transform
+	var facing = -pose.basis.z
+	player.rotation.y = atan2(-facing.x,-facing.z)
+	player.camera.global_transform = pose
+	dialogue_camera_tween = create_tween()
+	dialogue_camera_tween.tween_property(player.camera,"fov",dialogue_camera_fov,.25)
 	dialogue_camera_active = false
 
 func dispatch(action: Dictionary) -> Dictionary:
@@ -140,6 +279,11 @@ func dispatch(action: Dictionary) -> Dictionary:
 	return result
 
 func command(text: String):
+	var normalized = " ".join(text.strip_edges().split(" ",false)).to_lower()
+	for row in content.commands:
+		if row.text.to_lower() == normalized and context in row.devices and not engine.command_visible(state,row):
+			ui.print_output(text,"현재 맡은 업무에서 사용할 수 없는 명령입니다.")
+			return
 	var action = engine.parse(text,context,state)
 	if action.type == "pause":
 		var preview = engine.step(state,action)
@@ -183,7 +327,7 @@ func transfer_file(path: String, exporting: bool):
 	ui.notice("사건 진행을 가져왔습니다.")
 
 func _unhandled_input(event):
-	if player != null and player.input_blocked(): return
+	if ui == null or (player != null and player.input_blocked()): return
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == LabInputBindings.TABLET_KEY:
 		if ui.mode == "field": ui.open_tablet()
 		elif ui.mode == "tablet": ui.close()
@@ -285,8 +429,8 @@ func _build_office_world():
 	world = LabWorld.new()
 	world.name = "InvestigationOffice"
 	add_child(world)
-	world.setup(null,player)
-	if OS.has_feature("mobile"):
+	world.setup(null,player,office_scene)
+	if OS.has_feature("mobile") or "--mobile-qa" in OS.get_cmdline_user_args():
 		get_viewport().scaling_3d_scale = .65
 		get_viewport().msaa_3d = Viewport.MSAA_DISABLED
 		world.get_node("WindowSunset").shadow_enabled = false

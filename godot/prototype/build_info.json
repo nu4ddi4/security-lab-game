@@ -2,7 +2,7 @@
   "schema": 1,
   "app_id": "security-lab-beta",
   "platform": "windows-x86_64",
-  "version": "0.3.0-beta.1",
+  "version": "0.8.0-beta.1",
   "channel": "beta",
   "commit": "unknown",
   "install_layout": 1,

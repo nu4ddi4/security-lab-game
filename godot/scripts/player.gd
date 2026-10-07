@@ -20,6 +20,10 @@ var movement_seconds = 0.0
 var jump_peak = 0.0
 var jump_count = 0
 var standing_shape = CapsuleShape3D.new()
+var unified_interaction = false
+var interaction_reach = 3.4
+var aim_assist: ShapeCast3D
+var aim_screen_point = Vector2(-1,-1)
 
 func _ready():
 	collision_layer = 8
@@ -42,6 +46,15 @@ func _ready():
 	ray.collide_with_areas = true
 	ray.add_exception(self)
 	camera.add_child(ray)
+	aim_assist = ShapeCast3D.new()
+	var sphere = SphereShape3D.new()
+	sphere.radius = .16
+	aim_assist.shape = sphere
+	aim_assist.collision_mask = 6
+	aim_assist.collide_with_areas = true
+	aim_assist.add_exception(self)
+	aim_assist.enabled = false
+	camera.add_child(aim_assist)
 
 func set_enabled(value: bool):
 	enabled = value
@@ -63,13 +76,48 @@ func _unhandled_input(event):
 	if not enabled: return
 	if event is InputEventMouseMotion and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)):
 		look(event.relative)
-	if event.is_action_pressed("inspect") and target != null: inspect_requested.emit(target)
-	if event.is_action_pressed("tool") and target != null and target.has_method("open_tool"): tool_requested.emit(target)
+	if not unified_interaction and event.is_action_pressed("inspect") and target != null: inspect_requested.emit(target)
+	if event.is_action_pressed("tool") and target != null: interact()
 
-func _physics_process(delta):
+func interact():
+	if not enabled or input_blocked() or target == null: return
+	if target.has_method("open_tool"): tool_requested.emit(target)
+	elif unified_interaction and target.has_method("inspect"): inspect_requested.emit(target)
+
+func update_target():
+	if unified_interaction:
+		var direction = -camera.global_basis.z
+		if aim_screen_point.x >= 0:
+			direction = camera.project_ray_normal(aim_screen_point)
+		elif DisplayServer.get_name() != "headless" and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and not OS.has_feature("mobile") and not touch_controls_enabled:
+			direction = camera.project_ray_normal(get_viewport().get_mouse_position())
+		ray.target_position = camera.global_basis.inverse() * direction * interaction_reach
 	ray.force_raycast_update()
 	target = ray.get_collider() if ray.is_colliding() else null
-	if target != null and not target.has_method("get_interaction_prompt"): target = null
+	if target != null and target.has_method("get_interaction_prompt"): return
+	target = null
+	if not unified_interaction: return
+	# Screen-edge tolerance without enlarging or overlapping equipment volumes.
+	aim_assist.target_position = ray.target_position
+	aim_assist.force_shapecast_update()
+	var best = INF
+	for i in range(aim_assist.get_collision_count()):
+		var candidate = aim_assist.get_collider(i)
+		if candidate == null or not candidate.has_method("get_interaction_prompt"): continue
+		var point = aim_assist.get_collision_point(i)
+		var offset = point - camera.global_position
+		if offset.length() > interaction_reach: continue
+		var query = PhysicsRayQueryParameters3D.create(camera.global_position,point + offset.normalized()*.025,6,[get_rid()])
+		query.collide_with_areas = true
+		var hit = get_world_3d().direct_space_state.intersect_ray(query)
+		if not hit.is_empty() and hit.collider != candidate: continue
+		var score = offset.length_squared()
+		if score < best:
+			best = score
+			target = candidate
+
+func _physics_process(delta):
+	update_target()
 	if not enabled or input_blocked(): velocity = Vector3.ZERO; return
 	var wants_crouch = Input.is_action_pressed("crouch")
 	if crouched and not wants_crouch:

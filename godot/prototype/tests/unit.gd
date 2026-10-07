@@ -65,6 +65,18 @@ func _initialize():
 			var observed = engine.step(state,engine.parse("inspect staging","server_console",state)).state
 			check(engine.project(observed).documentCount == observed.documents.size(),"Queried collection shows unique observed documents")
 	var original = engine.create_state()
+	check(not engine.investigation_assigned(original),"New work does not expose investigation UI")
+	var initial_help = engine.step(original,engine.parse("help","server_console",original))
+	check(initial_help.text.contains("inspect account") and not initial_help.text.contains("inspect staging"),"Help shows assigned operational commands only")
+	check(not engine.step(original,engine.parse("ls","server_console",original)).text.contains("staging.log"),"Unassigned investigation files stay absent from listings")
+	var assigned = original.duplicate(true)
+	assigned.day = 4
+	check(engine.investigation_assigned(assigned),"Team-lead day-four assignment reveals investigation")
+	var assigned_help = engine.step(assigned,engine.parse("help","server_console",assigned))
+	check(assigned_help.text.contains("inspect staging"),"Investigation commands appear after assignment")
+	assigned.day = 2
+	assigned.report.approved = true
+	check(engine.investigation_assigned(assigned),"Previously approved saves retain their investigation assignment")
 	var listing = engine.step(original,engine.parse("ls","server_console",original))
 	check(listing.text.contains("account.txt"),"Terminal lists device files")
 	check(listing.state == original,"Listing never acquires unread records")

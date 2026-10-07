@@ -72,7 +72,7 @@ func run(root: Node):
 	button_named(game.ui.root,"조작키 변경…").pressed.emit()
 	await get_tree().process_frame
 	editor = window_in(game.ui.root)
-	check(editor != null and editor.visible and editor.buttons.size() == 10,"Both settings paths expose shared editor with ten actions")
+	check(editor != null and editor.visible and editor.buttons.size() == (9 if prototype else 10),"Both settings paths expose their active actions in the shared editor")
 	check(game.player.settings_input_blocked,"Settings capture window blocks gameplay")
 	var position = game.player.global_position
 	var jumps = game.player.jump_count
@@ -82,26 +82,27 @@ func run(root: Node):
 	game.player.look(Vector2(100,50))
 	check(game.player.global_position.distance_to(position) < .02 and game.player.jump_count == jumps and game.player.camera.rotation == camera,"Capture window prevents movement, jump and mouse/touch look")
 	Input.action_release("forward"); Input.action_release("jump")
-	editor.buttons.inspect.pressed.emit()
+	var reviewed_action = "forward" if prototype else "inspect"
+	editor.buttons[reviewed_action].pressed.emit()
 	await send_key(KEY_E,editor,true,true)
-	check(editor.capture_action == "inspect","Autorepeat cannot become a binding")
+	check(editor.capture_action == reviewed_action,"Autorepeat cannot become a binding")
 	await send_key(KEY_F,editor)
 	await send_key(KEY_F,editor,false)
-	check(editor.capture_action == "inspect" and editor.status.text.contains("상세 도구"),"Conflicting F is rejected with action name")
+	check(editor.capture_action == reviewed_action and editor.status.text.contains("상세 도구"),"Conflicting F is rejected with action name")
 	await send_key(KEY_ESCAPE,editor)
 	await send_key(KEY_ESCAPE,editor,false)
-	check(editor.capture_action == "inspect" and editor.visible and editor.status.text.contains("일시정지"),"Conflicting Escape stays in capture instead of closing UI")
+	check(editor.capture_action == reviewed_action and editor.visible and editor.status.text.contains("일시정지"),"Conflicting Escape stays in capture instead of closing UI")
 	var chord = InputEventKey.new()
 	chord.physical_keycode = KEY_K
 	chord.pressed = true
 	chord.ctrl_pressed = true
 	editor.handle_input(chord)
-	check(editor.capture_action == "inspect" and editor.status.text.contains("키 조합"),"Modifier chord is rejected without losing previous binding")
+	check(editor.capture_action == reviewed_action and editor.status.text.contains("키 조합"),"Modifier chord is rejected without losing previous binding")
 	check(activity.inspect == 0 and activity.tool == 0 and activity.pause == 0,"Capture cannot trigger inspect/tool/pause")
 	editor.cancel_button.pressed.emit()
-	check(editor.capture_action.is_empty() and editor.draft.inspect == [KEY_E],"Cancel keeps previous binding")
+	check(editor.capture_action.is_empty() and editor.draft[reviewed_action] == ([KEY_W] if prototype else [KEY_E]),"Cancel keeps previous binding")
 	await capture("forward",KEY_UP)
-	await capture("inspect",KEY_G)
+	if not prototype: await capture("inspect",KEY_G)
 	await capture("tool",KEY_H)
 	await capture("pause",KEY_P)
 	await capture("jump",KEY_ESCAPE)

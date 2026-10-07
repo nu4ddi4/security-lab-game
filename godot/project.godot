@@ -5,7 +5,7 @@ config/name="Security Lab · Native"
 run/main_scene="res://scenes/entry.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/description="Offline security investigation simulator. Native companion to web v0.7.0."
-config/version="0.7.0-native.1"
+config/version="0.8.0-beta.1"
 
 [display]
 window/size/viewport_width=1600

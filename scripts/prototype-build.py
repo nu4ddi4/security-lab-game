@@ -15,7 +15,9 @@ def run(command, directory, marker=None, timeout=90):
         result = subprocess.run(command, cwd=directory, capture_output=True, text=True,
                                 encoding='utf-8', errors='replace', timeout=timeout)
     except subprocess.TimeoutExpired as error:
-        raise SystemExit('Prototype check timed out: ' + str(command)) from error
+        partial = (error.stdout or b'') + (error.stderr or b'')
+        if isinstance(partial, bytes): partial = partial.decode('utf-8', errors='replace')
+        raise SystemExit('Prototype check timed out: ' + str(command) + '\n' + partial) from error
     output = result.stdout + result.stderr
     if result.returncode or 'SCRIPT ERROR:' in output or 'ERROR:' in output:
         raise SystemExit(output or 'Prototype command failed.')
@@ -52,11 +54,17 @@ def stage(source, target):
         destination = target / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / name, destination)
+    # Model settings can be copied immediately; extracted image policies must
+    # wait until Godot creates their source files during the first import.
+    for policy in (source / 'assets/models').glob('*.glb.import'):
+        shutil.copyfile(policy, target / 'assets/models' / policy.name)
     project = (source / 'project.godot').read_text(encoding='utf-8')
     project = project.replace('res://scenes/entry.tscn', 'res://prototype/main.tscn')
     project = project.replace('Forward Plus', 'GL Compatibility').replace('"forward_plus"', '"gl_compatibility"')
     project = project.replace('Offline security investigation simulator. Native companion to web v0.7.0.',
                               'Offline security investigation beta.')
+    project = project.replace('window/stretch/mode="canvas_items"',
+                              'window/stretch/mode="canvas_items"\nwindow/stretch/aspect="expand"')
     project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '-beta.1"', project, flags=re.MULTILINE)
     (target / 'project.godot').write_text(project, encoding='utf-8')
     (target / 'export_presets.cfg').write_text('''[preset.0]
@@ -83,8 +91,24 @@ application/file_description="Offline security investigation beta"
 '''.replace('0.1.0.0', version + '.0'), encoding='utf-8')
 
 
+def configure_texture_compression(target):
+    changed = False
+    for pattern in ('*.jpg.import', '*.png.import'):
+        for policy in (target / 'assets/models').glob(pattern):
+            original = policy.read_text(encoding='utf-8')
+            compressed = original.replace('compress/mode=0', 'compress/mode=2')
+            if compressed != original:
+                policy.write_text(compressed, encoding='utf-8')
+                changed = True
+    return changed
+
+
 def check(godot, target):
     run([godot, '--headless', '--editor', '--path', str(target), '--import'], target)
+    # GLB extraction precedes texture import settings, matching the native
+    # build. Reimport only when generated textures still use lossless mode.
+    if configure_texture_compression(target):
+        run([godot, '--headless', '--editor', '--path', str(target), '--import'], target)
     run([godot, '--headless', '--path', str(target), '--script', 'res://tests/input_bindings_test.gd'], target, 'INPUT_BINDINGS_TEST')
     run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/unit.gd'],
         target, 'INVESTIGATION_UNIT')
@@ -135,7 +159,7 @@ def main():
         if args.rendered_check:
             captures = output.parent / 'ui'
             run([str(executable), '--audio-driver', 'Dummy', '--', '--prototype-smoke',
-                 '--prototype-capture-dir=' + str(captures)], directory, 'INVESTIGATION_SMOKE')
+                 '--prototype-capture-dir=' + str(captures)], directory, 'INVESTIGATION_SMOKE', timeout=180)
             expected = ['01-briefing', '02-dialogue', '03-terminal', '04-messenger', '05-notes', '06-field', '07-settings']
             if any(not (captures / (name + '.png')).is_file() for name in expected):
                 raise SystemExit('Exported Windows UI captures are incomplete.')

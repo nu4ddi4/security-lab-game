@@ -12,17 +12,16 @@ Godot **4.7.2 stable**에서 `godot/project.godot`을 열고 F5를 누릅니다.
 
 Windows 테스트 빌드는 `Investigation beta builds`의 Actions 아티팩트로 제공합니다. `SecurityLab-beta-X.Y.Z.exe`만 실행하면 됩니다. 사무실 맵·사건 자료·한국어 폰트를 EXE에 포함합니다. OpenGL 호환 렌더러를 사용합니다.
 
-배포는 [SecurityLab-beta-0.3.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-beta-0.3.0)입니다. 제목·태그·EXE·ZIP은 `SecurityLab-beta-X.Y.Z` 형식을 사용합니다. Pre-release로 게시하고 정식 Latest를 바꾸지 않습니다. 검증된 같은 소스의 EXE·EXE 전용 ZIP·APK·Inno 설치 파일·manifest·빌드 기록·체크섬을 함께 제공합니다. 이전 [SecurityLab-proto-0.2.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-proto-0.2.0)은 보존합니다.
+배포는 [SecurityLab-beta-0.4.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-beta-0.4.0)입니다. 제목·태그·EXE·ZIP은 `SecurityLab-beta-X.Y.Z` 형식을 사용합니다. Pre-release로 게시하고 정식 Latest를 바꾸지 않습니다. 검증된 같은 소스의 EXE·EXE 전용 ZIP·APK·Inno 설치 파일·manifest·빌드 기록·체크섬을 함께 제공합니다. 이전 [SecurityLab-proto-0.2.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-proto-0.2.0)은 보존합니다.
 
 버전은 `godot/prototype/version.json`에서 관리합니다. 버전·빌드 설정·입력·UI·앱 생명주기를 변경하면 Windows·Android 패키지 검사를 실행합니다. 일반 콘텐츠·엔진 수정은 빠른 검사를 사용합니다. 릴리즈는 성공한 같은 소스의 패키지를 재사용합니다. “커밋” 요청은 GitHub 반영과 릴리즈를 포함합니다. 로컬 Windows 빌드는 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로" --rendered-check`입니다.
 
 - WASD·마우스: 이동·시점, Shift: 달리기, C: 앉기, Space: 점프.
-- E: 외관 확인. 원본 기록을 확보하지 않습니다.
-- F: NPC와 현장 대화 또는 장비 조작. 가까이서 바라보는 대상의 안내만 표시합니다.
+- F / 상호작용: 장비·NPC·문을 한 버튼으로 조작합니다. 3.4m 이내 조준에 작은 여유를 적용하고 벽 너머 대상을 선택하지 않습니다. 장비를 여는 것만으로 원본 기록을 확보하지 않습니다.
 - Tab: 현장에서 휴대 단말을 열고 닫습니다. Esc는 열린 화면을 닫거나 현장에서 휴대 단말을 엽니다.
 - 업무 탭: 오늘의 운영 확인, 업무 종료, 진행 내보내기·가져오기.
 
-Android는 APK를 설치해 가로 화면으로 플레이합니다. 왼쪽 영역으로 이동하고 오른쪽 화면을 드래그해 시점을 조작합니다. 가까운 대상에만 대화·조작 버튼이 표시됩니다. 외부 키보드 입력도 함께 사용합니다. PC는 키보드·마우스가 기본이며 휴대 단말의 설정 탭에서 터치를 활성화합니다. Linux 배포는 이후 추가합니다.
+개발 중인 Android 화면은 비율과 센서 방향에 맞춰 가로·세로 배치를 조정합니다. 왼쪽 엄지로 이동하고 오른쪽 화면을 쓸어 시점을 조작합니다. 장비를 탭해 선택한 뒤 상호작용 버튼을 누릅니다. 외부 키보드 입력도 함께 사용합니다. PC는 키보드·마우스가 기본이며 휴대 단말의 설정 탭에서 터치를 활성화합니다. Linux 배포는 이후 추가합니다.
 
 설정 탭에서 업데이트를 확인하거나 시작 시 확인을 끌 수 있습니다. 빌드에 기록한 안정·사전 릴리즈 채널의 더 높은 버전만 확인합니다. 게임 명령은 네트워크를 사용하지 않습니다. 설치형 Windows 베타는 새 버전 알림에서 동의한 뒤에만 다운로드·저장·종료·설치·재실행합니다. 나중에·창 닫기·일반 종료는 설치하지 않습니다. 설치·건강 확인에 실패하면 이전 설치와 저장으로 복구합니다. Android는 새 APK를 덮어 설치하고 휴대용 Windows EXE는 새 파일을 받아 실행합니다. 게임 저장과 입력 설정은 유지됩니다.
 
@@ -91,11 +90,11 @@ python scripts/prototype-test.py --godot "C:/path/to/Godot_v4.7.2-stable_win64_c
 
 새 시나리오 8개와 사무실 장면의 이동·실제 장비 레이캐스트·UI 정지·저장 검사를 실행합니다. 매 시나리오 전이에서 입력 상태 불변성과 저장 복원을 확인합니다. Windows Native CI에도 같은 검사를 연결했습니다.
 
-Linux에서 시나리오 8개·456개 검증과 실제 렌더링 장면 검사를 통과했습니다. 첫날 안내 완주, 대화창·메신저 분리, 카메라 복원, 명령 자동완성·이력, 파일 조회 권한, 상호작용 안내와 저장을 확인했습니다.
+현재 개발 변경은 Linux에서 시나리오 8개·462개 검증과 실제 렌더링 장면 검사를 통과했습니다. 첫날 안내 완주, 대화 종료 시 시선 유지, help 이후 명령 안내, 조사 지시 시 UI 전환, 터치 선택·스크롤과 네 가지 화면 비율을 확인했습니다. [모바일·로딩 개선 및 검증 범위](BETA_UX_MOBILE_PLAN.md)에 후속 최적화와 이번 변경의 미검증 플랫폼을 기록합니다.
 
 Windows 빌드는 시나리오·사무실 장면 검사 후 EXE만 별도 폴더로 옮겨 실행·저장·재실행을 확인합니다. 실제 렌더링으로 첫 화면·대화·터미널·메신저·노트·이동을 검사하고 화면 7개를 Actions 아티팩트에 보관합니다. 수동 플레이의 사용성 검토는 별도로 진행합니다.
 
-Android 빌드는 ARM64·x86_64를 포함합니다. Android 15 에뮬레이터에서 첫 화면·터치와 키보드·백그라운드 저장·동일 패키지 덮어 설치·재실행을 통과했습니다. 빈 화면도 검사 실패로 처리합니다. Windows와 Android 검사가 모두 통과한 같은 소스의 파일만 배포합니다. 실제 휴대폰의 화면·키보드·성능은 별도로 확인합니다.
+Android 빌드는 ARM64·x86_64를 포함합니다. 게시된 0.4.0은 Android 15 에뮬레이터에서 첫 화면·터치와 키보드·백그라운드 저장·동일 패키지 덮어 설치·재실행을 통과했습니다. 빈 화면도 검사 실패로 처리합니다. Windows와 Android 검사가 모두 통과한 같은 소스의 파일만 배포합니다. 실제 휴대폰의 화면·키보드·성능은 별도로 확인합니다.
 
 프로토타입 APK는 해시로 고정한 AOSP 공개 개발용 서명을 사용해 버전 간 설치를 유지합니다. 정식 Android 배포에는 별도의 비공개 서명을 사용해야 합니다. Android 패키지 ID는 `com.nu4ddi4.securitylab.prototype`입니다.
 
