@@ -21,7 +21,7 @@ class PrototypeReleaseTests(unittest.TestCase):
                     'head_branch':'beta',
                     'head_repository':{'full_name':self.repo},
                     'path':'.github/workflows/godot-prototype.yml', 'event':'push'}
-        self.jobs = [{'name':name, 'conclusion':'success'} for name in ['prototype','android']]
+        self.jobs = [{'name':name, 'conclusion':'success'} for name in ['quick / test','prototype','android']]
         self.artifacts = [{'name':'SecurityLab-beta-0.2.0-' + platform, 'expired':False,
                            'size_in_bytes':42, 'workflow_run':{'head_sha':self.sha}}
                           for platform in ['Windows-x64','Android']]
@@ -33,7 +33,7 @@ class PrototypeReleaseTests(unittest.TestCase):
 
     def test_both_platforms_are_required(self):
         self.assertEqual(set(self.validate()), {'Windows-x64','Android'})
-        for jobs in [self.jobs[:1],self.jobs[1:],[dict(job,conclusion='skipped') for job in self.jobs]]:
+        for jobs in [self.jobs[:2],self.jobs[1:],self.jobs[::2],[dict(job,conclusion='skipped') for job in self.jobs]]:
             with self.subTest(jobs=jobs), self.assertRaises(ValueError): self.validate(jobs=jobs)
 
     def test_android_artifact_must_be_verified_and_same_version(self):

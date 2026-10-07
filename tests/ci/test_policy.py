@@ -43,7 +43,7 @@ class PolicyTests(unittest.TestCase):
         self.assertIn('branches: [main]', ci)
         self.assertIn('  test:', ci)
         self.assertNotIn('windows-latest', ci)
-        self.assertNotIn('workflow_call:', ci)
+        self.assertIn('  workflow_call:', ci)
         for file in ['godot-prototype.yml', 'godot-prototype-release.yml']:
             workflow = (ROOT / '.github/workflows' / file).read_text()
             self.assertIn('  workflow_dispatch:', workflow)

@@ -20,8 +20,8 @@ def validate_build(run, jobs, artifacts, repository, sha, version):
             or run.get('path') != '.github/workflows/godot-prototype.yml'
             or run.get('event') not in {'push', 'workflow_dispatch'}):
         raise ValueError('Expected successful Windows and Android builds from this branch')
-    if not {'prototype', 'android'} <= {job['name'] for job in jobs if job.get('conclusion') == 'success'}:
-        raise ValueError('Windows and Android execution checks must both succeed')
+    if not {'quick / test', 'prototype', 'android'} <= {job['name'] for job in jobs if job.get('conclusion') == 'success'}:
+        raise ValueError('Quick rules, Windows and Android execution checks must all succeed')
     selected = {}
     for platform in ['Windows-x64', 'Android']:
         name = 'SecurityLab-beta-' + version + '-' + platform

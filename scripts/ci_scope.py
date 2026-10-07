@@ -37,7 +37,7 @@ def changed_paths(event, sha):
 
 def main():
     event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text(encoding='utf-8'))
-    runtime = classify(changed_paths(event, os.environ['GITHUB_SHA']))
+    runtime = os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch' or classify(changed_paths(event, os.environ['GITHUB_SHA']))
     with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
         output.write('runtime=' + str(runtime).lower() + '\n')
     print(json.dumps({'runtime': runtime}))

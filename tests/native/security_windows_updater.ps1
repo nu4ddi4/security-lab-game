@@ -114,8 +114,9 @@ try {
             Expect ($result.state -eq 'installed') 'real Inno install and startup health succeeded'
             Expect ((Get-FileHash -LiteralPath (Join-Path $installRoot 'SecurityLab.exe')).Hash -eq (Get-FileHash -LiteralPath $newStub).Hash) 'new EXE exact'
             Expect (-not (Test-Path -LiteralPath (Join-Path $stage 'backup'))) 'backup removed only after health'
+            $child=[Diagnostics.Process]::GetProcessById([int]$result.pid);$owned+=,$child
             [IO.File]::WriteAllText((Join-Path $stage 'release-child'),'done')
-            $child=[Diagnostics.Process]::GetProcessById([int]$result.pid);$owned+=,$child;$null=$child.WaitForExit(5000)
+            $null=$child.WaitForExit(5000)
         } else {
             Expect ($result.state -eq 'rolled_back') ($case+' rollback completed')
             Expect ((Get-FileHash -LiteralPath (Join-Path $installRoot 'SecurityLab.exe')).Hash -eq (Get-FileHash -LiteralPath $oldStub).Hash) ($case+' old EXE restored')
