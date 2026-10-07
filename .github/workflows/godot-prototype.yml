@@ -170,7 +170,7 @@ jobs:
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta') &&
       (needs.version.outputs.published == 'true' ||
        (needs.prototype.result == 'success' &&
-        needs.android.result == 'success'))
+        (github.ref == 'refs/heads/main' || needs.android.result == 'success')))
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:

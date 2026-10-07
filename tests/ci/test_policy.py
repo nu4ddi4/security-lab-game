@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -37,7 +38,7 @@ class PolicyTests(unittest.TestCase):
                 os.chdir(previous)
             self.assertEqual(paths, ['README.md'])
 
-    def test_release_requires_successful_checks_and_both_platforms(self):
+    def test_release_requires_successful_platform_checks(self):
         ci = (ROOT / '.github/workflows/ci.yml').read_text()
         self.assertIn('branches: [main]', ci)
         self.assertNotIn('  push:', ci)
@@ -52,6 +53,28 @@ class PolicyTests(unittest.TestCase):
         self.assertIn('prototype-android-review-${{ github.run_id }}-${{ github.run_attempt }}', workflow)
         self.assertEqual(workflow.count('overwrite: true'), 2)
         self.assertNotIn('  pull_request:', workflow)
+
+        # Evaluate the actual job condition: skipping Android must not block main,
+        # while beta still requires both platforms and failed checks never publish.
+        condition = re.search(r'\n  release:\n.*?\n    if: >-\n(.*?)\n    runs-on:', workflow, re.S).group(1)
+        expression = ' '.join(condition.split()).replace('always()', 'True').replace('&&', ' and ').replace('||', ' or ')
+        for branch, windows, android, quick, published, expected in [
+            ('main', 'success', 'skipped', 'success', 'false', True),
+            ('beta', 'success', 'success', 'success', 'false', True),
+            ('beta', 'success', 'skipped', 'success', 'false', False),
+            ('main', 'failure', 'skipped', 'success', 'false', False),
+            ('main', 'success', 'skipped', 'failure', 'false', False),
+            ('main', 'skipped', 'skipped', 'success', 'true', True),
+        ]:
+            values = {'github.ref': 'refs/heads/' + branch, 'github.event_name': 'push',
+                      'inputs.publish': False, 'needs.quick.result': quick,
+                      'needs.version.result': 'success', 'needs.version.outputs.published': published,
+                      'needs.prototype.result': windows, 'needs.android.result': android}
+            evaluated = expression
+            for key, value in values.items():
+                evaluated = evaluated.replace(key, repr(value))
+            with self.subTest(branch=branch, windows=windows, android=android, quick=quick, published=published):
+                self.assertEqual(eval(evaluated, {'__builtins__': {}}, {}), expected)
 
 
 if __name__ == '__main__':
