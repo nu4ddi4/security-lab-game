@@ -7,7 +7,6 @@ import subprocess
 import time
 
 PACKAGE = 'com.nu4ddi4.securitylab.prototype'
-ACTIVITY = PACKAGE + '/com.godot.game.GodotApp'
 
 
 def adb(*args, binary=False):
@@ -29,7 +28,14 @@ def wait_for(marker, timeout=75):
 
 def launch():
     adb('logcat', '-c')
-    adb('shell', 'am', 'start', '-W', '-n', ACTIVITY)
+    # Godot 4.7 keeps its rendering activity private; launch the exported entry
+    # selected by Android, exactly as tapping the installed app icon does.
+    component = adb('shell', 'cmd', 'package', 'resolve-activity', '--brief',
+                    '-a', 'android.intent.action.MAIN', '-c', 'android.intent.category.LAUNCHER',
+                    '-p', PACKAGE).strip().splitlines()[-1]
+    if not component.startswith(PACKAGE + '/'):
+        raise ValueError('Android could not resolve the installed app launcher: ' + component)
+    adb('shell', 'am', 'start', '-W', '-n', component)
 
 
 def read_save():

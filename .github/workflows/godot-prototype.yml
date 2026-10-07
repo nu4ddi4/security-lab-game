@@ -104,3 +104,14 @@ jobs:
           path: prototype-android-dist/*
           if-no-files-found: error
           retention-days: 14
+      - name: Retain Android review screens
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prototype-android-review-${{ github.run_id }}
+          path: |
+            prototype-android-dist/android-startup.png
+            prototype-android-dist/android-smoke.json
+            prototype-android-dist/ui/*.png
+          if-no-files-found: ignore
+          retention-days: 14
