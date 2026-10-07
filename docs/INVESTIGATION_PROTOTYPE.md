@@ -12,7 +12,7 @@ Windows 테스트 빌드는 `Investigation prototype builds`의 Actions 아티�
 
 배포는 [SecurityLab-proto-0.2.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-proto-0.2.0)입니다. 제목·태그·EXE·ZIP은 `SecurityLab-proto-X.Y.Z` 형식을 사용합니다. Pre-release로 게시하고 정식 Latest를 바꾸지 않습니다. 검증된 Windows 빌드를 재사용하고 EXE·EXE만 담은 ZIP·APK·체크섬을 제공합니다. 다음 수정 배포는 `0.2.1`, 기능 배포는 `0.3.0`으로 올립니다.
 
-버전은 `godot/prototype/version.json`에서 관리합니다. 버전 파일이나 `.github/workflows/godot-prototype.yml`을 변경하면 Windows·Android 빌드를 실행합니다. 검증한 빌드 참조로 사전 릴리즈를 게시하며 빌드를 반복하지 않습니다. “커밋” 요청은 GitHub 반영과 릴리즈를 포함합니다. 로컬 Windows 빌드는 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로" --rendered-check`입니다.
+버전은 `godot/prototype/version.json`에서 관리합니다. 버전·빌드 설정·입력·UI·앱 생명주기를 변경하면 Windows·Android 패키지 검사를 실행합니다. 일반 콘텐츠·엔진 수정은 빠른 검사를 사용합니다. 릴리즈는 성공한 같은 소스의 패키지를 재사용합니다. “커밋” 요청은 GitHub 반영과 릴리즈를 포함합니다. 로컬 Windows 빌드는 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로" --rendered-check`입니다.
 
 - WASD·마우스: 이동·시점, Shift: 달리기, C: 앉기, Space: 점프.
 - E: 외관 확인. 원본 기록을 확보하지 않습니다.
@@ -81,7 +81,7 @@ Linux에서 시나리오 8개·456개 검증과 실제 렌더링 장면 검사�
 
 Windows 빌드는 시나리오·더미 장면 검사 후 EXE만 별도 폴더로 옮겨 실행·저장·재실행을 확인합니다. 실제 렌더링으로 첫 화면·대화·터미널·메신저·노트·이동을 검사하고 화면 7개를 Actions 아티팩트에 보관합니다. 수동 플레이의 사용성 검토는 별도로 진행합니다.
 
-Android 빌드는 ARM64·x86_64를 포함합니다. 에뮬레이터에서 첫 실행·터치와 키보드·저장·동일 패키지 덮어 설치·재실행을 확인합니다. Windows와 Android 검사가 모두 통과한 같은 소스의 파일만 배포합니다. 실제 휴대폰의 화면·키보드·성능은 별도로 확인합니다.
+Android 빌드는 ARM64·x86_64를 포함합니다. Android 15 에뮬레이터에서 첫 화면·터치와 키보드·백그라운드 저장·동일 패키지 덮어 설치·재실행을 통과했습니다. 빈 화면도 검사 실패로 처리합니다. Windows와 Android 검사가 모두 통과한 같은 소스의 파일만 배포합니다. 실제 휴대폰의 화면·키보드·성능은 별도로 확인합니다.
 
 프로토타입 APK는 해시로 고정한 AOSP 공개 개발용 서명을 사용해 버전 간 설치를 유지합니다. 정식 Android 배포에는 별도의 비공개 서명을 사용해야 합니다. Android 패키지 ID는 `com.nu4ddi4.securitylab.prototype`입니다.
 
