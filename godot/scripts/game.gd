@@ -13,6 +13,7 @@ var qa_mode = false
 var settings: LabSettings
 var updater: LabUpdater
 var diagnostics: LabDiagnostics
+var bindings = LabInputBindings.new()
 
 func _ready():
 	for argument in OS.get_cmdline_user_args():
@@ -74,7 +75,7 @@ func _ready():
 	diagnostics.mark_ready()
 	print("NATIVE_READY ",JSON.stringify({"godot":Engine.get_version_info().string,"load_ms":loaded_ms,"functional":world.protected_nodes.size(),"colliders":world.collider_count,"doors":world.doors.size(),"devices":world.devices.size(),"screens":equipment.screen_bindings,"leds":equipment.leds.size(),"renderer":RenderingServer.get_current_rendering_method()}))
 	if qa_mode and "--qa-manual" not in OS.get_cmdline_user_args():
-		var script = "res://tests/diagnostics_review.gd" if "--qa-diagnostics" in OS.get_cmdline_user_args() else "res://tests/layout_review.gd" if "--qa-layout" in OS.get_cmdline_user_args() else "res://tests/ux_review.gd" if "--qa-ux" in OS.get_cmdline_user_args() else "res://tests/physical_slice.gd" if "--qa-physical" in OS.get_cmdline_user_args() or "--qa-nav" in OS.get_cmdline_user_args() else "res://tests/review.gd" if "--qa-review" in OS.get_cmdline_user_args() else "res://tests/vertical_slice.gd"
+		var script = "res://tests/input_review.gd" if "--qa-input" in OS.get_cmdline_user_args() else "res://tests/diagnostics_review.gd" if "--qa-diagnostics" in OS.get_cmdline_user_args() else "res://tests/layout_review.gd" if "--qa-layout" in OS.get_cmdline_user_args() else "res://tests/ux_review.gd" if "--qa-ux" in OS.get_cmdline_user_args() else "res://tests/physical_slice.gd" if "--qa-physical" in OS.get_cmdline_user_args() or "--qa-nav" in OS.get_cmdline_user_args() else "res://tests/review.gd" if "--qa-review" in OS.get_cmdline_user_args() else "res://tests/vertical_slice.gd"
 		var qa = load(script).new()
 		add_child(qa)
 		qa.run.call_deferred(self)
@@ -99,13 +100,11 @@ func import_progress(path: String):
 	else: ui.toast.text = "가져오기 실패 · " + saves.error_message
 
 func setup_input():
-	var mapping = {"forward":[KEY_W],"back":[KEY_S],"left":[KEY_A],"right":[KEY_D],"sprint":[KEY_SHIFT],"crouch":[KEY_CTRL,KEY_C],"jump":[KEY_SPACE],"inspect":[KEY_E],"tool":[KEY_F],"pause":[KEY_ESCAPE]}
-	for action in mapping:
-		if not InputMap.has_action(action): InputMap.add_action(action)
-		for key in mapping[action]:
-			var event = InputEventKey.new()
-			event.physical_keycode = key
-			InputMap.action_add_event(action,event)
+	if qa_mode: bindings.path = "user://qa/input_bindings.json"
+	DirAccess.make_dir_recursive_absolute(bindings.path.get_base_dir())
+	bindings.load_profile()
+	# Existing QA uses default physical keys and never reads a user's profile.
+	if qa_mode: bindings.bindings = LabInputBindings.defaults(); bindings.apply()
 
 func _notification(what):
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and missions != null:
