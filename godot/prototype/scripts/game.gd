@@ -19,6 +19,7 @@ var dialogue_camera_active = false
 var dialogue_camera_tween: Tween
 
 func _ready():
+	if OS.has_feature("Android"): get_tree().quit_on_go_back = false
 	content = InvestigationContent.load_case()
 	if content.has("error"):
 		push_error(content.error)
@@ -152,6 +153,7 @@ func _unhandled_input(event):
 		get_viewport().set_input_as_handled()
 
 func _notification(what):
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST and ui != null: ui.toggle()
 	if what in [NOTIFICATION_APPLICATION_PAUSED,NOTIFICATION_APPLICATION_FOCUS_OUT] and ui != null:
 		save_now()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and ui != null:
