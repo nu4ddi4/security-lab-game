@@ -1,6 +1,5 @@
 """Export a signed, self-contained prototype APK and a matching emulator QA APK."""
 import argparse
-import base64
 import hashlib
 import importlib.util
 import json
@@ -14,11 +13,12 @@ import urllib.request
 import zipfile
 
 from release_version import android_code, build_version, channel, tag
+from release_backfill import unchanged_game
 
 PACKAGE = 'com.nu4ddi4.securitylab.prototype'
 # AOSP publishes these development-only test keys. Using the pinned certificate
 # keeps prototype APK upgrades installable across runners without a secret key.
-# A stable Android release must instead supply its private signing configuration.
+# Main and beta intentionally share this public key during pre-launch testing.
 TEST_KEY_SOURCE = 'https://raw.githubusercontent.com/aosp-mirror/platform_build/android-15.0.0_r1/target/product/security/'
 TEST_KEY_HASHES = {
     'testkey.pk8': '495675d32e89a149d5abe191f4e9c0e218b9068714e9b53a7c91e164a0741a23',
@@ -28,14 +28,6 @@ TEST_KEY_HASHES = {
 
 def version_code(version):
     return android_code(version)
-
-
-def require_private_signing():
-    names = ['ANDROID_KEYSTORE_BASE64', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS']
-    if any(not os.environ.get(name) for name in names):
-        raise ValueError('Main release requires Actions secrets: ' + ', '.join(names))
-    if not base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True):
-        raise ValueError('Android signing keystore is empty')
 
 
 def make_test_keystore(directory):
@@ -88,7 +80,7 @@ architectures/x86_64=true
 version/code={code}
 version/name="{version}"
 package/unique_name="{package}"
-package/name="Security Lab Beta"
+package/name="{display_name}"
 package/signed=true
 keystore/{signing}={keystore}
 keystore/{signing}_user={alias}
@@ -96,7 +88,7 @@ keystore/{signing}_password={password}
 screen/immersive_mode=true
 permissions/internet=true
 command_line/extra_args="{args}"
-'''.format(code=version_code(version), version=version, package=PACKAGE,
+'''.format(code=version_code(version), version=version, package=PACKAGE, display_name='Security Lab Beta' if channel(version) == 'beta' else 'Security Lab',
            keystore=json.dumps(str(keystore)), signing=signing, alias=json.dumps(alias), password=json.dumps(password), args='--audio-driver Dummy -- --prototype-smoke --prototype-capture-dir=user://qa-ui' if qa else '')
 
 
@@ -113,8 +105,10 @@ def main():
         raise SystemExit('Godot 4.7.2 stable is required.')
     root = Path(__file__).resolve().parents[1]
     version = build_version(root / 'godot')
-    if channel(version) == 'stable':
-        require_private_signing()
+    pipeline_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+    source_sha = os.environ.get('SECURITY_LAB_RELEASE_SOURCE_SHA') or pipeline_sha
+    if source_sha != pipeline_sha and not unchanged_game(source_sha):
+        raise ValueError('Cannot append an APK with different game resources to a published version')
     sdk = Path(os.environ.get('ANDROID_HOME', os.environ.get('ANDROID_SDK_ROOT', '')))
     java = Path(os.environ['JAVA_HOME'])
     signer = sdk / 'build-tools/35.0.1/apksigner'
@@ -130,6 +124,7 @@ def main():
         identity_path = target / 'prototype/build_info.json'
         identity = json.loads(identity_path.read_text(encoding='utf-8'))
         identity['platform'] = 'android'
+        identity['commit'] = source_sha
         identity_path.write_text(json.dumps(identity), encoding='utf-8')
         (target / 'android').mkdir()
         shutil.copyfile(root / 'godot/android/app-icon.svg', target / 'android/app-icon.svg')
@@ -141,25 +136,18 @@ def main():
         (target / 'project.godot').write_text(project, encoding='utf-8')
         build.check(godot, target)
         configure_editor(sdk, java)
-        if channel(version) == 'stable':
-            keystore = directory / 'release.keystore'
-            keystore.write_bytes(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True))
-            keystore.chmod(0o600)
-            alias, password = os.environ['ANDROID_KEY_ALIAS'], os.environ['ANDROID_KEYSTORE_PASSWORD']
-            certificate = subprocess.check_output(['keytool', '-exportcert', '-keystore', str(keystore),
-                '-alias', alias, '-storepass:env', 'ANDROID_KEYSTORE_PASSWORD'], stderr=subprocess.PIPE)
-            cert_hash = hashlib.sha256(certificate).hexdigest()
-        else:
-            keystore = make_test_keystore(directory)
-            alias, password, cert_hash = 'androiddebugkey', 'android', None
+        keystore = make_test_keystore(directory)
+        alias, password = 'androiddebugkey', 'android'
+        certificate = subprocess.check_output(['openssl', 'x509', '-in', str(directory / 'testkey.x509.pem'), '-outform', 'DER'])
+        cert_hash = hashlib.sha256(certificate).hexdigest()
         for qa in [False, True]:
             name = tag(version) + ('-qa' if qa else '') + '.apk'
             apk = output / name
             (target / 'export_presets.cfg').write_text(preset(version, keystore, qa, alias, password), encoding='utf-8')
             build.run([godot, '--headless', '--path', str(target), '--export-release' if channel(version) == 'stable' and not qa else '--export-debug', 'Android Prototype', str(apk)], target, timeout=180)
             certificates = subprocess.check_output([str(signer), 'verify', '--print-certs', str(apk)], text=True)
-            if cert_hash and 'Signer #1 certificate SHA-256 digest: ' + cert_hash not in certificates:
-                raise ValueError('APK certificate differs from the configured private signing key')
+            if 'Signer #1 certificate SHA-256 digest: ' + cert_hash not in certificates:
+                raise ValueError('APK certificate differs from the pinned public signing key')
             with zipfile.ZipFile(apk) as bundle:
                 print('APK_SIZE', json.dumps({'file': name, 'compressed': apk.stat().st_size,
                       'uncompressed': sum(info.file_size for info in bundle.infolist()),
@@ -170,6 +158,8 @@ def main():
             digest = hashlib.sha256(apk.read_bytes()).hexdigest()
             apk.with_suffix('.sha256').write_text(digest + '  ' + name + '\n', encoding='utf-8')
             print('PROTOTYPE_APK', json.dumps({'file': name, 'versionCode': version_code(version), 'sha256': digest}))
+        record = dict(identity, pipeline_commit=pipeline_sha, signing='public-aosp-test', certificate_sha256=cert_hash)
+        (output / 'android-build-info.json').write_text(json.dumps(record), encoding='utf-8')
 
 
 if __name__ == '__main__':

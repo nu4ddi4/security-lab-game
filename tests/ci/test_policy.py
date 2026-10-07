@@ -48,27 +48,32 @@ class PolicyTests(unittest.TestCase):
         self.assertIn('needs: [quick, version, prototype, android]', workflow)
         self.assertIn("needs.prototype.result == 'success'", workflow)
         self.assertIn("needs.android.result == 'success'", workflow)
-        self.assertIn("github.ref != 'refs/heads/main'", workflow)
+        self.assertIn("needs.version.outputs.append_android == 'true'", workflow)
         self.assertIn('cancel-in-progress: false', workflow)
         self.assertIn('prototype-android-review-${{ github.run_id }}-${{ github.run_attempt }}', workflow)
         self.assertEqual(workflow.count('overwrite: true'), 2)
         self.assertNotIn('  pull_request:', workflow)
 
-        # Evaluate the actual job condition: skipping Android must not block main,
-        # while beta still requires both platforms and failed checks never publish.
+        # Evaluate the actual condition, including Android-only additions to a
+        # published version: no failed or skipped Android build may be uploaded.
         condition = re.search(r'\n  release:\n.*?\n    if: >-\n(.*?)\n    runs-on:', workflow, re.S).group(1)
         expression = ' '.join(condition.split()).replace('always()', 'True').replace('&&', ' and ').replace('||', ' or ')
-        for branch, windows, android, quick, published, expected in [
-            ('main', 'success', 'skipped', 'success', 'false', True),
-            ('beta', 'success', 'success', 'success', 'false', True),
-            ('beta', 'success', 'skipped', 'success', 'false', False),
-            ('main', 'failure', 'skipped', 'success', 'false', False),
-            ('main', 'success', 'skipped', 'failure', 'false', False),
-            ('main', 'skipped', 'skipped', 'success', 'true', True),
+        for branch, windows, android, quick, published, append, expected in [
+            ('main', 'success', 'success', 'success', 'false', 'false', True),
+            ('main', 'success', 'skipped', 'success', 'false', 'false', False),
+            ('beta', 'success', 'success', 'success', 'false', 'false', True),
+            ('beta', 'success', 'skipped', 'success', 'false', 'false', False),
+            ('main', 'failure', 'success', 'success', 'false', 'false', False),
+            ('main', 'success', 'success', 'failure', 'false', 'false', False),
+            ('main', 'skipped', 'skipped', 'success', 'true', 'false', True),
+            ('main', 'skipped', 'success', 'success', 'true', 'true', True),
+            ('main', 'skipped', 'failure', 'success', 'true', 'true', False),
+            ('main', 'skipped', 'skipped', 'success', 'true', 'true', False),
         ]:
             values = {'github.ref': 'refs/heads/' + branch, 'github.event_name': 'push',
                       'inputs.publish': False, 'needs.quick.result': quick,
                       'needs.version.result': 'success', 'needs.version.outputs.published': published,
+                      'needs.version.outputs.append_android': append,
                       'needs.prototype.result': windows, 'needs.android.result': android}
             evaluated = expression
             for key, value in values.items():

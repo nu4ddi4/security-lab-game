@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import subprocess
 from release_version import REPOSITORY, next_version, parts, tag
+from release_backfill import android_assets, select_backfill
 
 
 def main():
@@ -19,12 +20,18 @@ def main():
                      and r['tag_name'].startswith('SecurityLab-')
                      and r.get('prerelease') == (branch == 'beta')), None)
     base = json.loads(Path('godot/prototype/version.json').read_text())['version']
+    existing = existing or select_backfill(releases, base, branch, sha)
     version = existing['tag_name'][len('SecurityLab-'):] if existing else next_version(base, branch, releases)
     parts(version)
+    source_sha = existing['target_commitish'] if existing else sha
+    append_android = bool(existing and not existing['draft'] and branch == 'main' and
+        not android_assets(version) <= {a['name'] for a in existing.get('assets', []) if a.get('state') == 'uploaded'})
     with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
         output.write('version=' + version + '\n')
         output.write('tag=' + tag(version) + '\n')
         output.write('published=' + str(bool(existing and not existing['draft'])).lower() + '\n')
+        output.write('source_sha=' + source_sha + '\n')
+        output.write('append_android=' + str(append_android).lower() + '\n')
     print(json.dumps({'version': version, 'already_published': bool(existing and not existing['draft'])}))
 
 
