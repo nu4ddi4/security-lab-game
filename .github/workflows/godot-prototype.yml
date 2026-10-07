@@ -27,7 +27,14 @@ jobs:
         run: |
           $version = (Get-Content godot/prototype/version.json -Raw | ConvertFrom-Json).version
           "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Reuse the same verified Windows build
+        id: windows_cache
+        uses: actions/cache@v4
+        with:
+          path: prototype-dist
+          key: prototype-windows-4.7.2-${{ hashFiles('godot/prototype/**', 'godot/scripts/player.gd', 'godot/assets/fonts/**', 'godot/LICENSES.txt', 'godot/project.godot', 'scripts/prototype-build.py') }}
       - name: Export and check standalone prototype
+        if: steps.windows_cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           python scripts/prototype-build.py --rendered-check
@@ -59,11 +66,12 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools build-tools;35.0.1 platforms;android-35'
+          log-accepted-android-sdk-licenses: 'false'
       - uses: ./.github/actions/godot-setup
         with:
           export: 'true'
-      - name: Install Android export tools
-        run: sdkmanager 'platform-tools' 'build-tools;35.0.1' 'platforms;android-35'
       - name: Export signed APK and matching QA APK
         run: python3 scripts/prototype-android-build.py
       - name: Enable emulator acceleration
