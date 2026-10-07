@@ -31,7 +31,9 @@ try {
         $nativeBuildInfo.commit = $nativeCommit
         [System.IO.File]::WriteAllText($nativeInfoPath, ($nativeBuildInfo | ConvertTo-Json -Depth 8), [System.Text.UTF8Encoding]::new($false))
         $nativeProject = [System.IO.File]::ReadAllText($nativeProjectPath)
-        $nativeProject = [regex]::Replace($nativeProject, '(?m)^config/version="[^"]*"$', ('config/version="'+$nativeBuildInfo.version+'"'))
+        $nativeVersionLine = 'config/version="'+$nativeBuildInfo.version+'"'
+        $nativeProject = [regex]::Replace($nativeProject, '(?m)^config/version="[^"\r\n]*"', $nativeVersionLine)
+        if (-not $nativeProject.Contains($nativeVersionLine)) { throw 'Cannot align exported native version with its metadata' }
         [System.IO.File]::WriteAllText($nativeProjectPath, $nativeProject, [System.Text.UTF8Encoding]::new($false))
         $exportLog = & $Godot --headless --path godot --export-release "Windows Native" $target 2>&1
         $nativeExportExit = $LASTEXITCODE
