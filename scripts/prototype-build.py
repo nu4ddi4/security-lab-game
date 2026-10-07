@@ -50,7 +50,7 @@ def stage(source, target):
                 'install_layout': 1, 'updates_default': True,
                 'manifest_url': 'https://github.com/nu4ddi4/security-lab-game/releases/download/beta-channel-beta/update.json'}
     (target / 'prototype/build_info.json').write_text(json.dumps(metadata), encoding='utf-8')
-    for name in ['assets/models/Interior_07_Godot.glb', 'assets/models/Investigation_Environment.glb', 'assets/textures/city-sunset.png', 'scripts/player.gd', 'assets/fonts/NotoSansKR.ttf', 'assets/fonts/OFL.txt', 'LICENSES.txt']:
+    for name in ['assets/models/Interior_07_Godot.glb', 'assets/models/Investigation_Environment.glb', 'assets/textures/city-sunset.png', 'scripts/player.gd', 'assets/fonts/NotoSansKR.ttf', 'assets/fonts/OFL.txt', 'assets/fonts/Gaegu-Regular.ttf', 'assets/fonts/Gaegu-OFL.txt', 'LICENSES.txt']:
         destination = target / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / name, destination)
@@ -72,7 +72,7 @@ name="Windows Prototype"
 platform="Windows Desktop"
 runnable=true
 export_filter="all_resources"
-include_filter="prototype/version.json,prototype/content/*.json,prototype/tests/*.json,prototype/build_info.json,resources/*.json,resources/*.ps1,assets/fonts/OFL.txt,LICENSES.txt"
+include_filter="prototype/version.json,prototype/content/*.json,prototype/tests/*.json,prototype/build_info.json,resources/*.json,resources/*.ps1,assets/fonts/OFL.txt,assets/fonts/Gaegu-OFL.txt,LICENSES.txt"
 exclude_filter="prototype/tests/results/*"
 export_path=""
 script_export_mode=2

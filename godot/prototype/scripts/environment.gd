@@ -15,8 +15,12 @@ class EquipmentDisplay extends Control:
 	var rows: Array = []
 	var tone = Color(.25,.72,.63)
 	var font = preload("res://assets/fonts/NotoSansKR.ttf")
+	var paper_board = false
 
 	func _draw():
+		if paper_board:
+			_draw_whiteboard()
+			return
 		draw_rect(Rect2(0,0,640,360),Color(.018,.031,.043))
 		draw_rect(Rect2(0,0,640,7),tone)
 		draw_string(font,Vector2(27,40),"SECURITY OPERATIONS   /   LOCAL SYSTEM",HORIZONTAL_ALIGNMENT_LEFT,600,15,Color(.46,.62,.66))
@@ -28,11 +32,31 @@ class EquipmentDisplay extends Control:
 		draw_line(Vector2(28,315),Vector2(610,315),Color(.12,.22,.28),1)
 		draw_string(font,Vector2(28,342),"원본 기록과 조작은 현장 단말에서 확인",HORIZONTAL_ALIGNMENT_LEFT,600,16,Color(.45,.61,.65))
 
+	func _draw_whiteboard():
+		var ink = Color(.055,.15,.23)
+		draw_string(font,Vector2(26,53),heading,HORIZONTAL_ALIGNMENT_LEFT,590,42,ink)
+		draw_polyline(PackedVector2Array([Vector2(28,64),Vector2(245,66),Vector2(380,63)]),ink,2,true)
+		for i in rows.size():
+			var y = 112+i*57
+			var marker = Color(.42,.12,.08) if i in [1,2] and tone.r > .7 else ink
+			draw_polyline(PackedVector2Array([Vector2(29,y-18),Vector2(42,y-17),Vector2(43,y-3),Vector2(28,y-4),Vector2(29,y-18)]),marker,1.6,true)
+			draw_string(font,Vector2(54+(i%2)*3,y),str(rows[i]),HORIZONTAL_ALIGNMENT_LEFT,560,30,marker)
+		draw_string(font,Vector2(365,343),"원본 기록으로 재확인!",HORIZONTAL_ALIGNMENT_LEFT,255,25,ink)
+
 func setup(office: LabWorld, content: Dictionary):
 	world = office
 	model = load("res://assets/models/Investigation_Environment.glb").instantiate()
 	add_child(model)
 	_collect(model)
+	for marker in anchors.values():
+		if marker.has_meta("base_root"):
+			var base = world.model.find_child(str(marker.get_meta("base_root")),true,false)
+			if base is Node3D: base.global_position += marker.position
+		if marker.has_meta("replace_base_collision"):
+			var collider = world.protected_nodes.get(str(marker.get_meta("replace_base_collision")))
+			if collider != null:
+				var body = collider.get_node_or_null("NativeCollision")
+				if body != null: body.collision_layer = 0
 	var root = anchors.get("Investigation_Environment")
 	if root != null:
 		for source_name in str(root.get_meta("hide_base","")).split("|"):
@@ -99,10 +123,19 @@ func _display(id: String, mesh: MeshInstance3D):
 	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	add_child(viewport)
 	var canvas = EquipmentDisplay.new()
+	if id == "briefing_board":
+		canvas.paper_board = true
+		canvas.font = load("res://assets/fonts/Gaegu-Regular.ttf")
+		viewport.transparent_bg = true
 	canvas.size = viewport.size
 	viewport.add_child(canvas)
 	var material = StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	if canvas.paper_board:
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.roughness = .65
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	material.albedo_texture = viewport.get_texture()
 	# Viewport textures have no mip chain. These small, event-updated screens use
 	# linear filtering, including on the exported Compatibility renderer.
