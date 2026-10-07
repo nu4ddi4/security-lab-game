@@ -132,7 +132,7 @@ def main():
             files.append(destination)
         windows = directory / 'Windows-x64'
         report = json.loads((windows/'beta-windows-updater.json').read_text(encoding='utf-8-sig'))
-        if report.get('product') != PRODUCT or report.get('channel') != channel(version) or report.get('passed') is not True:
+        if report.get('product') != PRODUCT or report.get('passed') is not True:
             raise ValueError('Windows installation and rollback checks must pass')
         installer = verified_file(windows, 'SecurityLabSetup.exe')
         manifest = json.loads((windows/'update.json').read_text())

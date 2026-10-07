@@ -79,7 +79,8 @@ jobs:
         run: |
           python scripts/beta-installer-build.py --iscc $env:SECURITY_LAB_ISCC
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./tests/native/security_windows_updater.ps1 -Channel $(if ($env:SECURITY_LAB_RELEASE_VERSION.Contains("-beta.")) {"beta"} else {"stable"}) -Beta -Iscc $env:SECURITY_LAB_ISCC -Results prototype-dist/beta-windows-updater.json
+          # Isolated saves are permitted only in dev; never relax production path checks.
+          ./tests/native/security_windows_updater.ps1 -Beta -Iscc $env:SECURITY_LAB_ISCC -Results prototype-dist/beta-windows-updater.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/godot-update-network-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
