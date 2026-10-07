@@ -140,6 +140,9 @@ def main():
             build.run([godot, '--headless', '--path', str(target), '--export-debug', 'Android Prototype', str(apk)], target, timeout=180)
             subprocess.run([str(signer), 'verify', '--verbose', '--print-certs', str(apk)], check=True)
             with zipfile.ZipFile(apk) as bundle:
+                print('APK_SIZE', json.dumps({'file': name, 'compressed': apk.stat().st_size,
+                      'uncompressed': sum(info.file_size for info in bundle.infolist()),
+                      'largest': [(info.filename, info.file_size) for info in sorted(bundle.infolist(), key=lambda info: info.file_size, reverse=True)[:5]]}), flush=True)
                 for abi in ['arm64-v8a', 'x86_64']:
                     if 'lib/' + abi + '/libgodot_android.so' not in bundle.namelist():
                         raise ValueError('Missing APK architecture: ' + abi)

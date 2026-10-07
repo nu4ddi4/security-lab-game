@@ -45,6 +45,13 @@ def read_save():
     return json.loads(text)
 
 
+def retain_diagnostics():
+    logs = adb('logcat', '-d', '-v', 'brief')
+    Path('prototype-android-dist/android-log.txt').write_text(logs, encoding='utf-8')
+    print('ANDROID_STORAGE', adb('shell', 'df', '-h', '/data').strip(), flush=True)
+    print('\n'.join(line for line in logs.splitlines() if 'godot' in line.lower())[-20000:], flush=True)
+
+
 def rendered_image(data):
     with Image.open(io.BytesIO(data)) as image:
         sample = image.convert('RGB').resize((160, 90))
@@ -85,6 +92,7 @@ def main():
         raise ValueError('Fresh Android investigation did not start on day 1')
     wait_for('PROTOTYPE_FRAME_READY')
     presented = capture_startup(directory)
+    if not presented: retain_diagnostics()
     # Android suspends apps without a desktop close request. Ensure this saves.
     adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
     time.sleep(1)
@@ -129,10 +137,7 @@ if __name__ == '__main__':
         main()
     except Exception:
         try:
-            pid = adb('shell', 'pidof', PACKAGE).strip().split()[0]
-            logs = adb('logcat', '-d', '-v', 'brief', '--pid=' + pid)
-            Path('prototype-android-dist/android-log.txt').write_text(logs, encoding='utf-8')
-            print(logs[-16000:])
+            retain_diagnostics()
         except Exception as error:
             print('Could not retain Android app diagnostics:', error)
         raise

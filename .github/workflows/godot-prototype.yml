@@ -96,12 +96,12 @@ jobs:
       - name: Install, play, update and relaunch on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 29
+          api-level: 35
           arch: x86_64
           target: default
           profile: pixel_2
           disk-size: 6G
-          emulator-options: -no-window -gpu swiftshader -no-snapshot -wipe-data -partition-size 6144 -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swangle -no-snapshot -wipe-data -partition-size 6144 -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: python3 scripts/prototype-android-test.py
       - name: Read prototype version
