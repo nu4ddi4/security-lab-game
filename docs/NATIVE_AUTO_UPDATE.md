@@ -12,6 +12,6 @@ Windows 설치형 조사 게임은 현재 제품·채널의 더 새 버전을 �
 | `installer/SecurityLabBeta.iss` | 현재 베타 설치 프로그램 |
 | `scripts/beta-installer-build.py` · `prototype-release.py` | 검증된 파일 패키징·명시적 게시 |
 
-베타 제품은 `security-lab-beta`이며 `beta-channel-beta/update.json`만 확인한다. 이전 웹·Native 제품이나 다른 채널·이전 버전으로 전환하지 않는다. Android·포터블 Windows는 플랫폼에 맞는 새 베타 다운로드를 안내한다. Android 패키지 ID·서명을 유지한다.
+베타 제품은 `security-lab-beta`이며 `beta` 빌드는 `beta-channel-beta/update.json`, 정식 빌드는 `beta-channel-stable/update.json`을 확인한다. 이전 웹·Native 제품이나 다른 채널·이전 버전으로 전환하지 않는다. Android·포터블 Windows는 플랫폼에 맞는 새 베타 다운로드를 안내한다. Android 패키지 ID·서명을 유지한다.
 
 빠른 정책·저장·건강 검사는 `python scripts/prototype-test.py --suite services`로 실행한다. 실제 HTTP 요청·동의 UI·helper 실행·Inno 설치와 실패 복구는 수동 플랫폼 검증에서 수행한다. 네트워크 fixture는 명시적으로 허용한 loopback 주소만 사용한다. 개발 중 매번 설치하지 않는다.
