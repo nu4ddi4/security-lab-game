@@ -122,7 +122,10 @@ def main():
         target = directory / 'project'
         target.mkdir()
         build.stage(root / 'godot', target)
+        (target / 'android').mkdir()
+        shutil.copyfile(root / 'godot/android/app-icon.svg', target / 'android/app-icon.svg')
         project = (target / 'project.godot').read_text(encoding='utf-8')
+        project = project.replace('[application]', '[application]\nconfig/icon="res://android/app-icon.svg"')
         project = project.replace('textures/vram_compression/import_etc2_astc=false', 'textures/vram_compression/import_etc2_astc=true')
         project += '\n[input_devices]\npointing/emulate_touch_from_mouse=false\npointing/emulate_mouse_from_touch=true\n'
         project = project.replace('window/stretch/mode="canvas_items"', 'window/stretch/mode="canvas_items"\nwindow/handheld/orientation=0')
