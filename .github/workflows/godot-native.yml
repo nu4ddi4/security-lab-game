@@ -50,6 +50,9 @@ jobs:
         run: |
           & $env:SECURITY_LAB_GODOT_CONSOLE --headless --path godot -- --qa
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native diagnostics Windows privacy boundaries
+        shell: pwsh
+        run: ./scripts/godot-diagnostics-windows-test.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE
       - name: Investigation prototype
         shell: pwsh
         run: |
@@ -57,6 +60,9 @@ jobs:
             python scripts/prototype-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+      - name: Exported native diagnostics ZIP smoke
+        shell: pwsh
+        run: ./scripts/godot-diagnostics-export-test.ps1 -Headless
       - uses: actions/upload-artifact@v4
         id: native-artifact
         with:

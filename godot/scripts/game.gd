@@ -12,6 +12,7 @@ var loaded_ms = 0.0
 var qa_mode = false
 var settings: LabSettings
 var updater: LabUpdater
+var diagnostics: LabDiagnostics
 
 func _ready():
 	for argument in OS.get_cmdline_user_args():
@@ -21,6 +22,10 @@ func _ready():
 	missions.name = "MissionManager"
 	add_child(missions)
 	if qa_mode: saves.directory = "user://qa"
+	diagnostics = LabDiagnostics.new()
+	diagnostics.name = "Diagnostics"
+	add_child(diagnostics)
+	diagnostics.setup(self)
 	DirAccess.make_dir_recursive_absolute(saves.directory)
 	var load_status = saves.load_into(missions) if not qa_mode else "검증용 새 조사"
 	player = LabPlayer.new()
@@ -66,9 +71,10 @@ func _ready():
 		updater.status_changed.connect(func(message): ui.toast.text = message)
 		updater.setup(self)
 	loaded_ms = (Time.get_ticks_usec()-startup_usec)/1000.0
+	diagnostics.mark_ready()
 	print("NATIVE_READY ",JSON.stringify({"godot":Engine.get_version_info().string,"load_ms":loaded_ms,"functional":world.protected_nodes.size(),"colliders":world.collider_count,"doors":world.doors.size(),"devices":world.devices.size(),"screens":equipment.screen_bindings,"leds":equipment.leds.size(),"renderer":RenderingServer.get_current_rendering_method()}))
 	if qa_mode and "--qa-manual" not in OS.get_cmdline_user_args():
-		var script = "res://tests/layout_review.gd" if "--qa-layout" in OS.get_cmdline_user_args() else "res://tests/ux_review.gd" if "--qa-ux" in OS.get_cmdline_user_args() else "res://tests/physical_slice.gd" if "--qa-physical" in OS.get_cmdline_user_args() or "--qa-nav" in OS.get_cmdline_user_args() else "res://tests/review.gd" if "--qa-review" in OS.get_cmdline_user_args() else "res://tests/vertical_slice.gd"
+		var script = "res://tests/diagnostics_review.gd" if "--qa-diagnostics" in OS.get_cmdline_user_args() else "res://tests/layout_review.gd" if "--qa-layout" in OS.get_cmdline_user_args() else "res://tests/ux_review.gd" if "--qa-ux" in OS.get_cmdline_user_args() else "res://tests/physical_slice.gd" if "--qa-physical" in OS.get_cmdline_user_args() or "--qa-nav" in OS.get_cmdline_user_args() else "res://tests/review.gd" if "--qa-review" in OS.get_cmdline_user_args() else "res://tests/vertical_slice.gd"
 		var qa = load(script).new()
 		add_child(qa)
 		qa.run.call_deferred(self)
