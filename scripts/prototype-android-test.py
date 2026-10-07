@@ -81,6 +81,9 @@ def main():
     stem = 'SecurityLab-beta-' + metadata['version']
     apk, qa = directory / (stem + '.apk'), directory / (stem + '-qa.apk')
     adb('wait-for-device')
+    # Keep software-rendered CI frames representative but affordable. Gameplay
+    # uses the real office and the same scaled touch coordinates at this size.
+    adb('shell', 'wm', 'size', '540x960')
     print('ANDROID_STORAGE', adb('shell', 'df', '-h', '/data').strip(), flush=True)
     # Avoid Android's one-time system fullscreen tutorial covering review images.
     adb('shell', 'settings', 'put', 'secure', 'immersive_mode_confirmations', 'confirmed')
@@ -102,7 +105,7 @@ def main():
     # the production APK to exercise certificate compatibility and save retention.
     adb('install', '-r', str(qa))
     launch()
-    result = wait_for('INVESTIGATION_SMOKE')
+    result = wait_for('INVESTIGATION_SMOKE', timeout=180)
     captures = directory / 'ui'
     captures.mkdir(exist_ok=True)
     for name in ['01-briefing','02-dialogue','03-terminal','04-messenger','05-notes','06-field','07-settings']:

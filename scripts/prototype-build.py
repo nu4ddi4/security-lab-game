@@ -54,7 +54,7 @@ def stage(source, target):
     project = project.replace('Forward Plus', 'GL Compatibility').replace('"forward_plus"', '"gl_compatibility"')
     project = project.replace('Offline security investigation simulator. Native companion to web v0.7.0.',
                               'Offline security investigation beta.')
-    project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '-beta"', project, flags=re.MULTILINE)
+    project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '-beta.1"', project, flags=re.MULTILINE)
     (target / 'project.godot').write_text(project, encoding='utf-8')
     (target / 'export_presets.cfg').write_text('''[preset.0]
 name="Windows Prototype"
@@ -84,7 +84,7 @@ def check(godot, target):
     run([godot, '--headless', '--editor', '--path', str(target), '--import'], target)
     run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/unit.gd'],
         target, 'INVESTIGATION_UNIT')
-    run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/services.gd'], target, 'INVESTIGATION_SERVICES')
+    run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/services_runner.gd'], target, 'INVESTIGATION_SERVICES')
     run([godot, '--headless', '--path', str(target), '--', '--prototype-smoke'],
         target, 'INVESTIGATION_SMOKE')
 
@@ -124,7 +124,7 @@ def main():
             run([str(executable), '--headless', '--', '--prototype-smoke'],
                 directory, 'INVESTIGATION_SMOKE')
             print('Standalone EXE launch', attempt + 1, 'passed.')
-        run([str(executable), '--headless', '--script', 'res://prototype/tests/services.gd'],
+        run([str(executable), '--headless', '--', '--prototype-services'],
             directory, 'INVESTIGATION_SERVICES')
         print('Exported beta diagnostics, save and update identity passed.')
         if args.rendered_check:

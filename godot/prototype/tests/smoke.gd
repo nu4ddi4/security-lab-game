@@ -9,6 +9,7 @@ func capture(game: InvestigationPrototype, name: String):
 	await RenderingServer.frame_post_draw
 	var result = get_viewport().get_texture().get_image().save_png(capture_directory.path_join(name+".png"))
 	if result != OK: push_error("Cannot capture prototype UI: "+error_string(result))
+	print("INVESTIGATION_CAPTURE ",name)
 
 func run(game: InvestigationPrototype):
 	for argument in OS.get_cmdline_user_args():

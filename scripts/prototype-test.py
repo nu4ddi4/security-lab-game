@@ -14,7 +14,7 @@ if not version.stdout.strip().startswith('4.7.2.stable'):
     raise SystemExit('Godot 4.7.2 stable CLI is required; use --godot PATH.')
 commands = [
     (['--headless', '--path', 'godot', '--script', 'res://prototype/tests/unit.gd'], 'INVESTIGATION_UNIT'),
-    (['--headless', '--path', 'godot', '--script', 'res://prototype/tests/services.gd'], 'INVESTIGATION_SERVICES'),
+    (['--headless', '--path', 'godot', '--script', 'res://prototype/tests/services_runner.gd'], 'INVESTIGATION_SERVICES'),
     (['--headless', '--path', 'godot', '--', '--prototype-smoke'], 'INVESTIGATION_SMOKE'),
 ]
 for command, marker in commands:

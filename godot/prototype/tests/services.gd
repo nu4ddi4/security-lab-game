@@ -1,4 +1,4 @@
-extends SceneTree
+extends Node
 const Policy = preload("res://scripts/update_policy.gd")
 class TestDiagnostics extends InvestigationDiagnostics:
 	func supported() -> bool: return true
@@ -28,9 +28,9 @@ func write(path: String, value: String):
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	var file = FileAccess.open(path,FileAccess.WRITE)
 	file.store_string(value); file.close()
-func _init(): run.call_deferred()
+func _ready(): run.call_deferred()
 func run():
-	var host = Host.new(); root.add_child(host); host.add_child(host.player)
+	var host = Host.new(); get_tree().root.add_child(host); host.add_child(host.player)
 	host.content = InvestigationContent.load_case()
 	host.state = InvestigationEngine.new(host.content).create_state()
 	host.state.memo = "private-evidence-memo-do-not-export"
@@ -89,4 +89,4 @@ func run():
 	diagnostics.write_session(true)
 	check(diagnostics.read_json(diagnostics.data_directory.path_join("session.json")).data.clean_exit,"Clean exit marker is written locally")
 	print("INVESTIGATION_SERVICES ",JSON.stringify({"passed":failures.is_empty(),"assertions":assertions,"failures":failures}))
-	quit(0 if failures.is_empty() else 1)
+	get_tree().quit(0 if failures.is_empty() else 1)

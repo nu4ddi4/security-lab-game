@@ -7,13 +7,13 @@
 | 일반 문서·AGENTS | CI 정책 검사와 필수 `test` 판정 |
 | 개발 브랜치 push | 변경한 웹 또는 Godot의 빠른 검사 |
 | Draft PR | 빠른 검사 |
-| 일반 PR·main push | 빠른 검사 후 해당 런타임의 Windows EXE 빌드·검사 |
+| 일반 PR·main push·beta의 런타임 변경 push | 빠른 검사 후 해당 런타임의 Windows EXE 빌드·검사 |
 | Windows 패키지 수동 실행 | 선택한 브랜치의 웹 또는 Godot EXE 빌드 |
 | 프로토타입 버전·입력·UI·앱 생명주기·빌드 변경 | Windows EXE·Android APK 빌드와 실행 검사 |
 
 웹은 unit·서버 검사, Godot는 기존 Native 규칙·저장과 프로토타입 시나리오·더미 장면을 검사합니다. 빠른 Godot 검사는 임시 프로젝트에 필요한 스크립트·JSON·폰트만 복사해 큰 GLB와 내보내기 템플릿을 가져오지 않습니다.
 
-필수 검사 이름은 `test`로 유지합니다. 선택된 검사·Windows 빌드가 실패하거나 예상과 다르게 건너뛰면 `test`도 실패합니다. 문서 PR에도 결과를 반환합니다. push와 PR은 별도 실행 그룹을 사용해 필수 검사를 서로 취소하지 않습니다. Windows 전체 빌드는 개발 push에서 실행하지 않습니다.
+필수 검사 이름은 `test`로 유지합니다. 선택된 검사·Windows 빌드가 실패하거나 예상과 다르게 건너뛰면 `test`도 실패합니다. 문서 PR에도 결과를 반환합니다. push와 PR은 별도 실행 그룹을 사용해 필수 검사를 서로 취소하지 않습니다. beta의 Godot 변경은 기존 Native 패키지 검사도 실행합니다. 그 외 개발 push에서는 Windows 전체 빌드를 실행하지 않습니다.
 
 공통 설정·미분류 런타임 파일은 보수적으로 검사합니다. 소스 Blend만 바뀌면 실행 검사를 생략하고, 내보낸 GLB가 바뀌면 관련 검사를 실행합니다. `docs/RELEASE.md`는 main에서 미출시 버전의 재빌드를 요청할 수 있는 배포 문서입니다.
 
@@ -25,7 +25,7 @@
 
 수동 릴리즈에는 현재 main 커밋의 성공한 `Test` 또는 `Package executable` 실행 ID와 버전 태그를 입력합니다. 태그 push만으로 새 패키지를 만들지 않습니다. Godot 네이티브 EXE는 기존처럼 Actions 아티팩트로 제공하며, 이 작업은 웹 릴리즈를 게시합니다.
 
-프로토타입은 별도 브랜치에서 Windows·Android 검사가 성공한 실행의 EXE·APK를 사전 릴리즈로 게시합니다. EXE만 담은 ZIP과 체크섬을 함께 제공합니다. main과 정식 Latest는 바꾸지 않습니다. Android는 설치·렌더링·터치와 키보드·저장·덮어 설치·재실행을 에뮬레이터에서 검사합니다. 동일 소스의 검증된 Windows 빌드는 캐시로 재사용합니다.
+통합 프로토타입은 `beta`에서 `Investigation beta builds`의 Windows·Android 검사가 성공한 같은 SHA의 EXE·APK를 `SecurityLab-beta-X.Y.Z` 사전 릴리즈로 게시합니다. EXE 전용 ZIP·Inno 설치 파일·manifest·빌드 메타데이터·체크섬을 함께 제공합니다. Windows는 내보낸 EXE 안의 진단·저장·업데이트 식별과 실제 Inno 설치/실패 복구, 동의 전 다운로드 차단 및 알림 취소를 검사합니다. 채널 metadata는 버전별 배포 파일이 모두 게시된 뒤 `beta-channel-beta`에 반영합니다. main과 정식 Latest는 바꾸지 않습니다. Android는 설치·렌더링·터치와 키보드·저장·덮어 설치·재실행을 에뮬레이터에서 검사합니다. 동일 소스의 검증된 Windows 빌드는 캐시로 재사용합니다.
 
 ## 보관과 브랜치 정리
 

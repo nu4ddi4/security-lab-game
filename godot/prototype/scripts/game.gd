@@ -25,6 +25,9 @@ var dialogue_camera_active = false
 var dialogue_camera_tween: Tween
 
 func _ready():
+	if "--prototype-services" in OS.get_cmdline_user_args():
+		add_child(load("res://prototype/tests/services.gd").new())
+		return
 	if OS.has_feature("Android"): get_tree().quit_on_go_back = false
 	content = InvestigationContent.load_case()
 	if content.has("error"):
@@ -278,6 +281,10 @@ func _build_office_world():
 	world.name = "InvestigationOffice"
 	add_child(world)
 	world.setup(null,player)
+	if OS.has_feature("mobile"):
+		get_viewport().scaling_3d_scale = .65
+		get_viewport().msaa_3d = Viewport.MSAA_DISABLED
+		world.get_node("WindowSunset").shadow_enabled = false
 	detailed_world = true
 	var positions = {"control_console":Vector3(-5,1.8,3.62),"server_console":Vector3(-8,1.6,-4.32),"approval_archive":Vector3(8.5,1.75,-7.25),"maintenance_terminal":Vector3(7,1.45,2.72)}
 	var computer = world.model.find_child("CORP_Staff_Computer_0",true,false)

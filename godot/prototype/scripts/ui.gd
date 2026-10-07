@@ -386,13 +386,17 @@ func refresh_settings():
 	update_check.disabled = game.updater.state in ["checking","downloading","preparing"] if game.updater!=null else game.updates.busy
 	update_download.visible = game.updater.state in ["available","ready"] if game.updater!=null else not game.updates.download_url.is_empty()
 
-func refresh():
-	var view = game.engine.project(game.state,game.context)
+func objective_info() -> Dictionary:
 	var objective = guide_info()
 	if game.detailed_world and game.targets.has(objective.get("target","")):
 		var target = game.targets[objective.target]
 		var zone = game.content.case.devices.get(objective.target,{}).get("zone",game.content.case.npcs.get(objective.target,{}).get("role",""))
 		objective.text += "\n%s · %.1fm"%[zone,game.player.global_position.distance_to(target.global_position)]
+	return objective
+
+func refresh():
+	var view = game.engine.project(game.state,game.context)
+	var objective = objective_info()
 	hud.text = "%d일차 · %s" % [view.day,objective.title]
 	guide.text = objective.text
 	source.text = view.device.get("label","현장 단말")+" · 운영 점검 세션"
@@ -658,6 +662,7 @@ func _process(_delta):
 	if modal_open:
 		prompt.hide()
 		return
+	if game.detailed_world: guide.text = objective_info().text
 	var target = game.player.target
 	prompt.text = target.get_interaction_prompt() if target != null else ""
 	if game.controls.touch_enabled: prompt.text = prompt.text.replace("F — ","")

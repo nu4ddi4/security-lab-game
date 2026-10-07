@@ -91,7 +91,7 @@ screen/immersive_mode=true
 permissions/internet=true
 command_line/extra_args="{args}"
 '''.format(code=version_code(version), version=version, package=PACKAGE,
-           keystore=json.dumps(str(keystore)), args='-- --prototype-smoke --prototype-capture-dir=user://qa-ui' if qa else '')
+           keystore=json.dumps(str(keystore)), args='--audio-driver Dummy -- --prototype-smoke --prototype-capture-dir=user://qa-ui' if qa else '')
 
 
 def main():

@@ -18,19 +18,27 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Protected native geometry changed" }
     $target = [System.IO.Path]::GetFullPath($Output, $repoRoot)
     New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
-    # Stamp only the commit. A future updater's version/channel metadata survives.
+    # Preserve the updater identity and keep the EXE version and diagnostics aligned.
     # Restore source metadata even when export fails; runtime gets the exact HEAD.
     $nativeInfoPath = Join-Path $repoRoot 'godot/resources/build_info.json'
     $nativeInfoOriginal = [System.IO.File]::ReadAllBytes($nativeInfoPath)
+    $nativeProjectPath = Join-Path $repoRoot 'godot/project.godot'
+    $nativeProjectOriginal = [System.IO.File]::ReadAllBytes($nativeProjectPath)
     try {
         $nativeBuildInfo = Get-Content -LiteralPath $nativeInfoPath -Raw | ConvertFrom-Json
         $nativeCommit = (& git rev-parse HEAD).Trim()
         if ($LASTEXITCODE -ne 0 -or $nativeCommit -notmatch '^[0-9a-f]{40}$') { throw 'Cannot identify native build commit' }
         $nativeBuildInfo.commit = $nativeCommit
         [System.IO.File]::WriteAllText($nativeInfoPath, ($nativeBuildInfo | ConvertTo-Json -Depth 8), [System.Text.UTF8Encoding]::new($false))
+        $nativeProject = [System.IO.File]::ReadAllText($nativeProjectPath)
+        $nativeProject = [regex]::Replace($nativeProject, '(?m)^config/version="[^"]*"$', ('config/version="'+$nativeBuildInfo.version+'"'))
+        [System.IO.File]::WriteAllText($nativeProjectPath, $nativeProject, [System.Text.UTF8Encoding]::new($false))
         $exportLog = & $Godot --headless --path godot --export-release "Windows Native" $target 2>&1
         $nativeExportExit = $LASTEXITCODE
-    } finally { [System.IO.File]::WriteAllBytes($nativeInfoPath, $nativeInfoOriginal) }
+    } finally {
+        [System.IO.File]::WriteAllBytes($nativeInfoPath, $nativeInfoOriginal)
+        [System.IO.File]::WriteAllBytes($nativeProjectPath, $nativeProjectOriginal)
+    }
     $exportLog | Write-Output
     if ($nativeExportExit -ne 0 -or ($exportLog | Select-String 'ERROR:|SCRIPT ERROR:') -or -not (Test-Path -LiteralPath $target)) { throw "Windows native export failed" }
     $binary = Get-Item -LiteralPath $target -ErrorAction Stop

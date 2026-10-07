@@ -63,7 +63,7 @@ def main():
         run(args.godot, target, ['--script', 'res://tests/diagnostics_test.gd'], 'NATIVE_DIAGNOSTICS')
         if prototype:
             run(args.godot, target, ['--script', 'res://prototype/tests/unit.gd'], 'INVESTIGATION_UNIT')
-            run(args.godot, target, ['--script', 'res://prototype/tests/services.gd'], 'INVESTIGATION_SERVICES')
+            run(args.godot, target, ['--script', 'res://prototype/tests/services_runner.gd'], 'INVESTIGATION_SERVICES')
             run(args.godot, target, ['--', '--prototype-smoke', '--prototype-dummy'], 'INVESTIGATION_SMOKE')
 
 
