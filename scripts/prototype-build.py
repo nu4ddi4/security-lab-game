@@ -39,6 +39,9 @@ def stage(source, target):
     shutil.copytree(source / 'prototype', target / 'prototype')
     shutil.copytree(source / 'scripts', target / 'scripts')
     shutil.copytree(source / 'resources', target / 'resources')
+    (target / 'tests').mkdir()
+    for name in ['input_review.gd', 'input_bindings_test.gd']:
+        shutil.copyfile(source / 'tests' / name, target / 'tests' / name)
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source.parent, text=True).strip()
     metadata = {'schema': 1, 'app_id': 'security-lab-beta', 'platform': 'windows-x86_64',
                 'version': version + '-beta.1', 'channel': 'beta', 'commit': commit,
@@ -82,6 +85,7 @@ application/file_description="Offline security investigation beta"
 
 def check(godot, target):
     run([godot, '--headless', '--editor', '--path', str(target), '--import'], target)
+    run([godot, '--headless', '--path', str(target), '--script', 'res://tests/input_bindings_test.gd'], target, 'INPUT_BINDINGS_TEST')
     run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/unit.gd'],
         target, 'INVESTIGATION_UNIT')
     run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/services_runner.gd'], target, 'INVESTIGATION_SERVICES')
@@ -124,6 +128,7 @@ def main():
             run([str(executable), '--headless', '--', '--prototype-smoke'],
                 directory, 'INVESTIGATION_SMOKE')
             print('Standalone EXE launch', attempt + 1, 'passed.')
+        run([str(executable), '--headless', '--', '--prototype-smoke', '--prototype-input-review'], directory, 'INPUT_REVIEW')
         run([str(executable), '--headless', '--', '--prototype-services'],
             directory, 'INVESTIGATION_SERVICES')
         print('Exported beta diagnostics, save and update identity passed.')

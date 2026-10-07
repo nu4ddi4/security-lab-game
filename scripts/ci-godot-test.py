@@ -61,10 +61,14 @@ def main():
         run(args.godot, target, ['--script', 'res://tests/unit.gd'], 'NATIVE_UNIT')
         run(args.godot, target, ['--script', 'res://tests/native_update_test.gd'], 'NATIVE_UPDATE_TEST')
         run(args.godot, target, ['--script', 'res://tests/diagnostics_test.gd'], 'NATIVE_DIAGNOSTICS')
+        shutil.copyfile(source / 'tests/input_bindings_test.gd', target / 'tests/input_bindings_test.gd')
+        shutil.copyfile(source / 'tests/input_review.gd', target / 'tests/input_review.gd')
+        run(args.godot, target, ['--script', 'res://tests/input_bindings_test.gd'], 'INPUT_BINDINGS_TEST')
         if prototype:
             run(args.godot, target, ['--script', 'res://prototype/tests/unit.gd'], 'INVESTIGATION_UNIT')
             run(args.godot, target, ['--script', 'res://prototype/tests/services_runner.gd'], 'INVESTIGATION_SERVICES')
             run(args.godot, target, ['--', '--prototype-smoke', '--prototype-dummy'], 'INVESTIGATION_SMOKE')
+            run(args.godot, target, ['--', '--prototype-smoke', '--prototype-dummy', '--prototype-input-review'], 'INPUT_REVIEW')
 
 
 if __name__ == '__main__':

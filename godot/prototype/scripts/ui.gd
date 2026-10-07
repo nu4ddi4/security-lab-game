@@ -42,6 +42,7 @@ var input_status: Label
 var update_status: Label
 var update_check: Button
 var update_download: Button
+var binding_summary: Label
 
 func setup(controller: InvestigationPrototype):
 	game = controller
@@ -212,6 +213,10 @@ func _build_tablet():
 	touch_setting.toggled.connect(game.controls.set_touch)
 	input_status = label(tab(4),"")
 	label(tab(4),"터치: 왼쪽 이동 · 오른쪽 화면 드래그로 시점 · 가까운 대상의 대화/조작 버튼")
+	if OS.get_name() == "Windows" or game.qa_mode:
+		label(tab(4),"조작키 · 키보드")
+		binding_summary = label(tab(4),LabInputBindings.summary())
+		button(tab(4),"조작키 변경…",open_rebinding)
 	update_setting = CheckButton.new()
 	update_setting.text = "시작할 때 업데이트 확인"
 	update_setting.button_pressed = game.controls.automatic_updates
@@ -339,7 +344,8 @@ func label(parent: Node, text: String) -> Label:
 
 func button(parent: Node, text: String, callback: Callable) -> Button:
 	var node = Button.new()
-	node.text = text
+	node.text = LabInputBindings.hint(text)
+	if text.contains("Esc"): node.set_meta("binding_text",text)
 	if game.controls.mobile: node.custom_minimum_size.y = 58
 	node.pressed.connect(callback)
 	parent.add_child(node)
@@ -382,6 +388,7 @@ func refresh_settings():
 	update_setting.set_pressed_no_signal(game.controls.automatic_updates)
 	input_status.text = "터치와 키보드를 함께 사용할 수 있습니다." if game.controls.touch_enabled else "키보드·마우스 조작"
 	if game.controls.keyboard_seen: input_status.text += " · 키보드 입력 감지됨"
+	if is_instance_valid(binding_summary): binding_summary.text = LabInputBindings.summary()
 	update_status.text = game.updates.status
 	update_check.disabled = game.updater.state in ["checking","downloading","preparing"] if game.updater!=null else game.updates.busy
 	update_download.visible = game.updater.state in ["available","ready"] if game.updater!=null else not game.updates.download_url.is_empty()
@@ -398,7 +405,7 @@ func refresh():
 	var view = game.engine.project(game.state,game.context)
 	var objective = objective_info()
 	hud.text = "%d일차 · %s" % [view.day,objective.title]
-	guide.text = objective.text
+	guide.text = LabInputBindings.hint(objective.text)
 	source.text = view.device.get("label","현장 단말")+" · 운영 점검 세션"
 	clear(notes)
 	if view.notes.is_empty(): label(notes,"아직 확보한 원본이 없습니다. 현장 장비에서 원본을 조회하거나 메신저의 첨부를 확인하세요.")
@@ -662,8 +669,21 @@ func _process(_delta):
 	if modal_open:
 		prompt.hide()
 		return
-	if game.detailed_world: guide.text = objective_info().text
+	if game.detailed_world: guide.text = LabInputBindings.hint(objective_info().text)
 	var target = game.player.target
 	prompt.text = target.get_interaction_prompt() if target != null else ""
 	if game.controls.touch_enabled: prompt.text = prompt.text.replace("F — ","")
+	prompt.text = LabInputBindings.hint(prompt.text)
 	prompt.visible = target != null
+
+func open_rebinding():
+	var editor = LabInputRebinding.new()
+	editor.configure(game.bindings,game.player)
+	root.add_child(editor)
+	editor.popup_centered()
+
+func refresh_input_hints():
+	refresh_settings()
+	guide.text = LabInputBindings.hint(objective_info().text)
+	for control in root.find_children("*","Button",true,false):
+		if control.has_meta("binding_text"): control.text = LabInputBindings.hint(control.get_meta("binding_text"))

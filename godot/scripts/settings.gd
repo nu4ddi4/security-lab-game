@@ -5,6 +5,7 @@ var values = {"resolution":0,"fullscreen":false,"vsync":true,"quality":1,"master
 var game: Node
 var panel: Window
 var path = "user://settings.json"
+var binding_summary: Label
 
 func setup(root: Node):
 	game = root
@@ -25,6 +26,12 @@ func setup(root: Node):
 		AudioServer.set_bus_send(AudioServer.bus_count-1,"Master")
 	apply()
 	game.ui.settings_requested.connect(show_menu)
+	game.bindings.changed.connect(bindings_changed)
+
+func bindings_changed():
+	if is_instance_valid(binding_summary): binding_summary.text = LabInputBindings.summary()
+	game.ui.refresh_input_hints()
+	for device in game.world.devices.values(): device.update_placard()
 
 func apply():
 	if DisplayServer.get_name() != "headless":
@@ -74,6 +81,13 @@ func show_menu():
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation",14)
 	scroll.add_child(body)
+	game.ui.label(body,"조작키",24)
+	binding_summary = game.ui.wrapped_label(body,LabInputBindings.summary(),16,600)
+	game.ui.button(body,"조작키 변경…",func():
+		var editor = LabInputRebinding.new()
+		editor.configure(game.bindings,game.player)
+		panel.add_child(editor)
+		editor.popup_centered())
 	game.ui.label(body,"디스플레이 / 소리 / 조작",25)
 	var resolution = OptionButton.new()
 	for text in ["1600 × 900","1280 × 720","1920 × 1080"]: resolution.add_item(text)

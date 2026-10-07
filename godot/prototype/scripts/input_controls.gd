@@ -110,7 +110,7 @@ func release_touches():
 	Input.action_release("jump")
 
 func handle_touch(event: InputEvent) -> bool:
-	if game == null or not touch_enabled or not game.player.enabled: return false
+	if game == null or not touch_enabled or not game.player.enabled or game.player.input_blocked(): return false
 	var size = get_viewport().get_visible_rect().size
 	if event is InputEventScreenTouch:
 		if not event.pressed:
