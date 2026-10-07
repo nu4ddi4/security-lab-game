@@ -24,6 +24,40 @@ var unified_interaction = false
 var interaction_reach = 3.4
 var aim_assist: ShapeCast3D
 var aim_screen_point = Vector2(-1,-1)
+var application_focused = true
+var capture_suspended = false
+
+func _notification(what):
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		application_focused = false
+		capture_suspended = not OS.has_feature("mobile") and not touch_controls_enabled
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		velocity = Vector3.ZERO
+		touch_axes = Vector2.ZERO
+		for action in LabInputBindings.ACTIONS: Input.action_release(action.id)
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		application_focused = true
+		# Returning from the taskbar must leave the cursor free until a field click.
+		if capture_suspended: Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+func restore_mouse_mode(mode):
+	Input.mouse_mode = mode if application_focused and not capture_suspended else Input.MOUSE_MODE_VISIBLE
+
+func _unhandled_input(event):
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed and enabled and application_focused and capture_suspended and not settings_input_blocked:
+		capture_suspended = false
+		set_enabled(true)
+		get_viewport().set_input_as_handled()
+		return
+	if input_blocked(): return
+	if event.is_action_pressed("pause"):
+		pause_requested.emit()
+		get_viewport().set_input_as_handled()
+	if not enabled: return
+	if event is InputEventMouseMotion and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)):
+		look(event.relative)
+	if not unified_interaction and event.is_action_pressed("inspect") and target != null: inspect_requested.emit(target)
+	if event.is_action_pressed("tool") and target != null: interact()
 
 func _ready():
 	collision_layer = 8
@@ -58,7 +92,7 @@ func _ready():
 
 func set_enabled(value: bool):
 	enabled = value
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if value and not touch_controls_enabled and not OS.has_feature("mobile") else Input.MOUSE_MODE_VISIBLE
+	restore_mouse_mode(Input.MOUSE_MODE_CAPTURED if value and not touch_controls_enabled and not OS.has_feature("mobile") else Input.MOUSE_MODE_VISIBLE)
 	if not value:
 		velocity = Vector3.ZERO
 		touch_axes = Vector2.ZERO
@@ -67,17 +101,6 @@ func look(relative: Vector2):
 	if not enabled or input_blocked(): return
 	rotate_y(-relative.x * sensitivity)
 	camera.rotation.x = clampf(camera.rotation.x - relative.y * sensitivity, -1.42, 1.42)
-
-func _unhandled_input(event):
-	if input_blocked(): return
-	if event.is_action_pressed("pause"):
-		pause_requested.emit()
-		get_viewport().set_input_as_handled()
-	if not enabled: return
-	if event is InputEventMouseMotion and (Input.mouse_mode == Input.MOUSE_MODE_CAPTURED or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)):
-		look(event.relative)
-	if not unified_interaction and event.is_action_pressed("inspect") and target != null: inspect_requested.emit(target)
-	if event.is_action_pressed("tool") and target != null: interact()
 
 func interact():
 	if not enabled or input_blocked() or target == null: return
@@ -155,4 +178,4 @@ func respawn():
 
 func input_blocked() -> bool:
 	release_keys = release_keys.filter(func(key): return Input.is_physical_key_pressed(key))
-	return settings_input_blocked or not release_keys.is_empty()
+	return settings_input_blocked or not release_keys.is_empty() or not application_focused or capture_suspended

@@ -7,6 +7,9 @@ https://creativecommons.org/publicdomain/zero/1.0/
 Adapted neutral poses, workwear colours, badges and role props.
 Asset attribution: assets/credits.txt
 Korean font: assets/fonts/OFL.txt (Noto project, SIL OFL 1.1)
+Desk succulent: potted_plant_04 by James Ray Cock, Poly Haven (CC0 1.0).
+https://polyhaven.com/a/potted_plant_04
+Whiteboard handwriting: Gaegu (SIL OFL 1.1), assets/fonts/Gaegu-OFL.txt
 Procedural audio: project-generated.
 
 Godot Engine

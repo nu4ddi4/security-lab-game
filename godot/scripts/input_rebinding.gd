@@ -158,4 +158,4 @@ func _exit_tree():
 	player.settings_input_blocked = previous_blocked
 	player.release_keys = held_keys.keys().filter(func(key): return LabInputBindings.valid_key(key))
 	for action in LabInputBindings.ACTIONS: Input.action_release(action.id)
-	Input.mouse_mode = previous_mouse_mode
+	player.restore_mouse_mode(previous_mouse_mode)

@@ -214,6 +214,7 @@ func run(game: InvestigationPrototype):
 	if game.player.enabled: failures.append("Tablet freezes movement")
 	if game.detailed_world:
 		game.ui.close()
+		await aisle_checks(game,failures)
 		if game.investigation_environment.displays.size()!=6: failures.append("All six authored devices have equipment feedback")
 		if not game.find_children("*","Label3D",true,false).is_empty(): failures.append("Detailed office has no floating prototype labels")
 		for id in game.targets:
@@ -251,6 +252,7 @@ func run(game: InvestigationPrototype):
 	if game.ui.tabs.is_tab_hidden(2) or not game.ui.work.text.contains("발생 보고"): failures.append("Investigation UI appears at the day-four assignment")
 	game.state = previous_state
 	game.ui.refresh()
+	await focus_checks(game,failures)
 	await interaction_checks(game,failures)
 	await responsive_checks(game,failures)
 	if not game.store.load_state(game.content).has("state"): failures.append("Existing save format accepts the new UI flow")
@@ -279,6 +281,50 @@ func run(game: InvestigationPrototype):
 func _dummy_server_pose(game):
 	game.player.global_position = Vector3(0,.01,-2)
 	game.player.camera.look_at(Vector3(0,1.2,-3.85))
+
+func aisle_checks(game, failures: Array):
+	var pose = game.player.global_transform
+	var camera_pose = game.player.camera.transform
+	for side in ["West","East"]:
+		var anchors = game.investigation_environment.anchors
+		var start = anchors["WALK_"+side+"_Start"].global_position
+		var finish = anchors["WALK_"+side+"_End"].global_position
+		for reverse in [false,true]:
+			game.player.global_position = finish if reverse else start
+			game.player.rotation = Vector3(0,PI if reverse else 0,0)
+			game.player.velocity = Vector3.ZERO
+			await get_tree().physics_frame
+			Input.action_press("forward")
+			await get_tree().create_timer(3.35).timeout
+			Input.action_release("forward")
+			var destination = start if reverse else finish
+			if game.player.global_position.distance_to(destination) > .55:
+				failures.append("Walk entire "+side+" aisle in both directions: "+str(game.player.global_position))
+	game.player.global_transform = pose
+	game.player.camera.transform = camera_pose
+	game.player.velocity = Vector3.ZERO
+
+func focus_checks(game, failures: Array):
+	game.ui.close()
+	var original_touch = game.controls.touch_enabled
+	game.controls.set_touch(false)
+	var pose = game.player.global_transform
+	game.player._notification(NOTIFICATION_APPLICATION_FOCUS_OUT)
+	Input.action_press("forward")
+	await get_tree().create_timer(.1).timeout
+	Input.action_release("forward")
+	if Input.mouse_mode != Input.MOUSE_MODE_VISIBLE or game.player.global_transform != pose:
+		failures.append("Losing focus releases the cursor and freezes movement")
+	game.player._notification(NOTIFICATION_APPLICATION_FOCUS_IN)
+	game.player.restore_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	if Input.mouse_mode != Input.MOUSE_MODE_VISIBLE or not game.player.input_blocked():
+		failures.append("Focus return and editor restoration leave the cursor free")
+	var click = InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	game.player._unhandled_input(click)
+	if game.player.input_blocked(): failures.append("A field click resumes gameplay after focus return")
+	game.controls.set_touch(original_touch)
 
 func interaction_checks(game, failures: Array):
 	game.ui.open_tablet()
