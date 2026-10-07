@@ -18,6 +18,7 @@ const ACTIONS = [
 	{"id":"pause","label":"일시정지 / 조사 노트","defaults":[KEY_ESCAPE]}
 ]
 const SPECIAL_KEYS = [KEY_ESCAPE,KEY_TAB,KEY_BACKSPACE,KEY_ENTER,KEY_KP_ENTER,KEY_INSERT,KEY_DELETE,KEY_HOME,KEY_END,KEY_PAGEUP,KEY_PAGEDOWN,KEY_LEFT,KEY_RIGHT,KEY_UP,KEY_DOWN,KEY_SHIFT,KEY_CTRL,KEY_ALT,KEY_CAPSLOCK,KEY_KP_MULTIPLY,KEY_KP_DIVIDE,KEY_KP_SUBTRACT,KEY_KP_ADD,KEY_KP_PERIOD,KEY_KP_0,KEY_KP_1,KEY_KP_2,KEY_KP_3,KEY_KP_4,KEY_KP_5,KEY_KP_6,KEY_KP_7,KEY_KP_8,KEY_KP_9]
+const PRINTABLE_KEYS = [KEY_SPACE,KEY_APOSTROPHE,KEY_COMMA,KEY_MINUS,KEY_PERIOD,KEY_SLASH,KEY_SEMICOLON,KEY_EQUAL,KEY_BRACKETLEFT,KEY_BACKSLASH,KEY_BRACKETRIGHT,KEY_QUOTELEFT]
 var bindings: Dictionary = defaults()
 var path = "user://input_bindings.json"
 var load_status = ""
@@ -37,7 +38,7 @@ static func label_for(id: String) -> String:
 static func valid_key(value) -> bool:
 	if not (value is int or value is float) or not is_finite(float(value)) or value != int(value): return false
 	var key = int(value)
-	return key != TABLET_KEY and (key >= KEY_SPACE and key <= KEY_ASCIITILDE or key >= KEY_F1 and key <= KEY_F12 or key in SPECIAL_KEYS)
+	return key != TABLET_KEY and (key >= KEY_A and key <= KEY_Z or key >= KEY_0 and key <= KEY_9 or key >= KEY_F1 and key <= KEY_F12 or key in PRINTABLE_KEYS or key in SPECIAL_KEYS)
 
 static func validate(candidate) -> Dictionary:
 	if not candidate is Dictionary or candidate.size() != ACTIONS.size(): return {"ok":false,"message":"조작키 목록이 올바르지 않습니다."}
@@ -66,7 +67,8 @@ func load_profile():
 				var parser = JSON.new()
 				if parser.parse(file.get_as_text()) == OK: parsed = parser.data
 			file.close()
-		var result = validate(parsed.get("actions")) if parsed is Dictionary and parsed.get("schema") == 1 and parsed.get("mode") == "physical_keyboard" else {"ok":false}
+		var schema = parsed.get("schema") if parsed is Dictionary else null
+		var result = validate(parsed.get("actions")) if parsed is Dictionary and (schema is int or schema is float) and schema == 1 and parsed.get("mode") == "physical_keyboard" else {"ok":false}
 		if result.ok: bindings = result.bindings
 		else: load_status = "저장된 조작키가 올바르지 않아 기본값을 복구했습니다."
 	apply()

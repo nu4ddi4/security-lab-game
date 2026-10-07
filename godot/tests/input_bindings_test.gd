@@ -56,7 +56,7 @@ func _initialize():
 		check(not LabInputBindings.validate(bad).ok,"Essential action cannot be emptied: "+action.id)
 		bad.erase(action.id)
 		check(not LabInputBindings.validate(bad).ok,"Essential action cannot be omitted: "+action.id)
-	for bad_key in [0,-1,KEY_META,KEY_TAB,true,"E",1.5,INF,999999999]: check(not LabInputBindings.valid_key(bad_key),"Unsupported or malformed key rejected")
+	for bad_key in [0,-1,KEY_META,KEY_TAB,true,"E",1.5,INF,999999999,119,KEY_EXCLAM,KEY_AT]: check(not LabInputBindings.valid_key(bad_key),"Unsupported, unreachable or malformed physical key rejected")
 	for good_key in [KEY_ESCAPE,KEY_ENTER,KEY_SPACE,KEY_CTRL,KEY_SHIFT,KEY_F1,KEY_F12,KEY_UP,KEY_A,KEY_KP_1]: check(LabInputBindings.valid_key(good_key),"Supported physical key accepted")
 	var duplicate = defaults.duplicate(true)
 	duplicate.crouch = [KEY_CTRL,KEY_CTRL]
@@ -70,6 +70,10 @@ func _initialize():
 	changed.inspect = [KEY_F]
 	check(profile.save_profile(changed).ok and LabInputBindings.hint("E / F") == "F / G","Hint replacement is one pass, not recursive")
 	var invalid_profiles = ["not JSON","null","[]","{}",JSON.stringify({"schema":2,"mode":"physical_keyboard","actions":defaults}),JSON.stringify({"schema":1,"mode":"gamepad","actions":defaults}),JSON.stringify({"schema":1,"mode":"physical_keyboard","actions":duplicate}),"X".repeat(16385)]
+	var unreachable = defaults.duplicate(true)
+	unreachable.forward = [119]
+	invalid_profiles.append(JSON.stringify({"schema":1,"mode":"physical_keyboard","actions":unreachable}))
+	invalid_profiles.append(JSON.stringify({"schema":true,"mode":"physical_keyboard","actions":defaults}))
 	for raw in invalid_profiles:
 		write(raw)
 		restarted.load_profile()
