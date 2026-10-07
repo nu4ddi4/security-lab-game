@@ -56,11 +56,18 @@ func _ready():
 	add_child(save_timer)
 	if blocked_save: ui.notice(loaded.error + "\n새 조사를 시작하기 전 원본을 보존합니다.")
 	print("PROTOTYPE_READY ",JSON.stringify({"day":state.day,"dummy":true,"devices":content.case.devices.size(),"npcs":content.case.npcs.size(),"isolatedSave":store.directory}))
+	if DisplayServer.get_name() != "headless": _report_first_frame.call_deferred()
 	if testing:
 		var smoke = load("res://prototype/tests/smoke.gd").new()
 		add_child(smoke)
 		smoke.run.call_deferred(self)
 	elif controls.automatic_updates: updates.check.call_deferred()
+
+func _report_first_frame():
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	print("PROTOTYPE_FRAME_READY ",JSON.stringify({"platform":OS.get_name(),"touch":controls.touch_enabled}))
 
 func _setup_input():
 	var mapping = {"forward":KEY_W,"back":KEY_S,"left":KEY_A,"right":KEY_D,"sprint":KEY_SHIFT,"crouch":KEY_C,"jump":KEY_SPACE,"inspect":KEY_E,"tool":KEY_F,"pause":KEY_ESCAPE}

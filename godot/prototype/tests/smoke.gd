@@ -33,7 +33,9 @@ func run(game: InvestigationPrototype):
 		var tap = InputEventScreenTouch.new()
 		tap.index = 7
 		tap.pressed = true
-		tap.position = game.controls.button_rects.tool.get_center()
+		# Input.parse_input_event takes window pixels; UI targets use stretched
+		# viewport coordinates. Android and resized desktop windows differ here.
+		tap.position = get_viewport().get_final_transform()*game.controls.button_rects.tool.get_center()
 		Input.parse_input_event(tap)
 		await get_tree().process_frame
 		if game.ui.mode != "dialogue": failures.append("Actual touch event opens the contextual dialogue button")
@@ -42,7 +44,7 @@ func run(game: InvestigationPrototype):
 		game.ui.close()
 	var camera_pose = game.player.camera.global_transform
 	game._use("oh","npc",true)
-	await get_tree().create_timer(.3).timeout
+	await game.dialogue_camera_tween.finished
 	if game.ui.mode != "dialogue" or game.ui.modal.visible or game.ui.terminal_panel.visible: failures.append("Local dialogue is separate from tablet and terminal")
 	if game.ui.dialogue_panel.size.y >= get_viewport().get_visible_rect().size.y*.5: failures.append("Dialogue leaves the scene visible")
 	if game.player.enabled or not game.dialogue_camera_active: failures.append("Conversation locks movement and frames the speaker")

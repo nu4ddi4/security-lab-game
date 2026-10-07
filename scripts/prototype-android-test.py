@@ -52,13 +52,15 @@ def main():
     stem = 'SecurityLab-proto-' + metadata['version']
     apk, qa = directory / (stem + '.apk'), directory / (stem + '-qa.apk')
     adb('wait-for-device')
+    # Avoid Android's one-time system fullscreen tutorial covering review images.
+    adb('shell', 'settings', 'put', 'secure', 'immersive_mode_confirmations', 'confirmed')
     adb('install', '-r', str(apk))
     adb('shell', 'pm', 'clear', PACKAGE)
     launch()
     ready = wait_for('PROTOTYPE_READY')
     if ready.get('day') != 1:
         raise ValueError('Fresh Android investigation did not start on day 1')
-    time.sleep(2)
+    wait_for('PROTOTYPE_FRAME_READY')
     (directory / 'android-startup.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
     # Android suspends apps without a desktop close request. Ensure this saves.
     adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
@@ -70,8 +72,6 @@ def main():
     adb('install', '-r', str(qa))
     launch()
     result = wait_for('INVESTIGATION_SMOKE')
-    if result.get('platform') != 'Android' or not result.get('passed') or not result.get('mobile') or not result.get('touchDefault') or not result.get('keyboardDetected'):
-        raise ValueError('Android gameplay/input smoke failed: ' + json.dumps(result))
     captures = directory / 'ui'
     captures.mkdir(exist_ok=True)
     for name in ['01-briefing','02-dialogue','03-terminal','04-messenger','05-notes','06-field','07-settings']:
@@ -79,6 +79,8 @@ def main():
         if not data.startswith(b'\x89PNG\r\n\x1a\n'):
             raise ValueError('Missing Android rendered UI capture: ' + name)
         (captures / (name + '.png')).write_bytes(data)
+    if result.get('platform') != 'Android' or not result.get('passed') or not result.get('mobile') or not result.get('touchDefault') or not result.get('keyboardDetected'):
+        raise ValueError('Android gameplay/input smoke failed: ' + json.dumps(result))
     if read_save() != original:
         raise ValueError('Android package update changed the real investigation save')
     (directory / 'android-smoke.json').write_text(json.dumps(result), encoding='utf-8')
