@@ -29,6 +29,8 @@ jobs:
     outputs:
       version: ${{ steps.prepare.outputs.version }}
       published: ${{ steps.prepare.outputs.published }}
+      source_sha: ${{ steps.prepare.outputs.source_sha }}
+      append_android: ${{ steps.prepare.outputs.append_android }}
     steps:
       - uses: actions/checkout@v4
       - name: Allocate release version
@@ -97,14 +99,12 @@ jobs:
           "[SecurityLab-$env:PROTOTYPE_VERSION]($env:ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
   android:
     needs: [quick, version]
-    if: needs.version.outputs.published != 'true' && github.ref != 'refs/heads/main' && (github.event_name == 'push' || inputs.platforms != 'windows')
+    if: (needs.version.outputs.published != 'true' || needs.version.outputs.append_android == 'true') && (github.event_name == 'push' || inputs.platforms != 'windows')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
       SECURITY_LAB_RELEASE_VERSION: ${{ needs.version.outputs.version }}
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      SECURITY_LAB_RELEASE_SOURCE_SHA: ${{ needs.version.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v4
       - name: Fetch the verified detailed office asset
@@ -168,9 +168,10 @@ jobs:
       always() && needs.quick.result == 'success' && needs.version.result == 'success' &&
       (github.event_name == 'push' || inputs.publish) &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta') &&
-      (needs.version.outputs.published == 'true' ||
+      ((needs.version.outputs.published == 'true' &&
+        (needs.version.outputs.append_android != 'true' || needs.android.result == 'success')) ||
        (needs.prototype.result == 'success' &&
-        (github.ref == 'refs/heads/main' || needs.android.result == 'success')))
+        needs.android.result == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -179,6 +180,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       SECURITY_LAB_RELEASE_VERSION: ${{ needs.version.outputs.version }}
+      SECURITY_LAB_RELEASE_SOURCE_SHA: ${{ needs.version.outputs.source_sha }}
+      SECURITY_LAB_APPEND_ANDROID: ${{ needs.version.outputs.append_android }}
     steps:
       - uses: actions/checkout@v4
       - name: Publish verified files and then update channel
