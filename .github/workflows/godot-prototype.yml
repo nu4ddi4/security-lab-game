@@ -96,7 +96,7 @@ jobs:
           path: |
             ~/.android/avd
             ~/.android/adb*
-          key: prototype-android-api29-x64-v1
+          key: prototype-android-api29-x64-4gb-v2
       - name: Install, play, update and relaunch on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -104,7 +104,8 @@ jobs:
           arch: x86_64
           target: default
           profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disk-size: 4G
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: python3 scripts/prototype-android-test.py
       - name: Read prototype version
