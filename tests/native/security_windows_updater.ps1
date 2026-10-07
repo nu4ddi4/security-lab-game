@@ -1,4 +1,4 @@
-param([string]$Iscc='', [string]$Results='godot/tests/results/windows-updater.json')
+param([switch]$Beta, [string]$Iscc='', [string]$Results='godot/tests/results/windows-updater.json')
 $ErrorActionPreference='Stop'
 $repoRoot=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 . (Join-Path $repoRoot 'godot/resources/native_update_helper.ps1') -Library
@@ -37,12 +37,17 @@ function Compile-Fixture([string]$Code,[string]$Destination) {
     & $csc /nologo /target:exe /platform:x64 ('/out:'+$Destination) /reference:System.Web.Extensions.dll ($Destination+'.cs') | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Fixture compiler failed' }
 }
+$product = if ($Beta) {'SecurityLabBeta'} else {'SecurityLabNative'}
+$appId = if ($Beta) {'security-lab-beta'} else {'security-lab-native'}
+$saveName = if ($Beta) {'investigation/save.json'} else {'progress.json'}
+$stageName = if ($Beta) {'beta-updates'} else {'updates'}
+if ($Beta) { $stub=$stub.Replace('"updates",token','"beta-updates",token').Replace('"progress.json"','"investigation/save.json"') }
 $oldStub=Join-Path $fixtureRoot 'old.exe'; Compile-Fixture ($stub.Replace('__HEALTHY__','true')) $oldStub
 $newStub=Join-Path $fixtureRoot 'new.exe'; Compile-Fixture ($stub.Replace('__HEALTHY__','true')) $newStub
 $failedStub=Join-Path $fixtureRoot 'failed.exe'; Compile-Fixture ($stub.Replace('__HEALTHY__','false')) $failedStub
 $badInstaller=Join-Path $fixtureRoot 'badsetup.exe'; Compile-Fixture $badSetup $badInstaller
-$sourceMarker=@{app_id='security-lab-native';channel='dev';install_layout=1}
-function Build-Info([string]$Version,[string]$Commit) { @{schema=1;app_id='security-lab-native';platform='windows-x86_64';version=$Version;channel='dev';commit=$Commit;install_layout=1;updates_default=$false;manifest_url='https://github.com/nu4ddi4/security-lab-game/releases/download/native-channel-dev/update.json'} }
+$sourceMarker=@{app_id=$appId;channel='dev';install_layout=1}
+function Build-Info([string]$Version,[string]$Commit) { @{schema=1;app_id=$appId;platform='windows-x86_64';version=$Version;channel='dev';commit=$Commit;install_layout=1;updates_default=$false;manifest_url='https://github.com/nu4ddi4/security-lab-game/releases/download/native-channel-dev/update.json'} }
 $oldBuild=Build-Info '0.7.0-dev.0' ('a'*40)
 $newBuild=Build-Info '0.7.1-dev.1' ('b'*40)
 function Compile-Setup([string]$App,[string]$Label) {
@@ -51,7 +56,7 @@ function Compile-Setup([string]$App,[string]$Label) {
     Copy-Item -LiteralPath $App -Destination (Join-Path $payload 'SecurityLab.exe')
     Write-UpdateJson (Join-Path $payload 'build_info.json') $newBuild
     Write-UpdateJson (Join-Path $payload 'securitylab.install.json') $sourceMarker
-    $compilerOutput = @(& $Iscc /Qp ('/DSourceDirectory='+$payload) ('/DOutputDirectory='+$output) '/DChannel=dev' '/DAppVersion=0.7.1-dev.1' '/DBinaryVersion=0.7.1.0' (Join-Path $repoRoot 'installer/SecurityLab.iss') 2>&1)
+    $compilerOutput = @(& $Iscc /Qp ('/DSourceDirectory='+$payload) ('/DOutputDirectory='+$output) '/DChannel=dev' '/DAppVersion=0.7.1-dev.1' '/DBinaryVersion=0.7.1.0' (Join-Path $repoRoot $(if ($Beta) {'installer/SecurityLabBeta.iss'} else {'installer/SecurityLab.iss'})) 2>&1)
     if ($LASTEXITCODE -ne 0) { throw ('Real Inno fixture compilation failed: '+($compilerOutput -join "`n")) }
     Join-Path $output 'SecurityLabSetup.exe'
 }
@@ -61,12 +66,12 @@ Expect-Reject { Assert-LocalPath '\\server\share\game' } 'UNC denied'
 Expect-Reject { Assert-LocalPath 'C:\games\file:stream' } 'NTFS alternate stream denied'
 Expect-Reject { Assert-ChildPath $fixtureRoot (Join-Path $fixtureRoot '../escape') } 'Traversal denied'
 Expect ((ConvertTo-ProcessArgument 'a & b% $c').StartsWith('"')) 'Opaque process arguments'
-$registryBefore=Get-UpdateRegistry 'dev'
+$registryBefore=Get-UpdateRegistry 'dev' $product
 $owned=@();$stages=@()
 try {
  foreach ($case in @('success','installer-failure','startup-failure','wrong-hash','wrong-channel','junction','second-instance')) {
     $nonce=[Guid]::NewGuid().ToString('N')
-    $stage=Join-Path (Get-SecurityLabDataRoot) ('updates/'+$nonce);$stages+=,$stage
+    $stage=Join-Path (Get-SecurityLabDataRoot) ($stageName+'/'+$nonce);$stages+=,$stage
     $saveRoot=Join-Path (Get-SecurityLabDataRoot) ('qa/updater/'+$nonce)
     $installRoot=Join-Path $fixtureRoot ($case+' A & B% $ (space) '+[char]0xd55c)
     $null=New-Item -ItemType Directory -Path $stage,$installRoot,$saveRoot -Force
@@ -74,10 +79,12 @@ try {
     Write-UpdateJson (Join-Path $installRoot 'build_info.json') $oldBuild
     Write-UpdateJson (Join-Path $installRoot 'securitylab.install.json') $sourceMarker
     [IO.File]::WriteAllText((Join-Path $installRoot 'old-only.txt'),'keep whole install')
-    [IO.File]::WriteAllText((Join-Path $saveRoot 'progress.json'),'original saved progress')
+    $null=New-Item -ItemType Directory -Path (Join-Path $saveRoot 'investigation') -Force
+    [IO.File]::WriteAllText((Join-Path $saveRoot $saveName),'original saved progress')
+    if ($Beta) { [IO.File]::WriteAllText((Join-Path $saveRoot 'controls.cfg'),'original controls') }
     $setup=if ($case -eq 'installer-failure') {$badInstaller} elseif ($case -eq 'startup-failure') {$failureSetup} else {$successSetup}
     Copy-Item -LiteralPath $setup -Destination (Join-Path $stage 'SecurityLabSetup.exe')
-    $target=@{schema=1;app_id='security-lab-native';platform='windows-x86_64';install_layout=1;channel='dev';version=$newBuild.version;commit=$newBuild.commit;size=(Get-Item -LiteralPath $setup).Length;sha256=(Get-FileHash -LiteralPath $setup).Hash.ToLowerInvariant();exe_sha256=(Get-FileHash -LiteralPath (Join-Path $fixtureRoot 'healthy-package/payload/SecurityLab.exe')).Hash.ToLowerInvariant()}
+    $target=@{schema=1;app_id=$appId;platform='windows-x86_64';install_layout=1;channel='dev';version=$newBuild.version;commit=$newBuild.commit;size=(Get-Item -LiteralPath $setup).Length;sha256=(Get-FileHash -LiteralPath $setup).Hash.ToLowerInvariant();exe_sha256=(Get-FileHash -LiteralPath (Join-Path $fixtureRoot 'healthy-package/payload/SecurityLab.exe')).Hash.ToLowerInvariant()}
     if ($case -eq 'startup-failure') {$target.exe_sha256=(Get-FileHash -LiteralPath $failedStub).Hash.ToLowerInvariant()}
     if ($case -eq 'wrong-hash') {$target.sha256='c'*64}
     if ($case -eq 'wrong-channel') {$target.channel='beta';$target.version='0.7.1-beta.1'}
@@ -119,15 +126,16 @@ try {
             Expect (Test-Path -LiteralPath (Join-Path $stage 'backup.json')) ($case+' recovery journal retained')
         }
     }
-    Expect ((Get-Content -LiteralPath (Join-Path $saveRoot 'progress.json') -Raw) -eq 'original saved progress') ($case+' saves preserved')
-    Restore-UpdateRegistry 'dev' $registryBefore
+    Expect ((Get-Content -LiteralPath (Join-Path $saveRoot $saveName) -Raw) -eq 'original saved progress') ($case+' saves preserved')
+    if ($Beta) { Expect ((Get-Content -LiteralPath (Join-Path $saveRoot 'controls.cfg') -Raw) -eq 'original controls') ($case+' beta input settings preserved') }
+    Restore-UpdateRegistry 'dev' $registryBefore $product
  }
- $summary=@{passed=$true;assertions=$checks.Count;checks=$checks.ToArray();fixture_directory=$fixtureRoot;method='Real Inno installers and isolated Windows fixture EXEs; game missions tested separately'}
+ $summary=@{passed=$true;product=$appId;assertions=$checks.Count;checks=$checks.ToArray();fixture_directory=$fixtureRoot;method='Real Inno installers and isolated Windows fixture EXEs; game missions tested separately'}
  $resultPath=[IO.Path]::GetFullPath($Results,$repoRoot);$null=New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($resultPath)) -Force
  Write-UpdateJson $resultPath $summary
  Write-Output ('WINDOWS_UPDATE_TEST '+($summary | ConvertTo-Json -Compress -Depth 5))
 } finally {
  foreach($process in $owned){try{if(-not $process.HasExited){$process.Kill();$null=$process.WaitForExit(5000)}}catch{}}
- Restore-UpdateRegistry 'dev' $registryBefore
+ Restore-UpdateRegistry 'dev' $registryBefore $product
  # Fixtures and backup journals are kept under owned test directories for review.
 }

@@ -68,7 +68,7 @@ name="Android Prototype"
 platform="Android"
 runnable=true
 export_filter="all_resources"
-include_filter="prototype/version.json,prototype/content/*.json,prototype/tests/*.json,assets/fonts/OFL.txt,LICENSES.txt"
+include_filter="prototype/version.json,prototype/content/*.json,prototype/tests/*.json,prototype/build_info.json,resources/*.json,resources/*.ps1,assets/fonts/OFL.txt,LICENSES.txt"
 exclude_filter="prototype/tests/results/*"
 export_path=""
 script_export_mode=2
@@ -82,7 +82,7 @@ architectures/x86_64=true
 version/code={code}
 version/name="{version}"
 package/unique_name="{package}"
-package/name="Security Lab Prototype"
+package/name="Security Lab Beta"
 package/signed=true
 keystore/debug={keystore}
 keystore/debug_user="androiddebugkey"
@@ -122,6 +122,10 @@ def main():
         target = directory / 'project'
         target.mkdir()
         build.stage(root / 'godot', target)
+        identity_path = target / 'prototype/build_info.json'
+        identity = json.loads(identity_path.read_text(encoding='utf-8'))
+        identity['platform'] = 'android'
+        identity_path.write_text(json.dumps(identity), encoding='utf-8')
         (target / 'android').mkdir()
         shutil.copyfile(root / 'godot/android/app-icon.svg', target / 'android/app-icon.svg')
         project = (target / 'project.godot').read_text(encoding='utf-8')
@@ -134,7 +138,7 @@ def main():
         configure_editor(sdk, java)
         keystore = make_test_keystore(directory)
         for qa in [False, True]:
-            name = 'SecurityLab-proto-' + version + ('-qa' if qa else '') + '.apk'
+            name = 'SecurityLab-beta-' + version + ('-qa' if qa else '') + '.apk'
             apk = output / name
             (target / 'export_presets.cfg').write_text(preset(version, keystore, qa), encoding='utf-8')
             build.run([godot, '--headless', '--path', str(target), '--export-debug', 'Android Prototype', str(apk)], target, timeout=180)

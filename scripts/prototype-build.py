@@ -1,4 +1,4 @@
-"""Build the dummy investigation as a standalone Windows EXE."""
+"""Build the integrated investigation beta as a standalone Windows EXE."""
 import argparse
 import hashlib
 import json
@@ -37,7 +37,15 @@ def prototype_version(source):
 def stage(source, target):
     version = prototype_version(source)
     shutil.copytree(source / 'prototype', target / 'prototype')
-    for name in ['scripts/player.gd', 'assets/fonts/NotoSansKR.ttf', 'assets/fonts/OFL.txt', 'LICENSES.txt']:
+    shutil.copytree(source / 'scripts', target / 'scripts')
+    shutil.copytree(source / 'resources', target / 'resources')
+    commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source.parent, text=True).strip()
+    metadata = {'schema': 1, 'app_id': 'security-lab-beta', 'platform': 'windows-x86_64',
+                'version': version + '-beta.1', 'channel': 'beta', 'commit': commit,
+                'install_layout': 1, 'updates_default': True,
+                'manifest_url': 'https://github.com/nu4ddi4/security-lab-game/releases/download/beta-channel-beta/update.json'}
+    (target / 'prototype/build_info.json').write_text(json.dumps(metadata), encoding='utf-8')
+    for name in ['assets/models/Interior_07_Godot.glb', 'assets/textures/city-sunset.png', 'scripts/player.gd', 'assets/fonts/NotoSansKR.ttf', 'assets/fonts/OFL.txt', 'LICENSES.txt']:
         destination = target / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / name, destination)
@@ -45,15 +53,15 @@ def stage(source, target):
     project = project.replace('res://scenes/entry.tscn', 'res://prototype/main.tscn')
     project = project.replace('Forward Plus', 'GL Compatibility').replace('"forward_plus"', '"gl_compatibility"')
     project = project.replace('Offline security investigation simulator. Native companion to web v0.7.0.',
-                              'Offline dummy investigation prototype.')
-    project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '-prototype"', project, flags=re.MULTILINE)
+                              'Offline security investigation beta.')
+    project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '-beta"', project, flags=re.MULTILINE)
     (target / 'project.godot').write_text(project, encoding='utf-8')
     (target / 'export_presets.cfg').write_text('''[preset.0]
 name="Windows Prototype"
 platform="Windows Desktop"
 runnable=true
 export_filter="all_resources"
-include_filter="prototype/version.json,prototype/content/*.json,prototype/tests/*.json,assets/fonts/OFL.txt,LICENSES.txt"
+include_filter="prototype/version.json,prototype/content/*.json,prototype/tests/*.json,prototype/build_info.json,resources/*.json,resources/*.ps1,assets/fonts/OFL.txt,LICENSES.txt"
 exclude_filter="prototype/tests/results/*"
 export_path=""
 script_export_mode=2
@@ -67,8 +75,8 @@ codesign/enable=false
 application/modify_resources=true
 application/file_version="0.1.0.0"
 application/product_version="0.1.0.0"
-application/product_name="Security Lab Prototype"
-application/file_description="Offline dummy security investigation prototype"
+application/product_name="Security Lab Beta"
+application/file_description="Offline security investigation beta"
 '''.replace('0.1.0.0', version + '.0'), encoding='utf-8')
 
 
@@ -76,6 +84,7 @@ def check(godot, target):
     run([godot, '--headless', '--editor', '--path', str(target), '--import'], target)
     run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/unit.gd'],
         target, 'INVESTIGATION_UNIT')
+    run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/services.gd'], target, 'INVESTIGATION_SERVICES')
     run([godot, '--headless', '--path', str(target), '--', '--prototype-smoke'],
         target, 'INVESTIGATION_SMOKE')
 
@@ -83,7 +92,7 @@ def check(godot, target):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--godot', default=os.environ.get('SECURITY_LAB_GODOT_CONSOLE', 'godot'))
-    parser.add_argument('--output', help='Defaults to prototype-dist/SecurityLab-proto-X.Y.Z.exe')
+    parser.add_argument('--output', help='Defaults to prototype-dist/SecurityLab-beta-X.Y.Z.exe')
     parser.add_argument('--check-only', action='store_true')
     parser.add_argument('--rendered-check', action='store_true', help='Also exercise and capture the exported Windows UI')
     args = parser.parse_args()
@@ -92,11 +101,12 @@ def main():
         raise SystemExit('Godot 4.7.2 stable is required.')
     root = Path(__file__).resolve().parents[1]
     version = prototype_version(root / 'godot')
-    output = Path(args.output or ('prototype-dist/SecurityLab-proto-' + version + '.exe')).resolve()
+    output = Path(args.output or ('prototype-dist/SecurityLab-beta-' + version + '.exe')).resolve()
     with tempfile.TemporaryDirectory(prefix='security-lab-prototype-') as directory:
         target = Path(directory)
         stage(root / 'godot', target)
         check(godot, target)
+        baked_metadata = (target / "prototype/build_info.json").read_text(encoding="utf-8")
         if args.check_only:
             return
         if os.name != 'nt':
@@ -122,6 +132,7 @@ def main():
             if any(not (captures / (name + '.png')).is_file() for name in expected):
                 raise SystemExit('Exported Windows UI captures are incomplete.')
             print('Rendered Windows EXE UI and interaction passed.')
+    (output.parent / 'build_info.json').write_text(baked_metadata, encoding='utf-8')
     digest = hashlib.sha256(output.read_bytes()).hexdigest()
     output.with_suffix('.sha256').write_text(digest + '  ' + output.name + '\n', encoding='utf-8')
     print('PROTOTYPE_EXE', json.dumps({'file':output.name, 'bytes':output.stat().st_size, 'sha256':digest}))

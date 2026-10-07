@@ -170,7 +170,7 @@ func updater_summary() -> Dictionary:
 	var updater = property(game,"updater")
 	if updater is Object:
 		result.available = true
-		result.state = serializer.enum_value(property(updater,"state"),["disabled","idle","checking","downloading","ready","preparing","failed"])
+		result.state = serializer.enum_value(property(updater,"state"),["disabled","idle","checking","available","downloading","ready","preparing","failed"])
 		var enabled = property(updater,"enabled")
 		if enabled is bool: result.enabled = enabled
 		result.build = serializer.build(property(updater,"info",{}))

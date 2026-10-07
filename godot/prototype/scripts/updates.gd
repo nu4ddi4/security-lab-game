@@ -27,7 +27,7 @@ static func newer(a: String, b: String) -> bool:
 
 static func select_release(releases: Array, metadata: Dictionary, target: String) -> Dictionary:
 	var best = {}
-	var prefix = metadata.get("tag_prefix","SecurityLab-proto-")
+	var prefix = metadata.get("tag_prefix","SecurityLab-beta-")
 	for release in releases:
 		if not release is Dictionary or release.get("draft",true) != false: continue
 		if release.get("prerelease") != metadata.get("prerelease"): continue

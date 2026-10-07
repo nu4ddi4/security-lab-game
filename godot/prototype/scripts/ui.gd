@@ -220,8 +220,18 @@ func _build_tablet():
 	label(tab(4),"%s · %s 채널" % [game.updates.installed.get("version","개발"),"사전 릴리즈" if game.updates.installed.get("prerelease",true) else "안정"])
 	update_status = label(tab(4),"")
 	update_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	update_check = button(tab(4),"업데이트 확인",game.updates.check)
-	update_download = button(tab(4),"새 버전 다운로드",game.updates.open_download)
+	update_check = button(tab(4),"업데이트 확인",func():
+		if game.updater!=null: game.updater.check()
+		else: game.updates.check())
+	update_download = button(tab(4),"업데이트 확인하고 설치…",func():
+		if game.updater!=null: game.updater.request_install()
+		else: confirm("업데이트가 있습니다. 새 버전을 다운로드할까요? 설치 전 게임을 닫으세요. 저장은 유지됩니다.",game.updates.open_download))
+	var diagnostic_status = label(tab(4),"")
+	if OS.get_name()=="Windows":
+		button(tab(4),"진단 정보 복사",func(): diagnostic_status.text = game.diagnostics.copy_information().message)
+		button(tab(4),"지원 패키지 만들기",func(): diagnostic_status.text = game.diagnostics.create_package().message)
+		button(tab(4),"지원 패키지 폴더 열기",func():
+			if not game.diagnostics.last_package.is_empty(): OS.shell_open(game.diagnostics.last_package.get_base_dir()))
 
 func _build_terminal():
 	terminal_panel = panel(.08,.09,.92,.91)
@@ -372,13 +382,17 @@ func refresh_settings():
 	update_setting.set_pressed_no_signal(game.controls.automatic_updates)
 	input_status.text = "터치와 키보드를 함께 사용할 수 있습니다." if game.controls.touch_enabled else "키보드·마우스 조작"
 	if game.controls.keyboard_seen: input_status.text += " · 키보드 입력 감지됨"
-	update_status.text = game.updates.status
+	update_status.text = ("업데이트가 있습니다 · "+game.updater.manifest.get("version","") if game.updater.state=="available" else game.updater.state) if game.updater!=null else game.updates.status
 	update_check.disabled = game.updates.busy
-	update_download.visible = not game.updates.download_url.is_empty()
+	update_download.visible = game.updater.state in ["available","ready"] if game.updater!=null else not game.updates.download_url.is_empty()
 
 func refresh():
 	var view = game.engine.project(game.state,game.context)
 	var objective = guide_info()
+	if game.detailed_world and game.targets.has(objective.get("target","")):
+		var target = game.targets[objective.target]
+		var zone = game.content.case.devices.get(objective.target,{}).get("zone",game.content.case.npcs.get(objective.target,{}).get("role",""))
+		objective.text += "\n%s · %.1fm"%[zone,game.player.global_position.distance_to(target.global_position)]
 	hud.text = "%d일차 · %s" % [view.day,objective.title]
 	guide.text = objective.text
 	source.text = view.device.get("label","현장 단말")+" · 운영 점검 세션"

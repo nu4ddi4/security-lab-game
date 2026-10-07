@@ -7,11 +7,11 @@ const REPOSITORY = "https://github.com/nu4ddi4/security-lab-game/releases/downlo
 const CHANNELS = ["stable", "beta", "dev"]
 const MAX_INSTALLER_BYTES = 536870912
 
-static func manifest_url(channel: String) -> String:
-	return REPOSITORY+"native-channel-"+channel+"/update.json" if channel in CHANNELS else ""
+static func manifest_url(channel: String, app_id: String = APP_ID) -> String:
+	return REPOSITORY+("beta-channel-" if app_id=="security-lab-beta" else "native-channel-")+channel+"/update.json" if channel in CHANNELS and app_id in [APP_ID,"security-lab-beta"] else ""
 
-static func preference_path(channel: String) -> String:
-	return "user://update-settings-"+channel+".json" if channel in CHANNELS else ""
+static func preference_path(channel: String, app_id: String = APP_ID) -> String:
+	return "user://"+("beta-update-settings-" if app_id=="security-lab-beta" else "update-settings-")+channel+".json" if channel in CHANNELS else ""
 
 static func enabled_for(build: Dictionary, arguments: PackedStringArray, preference, windows: bool) -> bool:
 	if not windows or "--disable-updates" in arguments: return false
@@ -62,15 +62,16 @@ static func local_origin(url: String) -> String:
 	if port!="" and (int(port)<1 or int(port)>65535): return ""
 	return match.get_string(0).trim_suffix("/")
 
-static func trusted_manifest(url: String, channel: String, local_test: bool) -> bool:
+static func trusted_manifest(url: String, channel: String, local_test: bool, app_id: String = APP_ID) -> bool:
 	if channel not in CHANNELS or not clean_url(url): return false
-	if url==manifest_url(channel): return true
+	if url==manifest_url(channel,app_id): return true
 	var origin = local_origin(url) if local_test else ""
 	return origin!="" and url==origin+"/"+channel+"/update.json"
 
-static func trusted_installer(url: String, version: String, channel: String, source: String, local_test: bool) -> bool:
+static func trusted_installer(url: String, version: String, channel: String, source: String, local_test: bool, app_id: String = APP_ID) -> bool:
 	if not clean_url(url): return false
-	if url==REPOSITORY+"native-"+channel+"-v"+version+"/SecurityLabSetup.exe": return true
+	var tag = "SecurityLab-beta-"+version.split("-")[0] if app_id=="security-lab-beta" else "native-"+channel+"-v"+version
+	if url==REPOSITORY+tag+"/SecurityLabSetup.exe": return true
 	var origin = local_origin(source) if local_test else ""
 	return origin!="" and url==origin+"/"+channel+"/SecurityLabSetup.exe"
 
@@ -83,12 +84,12 @@ static func hex(value, length: int) -> bool:
 	return value is String and RegEx.create_from_string("^[0-9a-f]{%d}$"%length).search(value)!=null
 
 static func build_valid(info: Dictionary) -> bool:
-	return info.get("schema")==1 and info.get("app_id")==APP_ID and info.get("platform")==PLATFORM and info.get("channel") in CHANNELS and info.get("version") is String and valid_version(info.version,info.channel) and hex(info.get("commit"),40) and info.get("install_layout")==1 and info.get("updates_default") is bool and info.updates_default==(info.channel=="stable") and info.get("manifest_url")==manifest_url(info.channel)
+	return info.get("schema")==1 and info.get("app_id") in [APP_ID,"security-lab-beta"] and info.get("platform")==PLATFORM and info.get("channel") in CHANNELS and info.get("version") is String and valid_version(info.version,info.channel) and hex(info.get("commit"),40) and info.get("install_layout")==1 and info.get("updates_default") is bool and (info.app_id=="security-lab-beta" or info.updates_default==(info.channel=="stable")) and info.get("manifest_url")==manifest_url(info.channel,info.app_id)
 
-static func manifest_valid(info: Dictionary, channel: String, source: String, local_test: bool) -> bool:
-	if info.get("schema")!=1 or info.get("app_id")!=APP_ID or info.get("platform")!=PLATFORM or info.get("channel")!=channel or info.get("install_layout")!=1: return false
+static func manifest_valid(info: Dictionary, channel: String, source: String, local_test: bool, app_id: String = APP_ID) -> bool:
+	if info.get("schema")!=1 or info.get("app_id")!=app_id or info.get("platform")!=PLATFORM or info.get("channel")!=channel or info.get("install_layout")!=1: return false
 	if not info.get("version") is String or not valid_version(info.version,channel): return false
 	if not hex(info.get("commit"),40) or not hex(info.get("sha256"),64) or not hex(info.get("exe_sha256"),64): return false
 	var size = info.get("size")
 	if not (size is int or size is float) or not is_finite(float(size)) or size!=int(size) or size<1024 or size>MAX_INSTALLER_BYTES: return false
-	return info.get("installer_url") is String and trusted_installer(info.installer_url,info.version,channel,source,local_test)
+	return info.get("installer_url") is String and trusted_installer(info.installer_url,info.version,channel,source,local_test,app_id)

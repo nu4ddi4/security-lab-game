@@ -114,8 +114,6 @@ func _notification(what):
 		ui.open_tool("Notes")
 
 func request_quit():
-	if updater!=null and updater.enabled and updater.install_on_exit and updater.state=="ready":
-		updater.install(); return
 	if updater!=null and updater.state=="preparing": return
 	if missions!=null and not saves.save(missions):
 		if ui!=null: ui.toast.text = saves.error_message

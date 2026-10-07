@@ -23,6 +23,7 @@ try {
     $null=New-Item -ItemType Directory -Path $payload -Force
     $build=[ordered]@{schema=1;app_id='security-lab-native';platform='windows-x86_64';version=$Version;channel=$Channel;commit=$Commit;install_layout=1;updates_default=($Channel -eq 'stable');manifest_url="https://github.com/nu4ddi4/security-lab-game/releases/download/native-channel-$Channel/update.json"}
     foreach ($file in @('godot/resources/build_info.json','godot/project.godot','godot/export_presets.cfg')) { $original[$file]=[IO.File]::ReadAllBytes((Join-Path $repoRoot $file)) }
+    [IO.File]::WriteAllText((Join-Path $repoRoot 'godot/project.godot'),([IO.File]::ReadAllText((Join-Path $repoRoot 'godot/project.godot')).Replace('res://scenes/entry.tscn','res://scenes/main.tscn')),[Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllText((Join-Path $repoRoot 'godot/resources/build_info.json'),($build | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
     foreach ($file in @('godot/project.godot','godot/export_presets.cfg')) {
         $text=[IO.File]::ReadAllText((Join-Path $repoRoot $file))

@@ -9,6 +9,12 @@ var player: LabPlayer
 var ui: InvestigationUI
 var controls: InvestigationControls
 var updates: InvestigationUpdates
+var updater: InvestigationInstallerUpdates
+var diagnostics: InvestigationDiagnostics
+var settings = null
+var qa_mode = false
+var world: LabWorld
+var detailed_world = false
 var context = ""
 var blocked_save = false
 var save_timer: Timer
@@ -26,6 +32,7 @@ func _ready():
 		return
 	engine = InvestigationEngine.new(content)
 	var testing = "--prototype-smoke" in OS.get_cmdline_user_args()
+	qa_mode = testing
 	if testing: store.directory = "user://investigation-qa"
 	var loaded = {"new":true} if testing else store.load_state(content)
 	blocked_save = loaded.has("error")
@@ -44,6 +51,15 @@ func _ready():
 	add_child(ui)
 	ui.setup(self)
 	controls.setup(self)
+	diagnostics = InvestigationDiagnostics.new()
+	add_child(diagnostics)
+	diagnostics.setup(self)
+	diagnostics.mark_ready()
+	if OS.get_name()=="Windows" and not testing and FileAccess.file_exists(OS.get_executable_path().get_base_dir().path_join("securitylab.install.json")):
+		updater = InvestigationInstallerUpdates.new()
+		add_child(updater)
+		updater.status_changed.connect(func(text): ui.notice(text); ui.refresh_settings())
+		updater.setup(self)
 	updates.changed.connect(ui.refresh_settings)
 	controls.changed.connect(ui.refresh_settings)
 	player.inspect_requested.connect(func(target): target.inspect())
@@ -58,13 +74,13 @@ func _ready():
 	# Persist a fresh investigation before Android can suspend its render loop.
 	if not loaded.has("state") and not blocked_save: save_now()
 	if blocked_save: ui.notice(loaded.error + "\n새 조사를 시작하기 전 원본을 보존합니다.")
-	print("PROTOTYPE_READY ",JSON.stringify({"day":state.day,"dummy":true,"devices":content.case.devices.size(),"npcs":content.case.npcs.size(),"isolatedSave":store.directory}))
+	print("PROTOTYPE_READY ",JSON.stringify({"day":state.day,"dummy":not detailed_world,"devices":content.case.devices.size(),"npcs":content.case.npcs.size(),"isolatedSave":store.directory}))
 	if DisplayServer.get_name() != "headless": _report_first_frame.call_deferred()
 	if testing:
 		var smoke = load("res://prototype/tests/smoke.gd").new()
 		add_child(smoke)
 		smoke.run.call_deferred(self)
-	elif controls.automatic_updates: updates.check.call_deferred()
+	elif controls.automatic_updates and updater==null: updates.check.call_deferred()
 
 func _report_first_frame():
 	await get_tree().process_frame
@@ -128,8 +144,11 @@ func command(text: String):
 			ui.print_output(text,dispatch(action).text))
 	else: ui.print_output(text,dispatch(action).text)
 
-func save_now():
-	if not blocked_save and not store.save(state,content): ui.notice(store.error)
+func save_now() -> bool:
+	if blocked_save: return false
+	var saved = store.save(state,content)
+	if not saved: ui.notice(store.error)
+	return saved
 
 func new_game():
 	if not store.preserve(): ui.notice(store.error); return
@@ -167,6 +186,7 @@ func _notification(what):
 	if what in [NOTIFICATION_APPLICATION_PAUSED,NOTIFICATION_APPLICATION_FOCUS_OUT] and ui != null:
 		save_now()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and ui != null:
+		if updater!=null and updater.state=="preparing": return
 		save_now()
 		get_tree().quit()
 
@@ -221,6 +241,9 @@ func _target(id: String, kind: String, position: Vector3, text: String):
 	_label(text,position+Vector3(0,.9,0),28)
 
 func _build_world():
+	if "--prototype-dummy" not in OS.get_cmdline_user_args():
+		_build_office_world()
+		return
 	_box(Vector3(0,-.1,0),Vector3(20,.2,24),Color(.18,.23,.27))
 	_box(Vector3(0,1.5,-8),Vector3(20,3,.2),Color(.3,.34,.38))
 	for x in [-10,10]: _box(Vector3(x,1.5,0),Vector3(.2,3,24),Color(.3,.34,.38))
@@ -249,3 +272,27 @@ func _build_world():
 	var light = DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-55,-30,0)
 	add_child(light)
+
+func _build_office_world():
+	world = LabWorld.new()
+	world.name = "InvestigationOffice"
+	add_child(world)
+	world.setup(null,player)
+	detailed_world = true
+	var positions = {"control_console":Vector3(-5,1.8,3.62),"server_console":Vector3(-8,1.6,-4.32),"approval_archive":Vector3(8.5,1.75,-7.25),"maintenance_terminal":Vector3(7,1.45,2.72)}
+	var computer = world.model.find_child("CORP_Staff_Computer_0",true,false)
+	positions.project_pc = world.node_bounds(computer).get_center()+Vector3(0,.25,.22) if computer!=null else Vector3(-1,1.1,5)
+	positions.briefing_board = world.node_bounds(world.protected_nodes.INTERACT_Whiteboard).get_center()+Vector3(0,0,.3)
+	for id in positions: _target(id,"device",positions[id],content.case.devices[id].label)
+	var people = {"oh":Vector3(-4,1,6.4),"park":Vector3(-6,1,-1.3),"han":Vector3(2,1,6.8),"seo":Vector3(6,1,-1.3)}
+	for id in people:
+		var p = people[id]
+		_box(p,Vector3(.6,1.7,.6),Color(.6,.45,.25))
+		_target(id,"npc",p+Vector3(0,0,.4),content.case.npcs[id].name+" · "+content.case.npcs[id].role)
+	review_target("oh")
+
+func review_target(id: String):
+	var point = targets[id].global_position
+	player.global_position = Vector3(point.x,.01,point.z+1.7)
+	player.velocity = Vector3.ZERO
+	player.camera.look_at(point)

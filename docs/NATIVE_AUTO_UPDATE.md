@@ -7,7 +7,7 @@ The design was reviewed against [codingcircle UpdateManager](https://github.com/
 
 ## Channels and files
 
-| Channel | Default automatic check/download | Manifest release tag | Version |
+| Channel | Default automatic version check | Manifest release tag | Version |
 |---|---|---|---|
 | stable | ON | native-channel-stable | 0.7.1 |
 | beta | OFF | native-channel-beta | 0.7.1-beta.1 |
@@ -40,11 +40,20 @@ share existing progress; they do not share installation directories.
 
 ## Download, installation and recovery
 
-Startup check and download run asynchronously. A ready update installs on normal
-exit, or through Settings → save and install. The automatic-check checkbox opts
-out persistently. An offline or rejected update leaves the game usable.
+Only the version check runs automatically at startup. A valid newer version
+opens **업데이트가 있습니다**, showing the current/new version and channel.
+**다운로드 후 설치** gives consent for this update's download, save, application
+exit, installation and restart. **나중에**, Escape and closing the dialog leave
+the game running without downloading or installing. The update remains available
+through Settings → **업데이트 확인하고 설치…**, which opens the same confirmation.
+Closing the game never implies consent and never triggers installation.
+Consent is specific to this running session and candidate; it is not persisted
+or reused on the next launch. The automatic-check checkbox controls checks only;
+previous opt-in preferences and `--force-update-check` never authorize download
+or installation. An offline or rejected update leaves the game usable.
+After consent, the asynchronous download is verified before save and installation.
 
-1. Download to an unpredictable private `user://updates/TOKEN` directory; verify
+1. After explicit confirmation, download to an unpredictable private `user://updates/TOKEN` directory; verify
    exact size and SHA-256. Before installation, recheck identity/hash and save
    progress successfully. Save failure keeps the game open.
 2. Extract the fixed worker and write a data-only transaction. Launch the system
@@ -95,8 +104,11 @@ python scripts/godot-update-network-test.py --godot <Godot-4.7.2-console>
 Local checks: 452 existing native assertions; 90 updater policy assertions;
 47 Windows checks using real Inno fixtures (including install/startup rollback,
 quoted Korean/metacharacter paths, file pinning, saves, junctions and a second
-instance); 13 real HTTPRequest scenarios on loopback, including save failure,
-blocked redirects, helper launch and save-aware health acknowledgement. Tests
+instance); 18 real HTTPRequest scenarios on loopback, including save failure,
+blocked redirects, helper launch and save-aware health acknowledgement. Consent
+checks prove no installer request before approval or after deferral, exercise
+dialog confirm/cancel/close and refuse direct installation without consent. On Linux,
+the Windows-only helper launch is explicitly skipped; run all cases on Windows. Tests
 use isolated fixture installs/progress, not the player's real installation.
 These fixtures are distinct from the full-game mission play verification.
 

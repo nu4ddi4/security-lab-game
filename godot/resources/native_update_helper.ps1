@@ -64,8 +64,8 @@ function Copy-UpdateTree([string]$Source, [string]$Destination, $Inventory) {
         if ((Get-UpdateHash $to) -ne $file.sha256) { throw 'Backup/restore checksum failed' }
     }
 }
-function Get-UpdateRegistry([string]$Channel) {
-    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall\SecurityLabNative-'+$Channel+'_is1')
+function Get-UpdateRegistry([string]$Channel, [string]$Product='SecurityLabNative') {
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall\'+$Product+'-'+$Channel+'_is1')
     $snapshot = @{}
     if ($null -ne $key) {
         try { foreach ($name in $key.GetValueNames()) { $snapshot[$name] = @{kind=$key.GetValueKind($name).ToString();value=$key.GetValue($name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)} } }
@@ -73,8 +73,8 @@ function Get-UpdateRegistry([string]$Channel) {
     }
     @{exists=($null -ne $key);values=$snapshot}
 }
-function Restore-UpdateRegistry([string]$Channel, $Snapshot) {
-    $name = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\SecurityLabNative-'+$Channel+'_is1'
+function Restore-UpdateRegistry([string]$Channel, $Snapshot, [string]$Product='SecurityLabNative') {
+    $name = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\'+$Product+'-'+$Channel+'_is1'
     [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($name,$false)
     if ($Snapshot.exists) {
         $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($name)
@@ -99,7 +99,7 @@ function Start-UpdateProcess([string]$Executable, [string[]]$Parameters) {
     [Diagnostics.Process]::Start($start)
 }
 function Assert-UpdateBuild($Info) {
-    if ($Info.schema -ne 1 -or $Info.app_id -ne 'security-lab-native' -or $Info.platform -ne 'windows-x86_64' -or $Info.install_layout -ne 1 -or $Info.channel -notin @('stable','beta','dev') -or $Info.commit -cnotmatch '^[0-9a-f]{40}$') { throw 'Invalid build identity' }
+    if ($Info.schema -ne 1 -or $Info.app_id -notin @('security-lab-native','security-lab-beta') -or $Info.platform -ne 'windows-x86_64' -or $Info.install_layout -ne 1 -or $Info.channel -notin @('stable','beta','dev') -or $Info.commit -cnotmatch '^[0-9a-f]{40}$') { throw 'Invalid build identity' }
     if ($Info.version -cnotmatch '^(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})(?:-([0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*))?$') { throw 'Invalid version' }
     if ($Info.channel -eq 'stable' -and $Info.version.Contains('-')) { throw 'Stable rejects prerelease versions' }
     if ($Info.channel -ne 'stable' -and $Info.version -cnotmatch ('-'+$Info.channel+'[.]')) { throw 'Prerelease channel mismatch' }
@@ -126,12 +126,17 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         $nonce = [IO.Path]::GetFileName($stageRoot)
         $dataRoot = Assert-LocalPath (Get-SecurityLabDataRoot)
         $expectedStage = Join-Path (Join-Path $dataRoot 'updates') $nonce
-        if ($nonce -cnotmatch '^[0-9a-f]{32}$' -or $stageRoot -ne $expectedStage -or [IO.Path]::GetFileName($transactionPath) -ne 'transaction.json') { $stageRoot=''; throw 'Invalid staging directory' }
+        $betaStage = Join-Path (Join-Path $dataRoot 'beta-updates') $nonce
+        if ($nonce -cnotmatch '^[0-9a-f]{32}$' -or ($stageRoot -ne $expectedStage -and $stageRoot -ne $betaStage) -or [IO.Path]::GetFileName($transactionPath) -ne 'transaction.json') { $stageRoot=''; throw 'Invalid staging directory' }
         if ((Get-Item -LiteralPath $transactionPath).Length -gt 16384) { throw 'Transaction too large' }
         $request = Get-Content -LiteralPath $transactionPath -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($request.schema -ne 1 -or $request.token -cne $nonce) { throw 'Invalid transaction identity' }
         Assert-UpdateBuild $request.current; Assert-UpdateBuild $request.target
         $channel = $request.current.channel
+        if ($request.target.app_id -cne $request.current.app_id) { throw 'Product mismatch' }
+        $beta = $request.current.app_id -eq 'security-lab-beta'
+        if ($stageRoot -ne $(if ($beta) {$betaStage} else {$expectedStage})) { throw 'Product stage mismatch' }
+        $product = if ($beta) {'SecurityLabBeta'} else {'SecurityLabNative'}
         if ($request.target.channel -cne $channel) { throw 'Channel mismatch' }
         if (-not (Test-NewerUpdateVersion $request.target.version $request.current.version)) { throw 'Downgrade or duplicate version rejected' }
         if ($request.parent_pid -le 0 -or $request.parent_pid -gt 2147483647 -or $request.parent_pid -ne [Math]::Floor($request.parent_pid)) { throw 'Invalid parent PID' }
@@ -143,7 +148,7 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         $appExe = Join-Path $installRoot 'SecurityLab.exe'
         $sidecar = Get-Content -LiteralPath (Join-Path $installRoot 'build_info.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         $marker = Get-Content -LiteralPath (Join-Path $installRoot 'securitylab.install.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($marker.app_id -ne 'security-lab-native' -or $marker.channel -cne $channel -or $marker.install_layout -ne 1 -or $sidecar.version -cne $request.current.version -or $sidecar.commit -cne $request.current.commit -or $sidecar.channel -cne $channel) { throw 'Installed identity mismatch' }
+        if ($marker.app_id -cne $request.current.app_id -or $marker.channel -cne $channel -or $marker.install_layout -ne 1 -or $sidecar.version -cne $request.current.version -or $sidecar.commit -cne $request.current.commit -or $sidecar.channel -cne $channel) { throw 'Installed identity mismatch' }
         $null = Get-UpdateTree $installRoot
         $parentProcess = [Diagnostics.Process]::GetProcessById([int]$request.parent_pid)
         if ($parentProcess.MainModule.FileName -ne $appExe) { throw 'Parent process is not this installation' }
@@ -159,19 +164,20 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         $inventory = @(Get-UpdateTree $installRoot)
         Copy-UpdateTree $installRoot $backupRoot $inventory
         $saveSnapshot = @()
-        foreach ($saveName in @('progress.json','progress.backup.json')) {
+        $saveNames = if ($beta) {@('investigation/save.json','investigation/save.backup.json','controls.cfg','beta-update-settings-beta.json')} else {@('progress.json','progress.backup.json')}
+        foreach ($saveName in $saveNames) {
             $savePath = Join-Path $progressRoot $saveName
             $exists = Test-Path -LiteralPath $savePath
             if ($exists) {
                 $null = Assert-ChildPath $progressRoot $savePath
-                if ((Get-Item -LiteralPath $savePath).Length -gt 131072) { throw 'Save exceeds native save limit' }
+                if ((Get-Item -LiteralPath $savePath).Length -gt $(if ($beta) {262144} else {131072})) { throw 'Save exceeds native save limit' }
                 $saveHash = Get-UpdateHash $savePath
-                Copy-Item -LiteralPath $savePath -Destination (Join-Path $stageRoot ('saved-'+$saveName))
-                if ((Get-UpdateHash (Join-Path $stageRoot ('saved-'+$saveName))) -ne $saveHash) { throw 'Save backup verification failed' }
+                Copy-Item -LiteralPath $savePath -Destination (Join-Path $stageRoot ('saved-'+$saveName.Replace('/','_')))
+                if ((Get-UpdateHash (Join-Path $stageRoot ('saved-'+$saveName.Replace('/','_')))) -ne $saveHash) { throw 'Save backup verification failed' }
             } else { $saveHash = '' }
             $saveSnapshot += @{name=$saveName;exists=$exists;sha256=$saveHash}
         }
-        $registrySnapshot = Get-UpdateRegistry $channel
+        $registrySnapshot = Get-UpdateRegistry $channel $product
         Write-UpdateJson (Join-Path $stageRoot 'backup.json') @{files=$inventory;saves=$saveSnapshot;registry=$registrySnapshot;install=$installRoot;data=$progressRoot;channel=$channel}
         $backupReady = $true
         # Hold a read-only, non-delete-sharing handle through installer execution.
@@ -189,7 +195,7 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         $newBuild = Get-Content -LiteralPath (Join-Path $installRoot 'build_info.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         Assert-UpdateBuild $newBuild
         $newMarker = Get-Content -LiteralPath (Join-Path $installRoot 'securitylab.install.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($newBuild.channel -cne $channel -or $newBuild.version -cne $request.target.version -or $newBuild.commit -cne $request.target.commit -or $newMarker.app_id -ne 'security-lab-native' -or $newMarker.channel -cne $channel -or (Get-UpdateHash $appExe).ToLowerInvariant() -cne $request.target.exe_sha256) { throw 'Installed payload identity/digest mismatch' }
+        if ($newBuild.channel -cne $channel -or $newBuild.version -cne $request.target.version -or $newBuild.commit -cne $request.target.commit -or $newMarker.app_id -cne $request.current.app_id -or $newMarker.channel -cne $channel -or (Get-UpdateHash $appExe).ToLowerInvariant() -cne $request.target.exe_sha256) { throw 'Installed payload identity/digest mismatch' }
         Write-UpdateJson (Join-Path $stageRoot 'result.json') @{state='verifying_startup';token=$nonce}
         $newProcess = Start-UpdateProcess $appExe @('--','--disable-updates',('--update-relaunch='+$nonce))
         $healthy = $false
@@ -223,12 +229,13 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
                 foreach ($save in $saveSnapshot) {
                     $destination = Assert-ChildPath $progressRoot (Join-Path $progressRoot $save.name)
                     if ($save.exists) {
-                        $from = Join-Path $stageRoot ('saved-'+$save.name)
+                        $from = Join-Path $stageRoot ('saved-'+$save.name.Replace('/','_'))
                         if ((Get-UpdateHash $from) -ne $save.sha256) { throw 'Rollback save corrupt' }
+                         $null = [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destination))
                         Copy-Item -LiteralPath $from -Destination $destination -Force
                     } elseif (Test-Path -LiteralPath $destination) { Remove-Item -LiteralPath $destination -Force }
                 }
-                Restore-UpdateRegistry $channel $registrySnapshot
+                Restore-UpdateRegistry $channel $registrySnapshot $product
                 Write-UpdateJson (Join-Path $stageRoot 'result.json') @{state='rolled_back';token=$nonce;error=$failure;backup=$backupRoot}
                 $oldProcess = Start-UpdateProcess $appExe @('--','--disable-updates',('--update-rollback='+$nonce))
                 return 1

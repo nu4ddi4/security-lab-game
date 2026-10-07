@@ -1,21 +1,17 @@
-name: Investigation prototype builds
+name: Investigation beta builds
 on:
   workflow_dispatch:
   push:
-    branches: ['codex/godot-investigation-prototype']
+    branches: ['beta']
     paths:
+      - godot/**
+      - installer/**
+      - scripts/prototype-*.py
+      - scripts/beta-*.py
+      - tests/native/**
+      - .github/actions/godot-setup/**
+      - .github/actions/inno-setup/**
       - .github/workflows/godot-prototype.yml
-      - godot/prototype/version.json
-      - godot/prototype/main.tscn
-      - godot/prototype/scripts/game.gd
-      - godot/prototype/scripts/input_controls.gd
-      - godot/prototype/scripts/ui.gd
-      - godot/prototype/scripts/updates.gd
-      - godot/prototype/tests/smoke.gd
-      - godot/scripts/player.gd
-      - godot/android/**
-      - scripts/prototype-android-build.py
-      - scripts/prototype-android-test.py
 permissions:
   contents: read
 concurrency:
@@ -24,9 +20,11 @@ concurrency:
 jobs:
   prototype:
     runs-on: windows-latest
-    timeout-minutes: 8
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch the verified detailed office asset
+        run: git lfs pull --include="godot/assets/models/Interior_07_Godot.glb" --exclude=""
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -44,18 +42,34 @@ jobs:
         uses: actions/cache@v4
         with:
           path: prototype-dist
-          key: prototype-windows-4.7.2-${{ hashFiles('godot/prototype/**', 'godot/scripts/player.gd', 'godot/assets/fonts/**', 'godot/LICENSES.txt', 'godot/project.godot', 'scripts/prototype-build.py') }}
+          key: beta-windows-4.7.2-${{ github.sha }}
       - name: Export and check standalone prototype
         if: steps.windows_cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           python scripts/prototype-build.py --rendered-check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: ./.github/actions/inno-setup
+      - name: Package the beta installer and verify updater behavior
+        shell: pwsh
+        run: |
+          python scripts/beta-installer-build.py --iscc $env:SECURITY_LAB_ISCC
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tests/native/security_windows_updater.ps1 -Iscc $env:SECURITY_LAB_ISCC
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tests/native/security_windows_updater.ps1 -Beta -Iscc $env:SECURITY_LAB_ISCC -Results prototype-dist/beta-windows-updater.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/godot-update-network-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         id: artifact
         with:
-          name: SecurityLab-proto-${{ steps.version.outputs.version }}-Windows-x64
-          path: prototype-dist/*
+          name: SecurityLab-beta-${{ steps.version.outputs.version }}-Windows-x64
+          path: |
+            prototype-dist/*.exe
+            prototype-dist/*.json
+            prototype-dist/*.sha256
+            prototype-dist/ui/*
           if-no-files-found: error
           retention-days: 14
       - name: Download link
@@ -64,12 +78,14 @@ jobs:
           ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
           PROTOTYPE_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          "[SecurityLab-proto-$env:PROTOTYPE_VERSION]($env:ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+          "[SecurityLab-beta-$env:PROTOTYPE_VERSION]($env:ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
   android:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch the verified detailed office asset
+        run: git lfs pull --include="godot/assets/models/Interior_07_Godot.glb" --exclude=""
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -109,7 +125,7 @@ jobs:
         run: python3 -c 'import json,os; print("version="+json.load(open("godot/prototype/version.json"))["version"],file=open(os.environ["GITHUB_OUTPUT"],"a"))'
       - uses: actions/upload-artifact@v4
         with:
-          name: SecurityLab-proto-${{ steps.version.outputs.version }}-Android
+          name: SecurityLab-beta-${{ steps.version.outputs.version }}-Android
           path: prototype-android-dist/*
           if-no-files-found: error
           retention-days: 14

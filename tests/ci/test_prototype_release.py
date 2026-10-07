@@ -18,11 +18,11 @@ class PrototypeReleaseTests(unittest.TestCase):
     def setUp(self):
         self.sha, self.repo, self.version = 'a' * 40, 'owner/game', '0.2.0'
         self.run = {'status':'completed', 'conclusion':'success', 'head_sha':self.sha,
-                    'head_branch':'codex/godot-investigation-prototype',
+                    'head_branch':'beta',
                     'head_repository':{'full_name':self.repo},
                     'path':'.github/workflows/godot-prototype.yml', 'event':'push'}
         self.jobs = [{'name':name, 'conclusion':'success'} for name in ['prototype','android']]
-        self.artifacts = [{'name':'SecurityLab-proto-0.2.0-' + platform, 'expired':False,
+        self.artifacts = [{'name':'SecurityLab-beta-0.2.0-' + platform, 'expired':False,
                            'size_in_bytes':42, 'workflow_run':{'head_sha':self.sha}}
                           for platform in ['Windows-x64','Android']]
 
@@ -37,7 +37,7 @@ class PrototypeReleaseTests(unittest.TestCase):
             with self.subTest(jobs=jobs), self.assertRaises(ValueError): self.validate(jobs=jobs)
 
     def test_android_artifact_must_be_verified_and_same_version(self):
-        for field,value in [('expired',True),('size_in_bytes',0),('name','SecurityLab-proto-0.1.1-Android'),('workflow_run',{'head_sha':'b'*40})]:
+        for field,value in [('expired',True),('size_in_bytes',0),('name','SecurityLab-beta-0.1.1-Android'),('workflow_run',{'head_sha':'b'*40})]:
             artifacts = copy.deepcopy(self.artifacts)
             artifacts[1][field] = value
             with self.subTest(field=field), self.assertRaises(ValueError): self.validate(artifacts=artifacts)
@@ -54,3 +54,9 @@ class PrototypeReleaseTests(unittest.TestCase):
         self.assertEqual(sorted(set(codes)),codes)
         for version in ['0.0.0','0.1.1000','-1.0.0']:
             with self.subTest(version=version), self.assertRaises(ValueError): android.version_code(version)
+
+    def test_beta_channel_version_order(self):
+        self.assertLess(release.version_key('0.3.0-beta.1'), release.version_key('0.3.1-beta.1'))
+        self.assertLess(release.version_key('0.3.0-beta.1'), release.version_key('0.3.0-beta.2'))
+        for version in ['0.3.0', '0.3.0-dev.1', 'invalid']:
+            with self.subTest(version=version), self.assertRaises(ValueError): release.version_key(version)

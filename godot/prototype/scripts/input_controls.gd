@@ -170,6 +170,6 @@ func _process(_delta):
 	for id in buttons:
 		buttons[id].position = positions[id]
 		button_rects[id] = Rect2(positions[id]-Vector2(82,38),Vector2(164,76))
-	buttons.tool.visible = game.player.target != null
+	buttons.tool.visible = game.player.target is InvestigationTarget
 	buttons.inspect.visible = game.player.target != null
-	buttons.tool.get_child(1).text = "대화" if game.player.target != null and game.player.target.kind == "npc" else "조작"
+	buttons.tool.get_child(1).text = "대화" if game.player.target is InvestigationTarget and game.player.target.kind == "npc" else "조작"

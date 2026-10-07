@@ -40,7 +40,7 @@ func setup(manager: LabMissions, actor: LabPlayer):
 			var extras = functional[id].extras
 			door.setup(node, extras.collisionBounds, player, extras.openAngleDegrees)
 			doors[id] = door
-		elif id.begins_with("INTERACT_"):
+		elif id.begins_with("INTERACT_") and manager!=null:
 			var device = LabDevice.new()
 			device.name = "NativeInteraction"
 			node.add_child(device)

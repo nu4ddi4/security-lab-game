@@ -79,7 +79,7 @@ func build(raw) -> Dictionary:
 	var commit = str(raw.get("commit","unknown"))
 	var regex = RegEx.new()
 	regex.compile("^[0-9a-f]{40}$")
-	return {"app_id":"security-lab-native","version":version(raw.get("version","unknown")),"commit":commit if regex.search(commit) != null else "unknown","channel":enum_value(raw.get("channel"),["stable","beta","dev"],"unknown")}
+	return {"app_id":enum_value(raw.get("app_id"),["security-lab-native","security-lab-beta"],"security-lab-native"),"version":version(raw.get("version","unknown")),"commit":commit if regex.search(commit) != null else "unknown","channel":enum_value(raw.get("channel"),["stable","beta","dev"],"unknown")}
 
 func enum_value(value, allowed: Array, fallback = "unknown") -> String:
 	return value if value is String and value in allowed else fallback
@@ -96,7 +96,7 @@ func log_summary(raw: String) -> Dictionary:
 	# regex redaction. Only fixed event codes, numeric counters and enums survive.
 	var result = {"lines_scanned":0,"error_lines":0,"warning_lines":0,"crash_marker":false,"events":[],"errors":[],"free_text_included":false}
 	var site = RegEx.new()
-	site.compile("\\(res://scripts/(diagnostics|diagnostics_serializer|game|settings|save_manager|missions|ui|player|world|audio|equipment|screen|device|door|exterior|update_manager|update_policy)\\.gd:([0-9]{1,7})\\)")
+	site.compile("\\(res://((?:scripts/(?:diagnostics|diagnostics_serializer|game|settings|save_manager|missions|ui|player|world|audio|equipment|screen|device|door|exterior|update_manager|update_policy)|prototype/scripts/(?:diagnostics|game|ui|input_controls|installer_updates|updates|engine|store|save_codec|target)))\\.gd:([0-9]{1,7})\\)")
 	for line in raw.split("\n"):
 		result.lines_scanned += 1
 		if line.begins_with("ERROR:") or line.begins_with("SCRIPT ERROR:"): result.error_lines += 1
@@ -112,14 +112,15 @@ func log_summary(raw: String) -> Dictionary:
 		if match_site != null and not result.errors.is_empty():
 			var last = result.errors[-1]
 			if not last.has("source"):
-				last.source = "res://scripts/"+match_site.get_string(1)+".gd"
+				last.source = "res://"+match_site.get_string(1)+".gd"
 				last.line = int(match_site.get_string(2))
 		if line.contains("handle_crash") or line.contains("Program crashed") or line.contains("Fatal error"): result.crash_marker = true
-		if not line.begins_with("NATIVE_READY "): continue
-		var ready = JSON.parse_string(line.trim_prefix("NATIVE_READY "))
+		var prefix = "PROTOTYPE_READY " if line.begins_with("PROTOTYPE_READY ") else "NATIVE_READY "
+		if not line.begins_with(prefix): continue
+		var ready = JSON.parse_string(line.trim_prefix(prefix))
 		if not ready is Dictionary: continue
-		var event = {"event":"native_ready","renderer":enum_value(ready.get("renderer"),["forward_plus","mobile","gl_compatibility"])}
-		for key in ["load_ms","functional","colliders","doors","devices","screens","leds"]:
+		var event = {"event":"investigation_ready" if prefix=="PROTOTYPE_READY " else "native_ready","renderer":enum_value(ready.get("renderer"),["forward_plus","mobile","gl_compatibility"])}
+		for key in ["load_ms","functional","colliders","doors","devices","screens","leds","npcs"]:
 			if ready.get(key) is int or ready.get(key) is float and is_finite(ready[key]): event[key] = clampf(float(ready[key]),0,10000000)
 		result.events.append(event)
 	result.events = result.events.slice(-16)

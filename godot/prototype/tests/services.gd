@@ -1,0 +1,92 @@
+extends SceneTree
+const Policy = preload("res://scripts/update_policy.gd")
+class TestDiagnostics extends InvestigationDiagnostics:
+	func supported() -> bool: return true
+class Player extends Node:
+	var enabled = false
+	func is_on_floor() -> bool: return false
+class Host extends Node:
+	var store = InvestigationStore.new()
+	var content: Dictionary
+	var state: Dictionary
+	var blocked_save = false
+	var qa_mode = true
+	var settings = null
+	var updater = null
+	var player = Player.new()
+	var targets = {}
+	func save_now() -> bool: return not blocked_save and store.save(state,content)
+class TestUpdater extends InvestigationInstallerUpdates:
+	var executable = ""
+	func executable_path() -> String: return executable
+var failures = []
+var assertions = 0
+func check(condition: bool, message: String):
+	assertions += 1
+	if not condition: failures.append(message)
+func write(path: String, value: String):
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var file = FileAccess.open(path,FileAccess.WRITE)
+	file.store_string(value); file.close()
+func _init(): run.call_deferred()
+func run():
+	var host = Host.new(); root.add_child(host); host.add_child(host.player)
+	host.content = InvestigationContent.load_case()
+	host.state = InvestigationEngine.new(host.content).create_state()
+	host.state.memo = "private-evidence-memo-do-not-export"
+	var nonce = Crypto.new().generate_random_bytes(16).hex_encode()
+	host.store.directory = "user://qa/beta-services/"+nonce
+	check(host.save_now(),"Investigation saves before service checks")
+	var before = FileAccess.get_file_as_string(host.store.directory.path_join("save.json"))
+	var diagnostics = TestDiagnostics.new(); host.add_child(diagnostics); diagnostics.setup(host); diagnostics.mark_ready()
+	check(diagnostics.save_validation()["save.json"].status=="valid","Investigation codec validates its own save")
+	check(diagnostics.save_validation()["save.backup.json"].status=="missing","Missing investigation backup is explicit")
+	var package = diagnostics.create_package()
+	check(package.ok,"Beta support ZIP is created")
+	var zip = ZIPReader.new()
+	check(zip.open(diagnostics.last_package)==OK,"Support ZIP opens")
+	var report = zip.read_file("diagnostics.json").get_string_from_utf8()
+	var identity = JSON.parse_string(zip.read_file("build_info.json").get_string_from_utf8())
+	check(identity.app_id=="security-lab-beta" and identity.channel=="beta","Support ZIP records beta product and channel")
+	check(not report.contains(host.state.memo) and not report.contains("transaction.json"),"Support ZIP omits memo and updater transaction")
+	check(FileAccess.get_file_as_string(host.store.directory.path_join("save.json"))==before,"Diagnostics never mutate investigation save")
+	var log = diagnostics.serializer.log_summary('PROTOTYPE_READY {"devices":6,"npcs":4,"isolatedSave":"private-directory"}\nSCRIPT ERROR: Invalid access private-memo\n          at: refresh (res://prototype/scripts/ui.gd:42)')
+	check(log.events[0].event=="investigation_ready" and log.errors[0].source=="res://prototype/scripts/ui.gd","Beta log summary keeps only allowlisted event and source")
+	check(not JSON.stringify(log).contains("private-"),"Beta log summary never contains free text or save paths")
+	zip.close()
+	var updater = TestUpdater.new(); host.add_child(updater); updater.game = host
+	updater.info = {"schema":1,"app_id":"security-lab-beta","platform":"windows-x86_64","version":"0.3.0-beta.1","channel":"beta","commit":"a".repeat(40),"install_layout":1,"updates_default":true,"manifest_url":Policy.manifest_url("beta","security-lab-beta")}
+	updater.info = JSON.parse_string(JSON.stringify(updater.info))
+	check(Policy.build_valid(updater.info),"Beta baked build identity is valid")
+	check(Policy.preference_path("beta","security-lab-beta")!=Policy.preference_path("beta"),"Beta and Native preferences are isolated")
+	var manifest = updater.info.duplicate(); manifest.version="0.4.0-beta.1"; manifest.commit="b".repeat(40); manifest.sha256="c".repeat(64); manifest.exe_sha256="d".repeat(64); manifest.size=2048; manifest.installer_url=Policy.REPOSITORY+"SecurityLab-beta-0.4.0/SecurityLabSetup.exe"
+	check(Policy.manifest_valid(manifest,"beta",updater.info.manifest_url,false,"security-lab-beta"),"Beta accepts only its release installer")
+	check(not Policy.manifest_valid(manifest,"beta",Policy.manifest_url("beta"),false),"Native rejects the beta product")
+	var cross = manifest.duplicate(); cross.app_id="security-lab-native"
+	check(not Policy.manifest_valid(cross,"beta",updater.info.manifest_url,false,"security-lab-beta"),"Beta rejects a Native manifest")
+	host.blocked_save=true
+	check(not updater.save_progress(),"Blocked investigation save cannot authorize installation")
+	host.blocked_save=false
+	check(updater.valid_saved_progress(),"Installation health uses investigation codec")
+	updater.enabled=true; updater.state="ready"
+	await updater.install()
+	check(updater.state=="ready" and updater.helper_pid==-1,"Unapproved beta cannot install or start worker")
+	var install = host.store.directory.path_join("install")
+	write(install.path_join("SecurityLab.exe"),"fixture; never executed")
+	write(install.path_join("build_info.json"),JSON.stringify(updater.info))
+	write(install.path_join("securitylab.install.json"),JSON.stringify({"app_id":"security-lab-beta","channel":"beta","install_layout":1}))
+	updater.executable=ProjectSettings.globalize_path(install.path_join("SecurityLab.exe"))
+	check(updater.installed_identity_valid(),"Installed beta metadata matches its baked identity")
+	var stage=updater.stage_root().path_join(nonce)
+	write(stage.path_join("transaction.json"),JSON.stringify({"schema":1,"token":nonce,"target":updater.info,"data_directory":ProjectSettings.globalize_path("user://")}))
+	updater.acknowledge_health(nonce)
+	check(FileAccess.file_exists(stage.path_join("health.json")),"Healthy beta acknowledges its own save and installation")
+	DirAccess.remove_absolute(stage.path_join("health.json"))
+	write(host.store.directory.path_join("save.json"),"invalid investigation save")
+	updater.acknowledge_health(nonce)
+	check(not FileAccess.file_exists(stage.path_join("health.json")),"Invalid investigation save prevents health acknowledgement")
+	check(diagnostics.save_validation()["save.json"].status=="invalid","Diagnostics report invalid investigation save")
+	diagnostics.write_session(true)
+	check(diagnostics.read_json(diagnostics.data_directory.path_join("session.json")).data.clean_exit,"Clean exit marker is written locally")
+	print("INVESTIGATION_SERVICES ",JSON.stringify({"passed":failures.is_empty(),"assertions":assertions,"failures":failures}))
+	quit(0 if failures.is_empty() else 1)

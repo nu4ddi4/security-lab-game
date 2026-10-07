@@ -3,6 +3,7 @@ import argparse
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -16,7 +17,11 @@ def main():
     parser.add_argument('--results', default='godot/tests/results/updater-network.json')
     args = parser.parse_args()
     payload = b'MZ' + b'fixture payload; never executed'.ljust(4094, b'\0')
-    server_modes = ['ready', 'redirect-ready', 'hash-failure', 'size-failure', 'channel-failure', 'redirect-failure', 'oversized-manifest', 'no-local-option', 'disabled', 'helper-launch', 'save-failure', 'health-validation', 'bad-save-health']
+    server_modes = ['no-consent', 'declined', 'dialog-dismiss', 'dialog-close', 'dialog-confirm', 'ready', 'redirect-ready', 'hash-failure', 'size-failure', 'channel-failure', 'redirect-failure', 'oversized-manifest', 'no-local-option', 'disabled', 'helper-launch', 'save-failure', 'health-validation', 'bad-save-health']
+    skipped = []
+    if platform.system() != 'Windows':
+        server_modes.remove('helper-launch')
+        skipped.append('helper-launch: requires Windows PowerShell')
     rows = []
     with tempfile.TemporaryDirectory(prefix='security-lab-update-http-') as temporary:
         project = Path(temporary)
@@ -59,12 +64,14 @@ def main():
                 raise SystemExit(run.stdout + run.stderr)
             if mode in ['disabled', 'no-local-option'] and requests:
                 raise SystemExit('Disabled/disallowed updater sent a request')
-            if mode == 'channel-failure' and '/dev/SecurityLabSetup.exe' in requests:
-                raise SystemExit('Cross-channel manifest triggered download')
+            if mode in ['channel-failure', 'no-consent', 'declined', 'dialog-dismiss', 'dialog-close'] and '/dev/SecurityLabSetup.exe' in requests:
+                raise SystemExit('Unapproved or cross-channel manifest triggered download')
+            if mode in ['ready', 'redirect-ready', 'dialog-confirm'] and requests.count('/dev/SecurityLabSetup.exe') != 1:
+                raise SystemExit('Approved update did not download exactly once')
             row = json.loads(lines[-1]); row['requests'] = requests; rows.append(row)
     destination = Path(args.results); destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(json.dumps({'passed': True, 'cases': rows}, indent=2, ensure_ascii=False), encoding='utf-8')
-    print('NATIVE_UPDATE_NETWORK_TEST', json.dumps({'passed': True, 'cases': len(rows)}))
+    destination.write_text(json.dumps({'passed': True, 'cases': rows, 'skipped': skipped}, indent=2, ensure_ascii=False), encoding='utf-8')
+    print('NATIVE_UPDATE_NETWORK_TEST', json.dumps({'passed': True, 'cases': len(rows), 'skipped': skipped}))
 
 
 if __name__ == '__main__': main()

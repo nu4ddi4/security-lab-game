@@ -1,16 +1,18 @@
 # 잔여 권한 · Godot 프로토타입
 
-브랜치: `codex/godot-investigation-prototype` · 기반: `godot-port`의 `d2c27a4`.
+브랜치: `beta` · 게임 기반: `codex/godot-investigation-prototype` · 맵·배치: 검증한 `godot-port`.
 
-업로드된 `SECURITY_LAB_WEB_PROTOTYPE_PLAN.md`의 최신 본문과 P1~P22를 Godot에 적용합니다. 웹 UI 대신 더미 3D 환경을 사용하고, 사건 규칙과 콘텐츠는 장면에서 분리합니다.
+`beta`는 테스트·안정화 후 main에 병합할 통합 브랜치입니다. 병합 범위와 출처는 [병합 계획](GODOT_BRANCH_MERGE_PLAN.md)을 따릅니다.
+
+업로드된 `SECURITY_LAB_WEB_PROTOTYPE_PLAN.md`의 최신 본문과 P1~P22를 Godot에 적용합니다. 웹 UI 대신 사무실 3D 환경을 사용하고, 사건 규칙과 콘텐츠는 장면에서 분리합니다.
 
 ## 실행
 
 Godot **4.7.2 stable**에서 `godot/project.godot`을 열고 F5를 누릅니다. 기본 진입은 조사 프로토타입입니다. 새 조사는 회사·담당 업무 설명과 첫날 인계 안내로 시작합니다. 메인 메뉴는 이후 작업입니다.
 
-Windows 테스트 빌드는 `Investigation prototype builds`의 Actions 아티팩트로 제공합니다. `SecurityLab-proto-X.Y.Z.exe`만 실행하면 됩니다. 더미 환경·사건 자료·한국어 폰트를 EXE에 포함하며 기존 맵·웹·가이드는 포함하지 않습니다. 이 빌드는 OpenGL 호환 렌더러를 사용합니다.
+Windows 테스트 빌드는 `Investigation beta builds`의 Actions 아티팩트로 제공합니다. `SecurityLab-beta-X.Y.Z.exe`만 실행하면 됩니다. 사무실 맵·사건 자료·한국어 폰트를 EXE에 포함합니다. OpenGL 호환 렌더러를 사용합니다.
 
-배포는 [SecurityLab-proto-0.2.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-proto-0.2.0)입니다. 제목·태그·EXE·ZIP은 `SecurityLab-proto-X.Y.Z` 형식을 사용합니다. Pre-release로 게시하고 정식 Latest를 바꾸지 않습니다. 검증된 Windows 빌드를 재사용하고 EXE·EXE만 담은 ZIP·APK·체크섬을 제공합니다. 다음 수정 배포는 `0.2.1`, 기능 배포는 `0.3.0`으로 올립니다.
+배포는 [SecurityLab-beta-0.3.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-beta-0.3.0)입니다. 제목·태그·EXE·ZIP은 `SecurityLab-beta-X.Y.Z` 형식을 사용합니다. Pre-release로 게시하고 정식 Latest를 바꾸지 않습니다. 검증된 같은 소스의 EXE·EXE 전용 ZIP·APK·Inno 설치 파일·manifest·빌드 기록·체크섬을 함께 제공합니다. 이전 [SecurityLab-proto-0.2.0](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-proto-0.2.0)은 보존합니다.
 
 버전은 `godot/prototype/version.json`에서 관리합니다. 버전·빌드 설정·입력·UI·앱 생명주기를 변경하면 Windows·Android 패키지 검사를 실행합니다. 일반 콘텐츠·엔진 수정은 빠른 검사를 사용합니다. 릴리즈는 성공한 같은 소스의 패키지를 재사용합니다. “커밋” 요청은 GitHub 반영과 릴리즈를 포함합니다. 로컬 Windows 빌드는 `python scripts/prototype-build.py --godot "Godot 실행 파일 경로" --rendered-check`입니다.
 
@@ -22,7 +24,7 @@ Windows 테스트 빌드는 `Investigation prototype builds`의 Actions 아티�
 
 Android는 APK를 설치해 가로 화면으로 플레이합니다. 왼쪽 영역으로 이동하고 오른쪽 화면을 드래그해 시점을 조작합니다. 가까운 대상에만 대화·조작 버튼이 표시됩니다. 외부 키보드 입력도 함께 사용합니다. PC는 키보드·마우스가 기본이며 휴대 단말의 설정 탭에서 터치를 활성화합니다. Linux 배포는 이후 추가합니다.
 
-설정 탭에서 업데이트를 확인하거나 시작 시 확인을 끌 수 있습니다. 빌드에 기록한 안정·사전 릴리즈 채널의 더 높은 버전만 확인합니다. 게임 명령은 네트워크를 사용하지 않습니다. Android는 새 APK를 덮어 설치하고 Windows는 게임을 닫고 새 EXE를 실행합니다. 게임 저장과 입력 설정은 유지됩니다.
+설정 탭에서 업데이트를 확인하거나 시작 시 확인을 끌 수 있습니다. 빌드에 기록한 안정·사전 릴리즈 채널의 더 높은 버전만 확인합니다. 게임 명령은 네트워크를 사용하지 않습니다. 설치형 Windows 베타는 새 버전 알림에서 동의한 뒤에만 다운로드·저장·종료·설치·재실행합니다. 나중에·창 닫기·일반 종료는 설치하지 않습니다. 설치·건강 확인에 실패하면 이전 설치와 저장으로 복구합니다. Android는 새 APK를 덮어 설치하고 휴대용 Windows EXE는 새 파일을 받아 실행합니다. 게임 저장과 입력 설정은 유지됩니다.
 
 NPC 대화는 화면 아래 대화창을 사용합니다. 대화 중 이동·시점 입력을 멈추고 카메라를 화자 쪽으로 살짝 조정합니다. 대화를 닫으면 원래 시점으로 돌아갑니다. 휴대 단말의 메신저는 연락처별 업무 연락·이전 제출·첨부 이력을 표시합니다.
 
@@ -46,7 +48,7 @@ godot --path godot -- --legacy
 | 4. 더미 플레이 | 3개 구역, 장비 6개, NPC 4명, 터미널·노트·메신저·보고·업무 | 완료 |
 | 5. 5~7일차 | 운영 확인, 상태별 후속 연락, 승인 후 감사 원본 조회, 종료 확인 | 기본 진행 |
 | 6. 본편 | 상세 경위 대조, 최종 행위자 보고, T-19 통제·반출 결과, 정식 결말 | 다음 작업 |
-| 7. 실제 환경 | 더미를 실제 맵·장비·NPC로 교체, Windows 플레이 확인·배포 | 이후 |
+| 7. 실제 환경 | godot-port 사무실 맵·문·충돌·외관에 조사 장비 ID를 연결 | beta 통합 |
 
 2일차에도 범위·접근·수집 근거가 갖춰지면 발생 보고를 승인합니다. 보고 전 실행 중지도 가능하며, 스냅샷은 선택 사항입니다. 중지는 재실행을 막지만 기존 장애를 복구하지 않습니다. 색인 복구는 수집 작업을 중지하지 않습니다. 날짜만으로 예방한 장애를 다시 만들지 않습니다.
 
@@ -62,10 +64,10 @@ godot --path godot -- --legacy
 | `prototype/scripts/engine.gd` | `create_state()` · `parse()` · `step()` · `project()`; Node·파일·시계에 의존하지 않는 진행 규칙 |
 | `prototype/scripts/save_codec.gd` | 버전·ID·기록 참조·날짜 이력 검증, JSON 변환 |
 | `prototype/scripts/store.gd` | 파일 저장·백업·보존·가져오기 |
-| `prototype/scripts/game.gd` · `ui.gd` · `target.gd` | 더미 환경, UI, 논리 장비 ID 연결 |
+| `prototype/scripts/game.gd` · `ui.gd` · `target.gd` | 사무실 환경, UI, 논리 장비 ID 연결 |
 | `prototype/tests/scenarios.json` | 엔진 교체 시 재사용할 입력·기대 결과 시나리오 |
 
-기존 `LabPlayer`만 이동에 재사용합니다. 기존 `LabMissions`와 학습 저장에는 의존하지 않습니다. 장비 ID가 같으면 실제 맵을 붙일 때 사건 엔진을 바꿀 필요가 없습니다. 다른 런타임은 같은 JSON·논리 ID·시나리오를 사용할 수 있습니다.
+`LabPlayer`는 프로토타입의 혼합 입력을 유지하고, `LabWorld`는 맵·문·충돌·외관에 재사용합니다. 기존 `LabMissions`와 학습 저장에는 의존하지 않습니다. 기존 장비 ID를 유지해 사건 엔진과 저장을 그대로 사용합니다. 다른 런타임은 같은 JSON·논리 ID·시나리오를 사용할 수 있습니다.
 
 저장은 `user://investigation/save.json`이며 기존 `user://progress.json`과 분리됩니다. Windows 기본 위치는 `%APPDATA%/Godot/app_userdata/Security Lab · Native/investigation/`입니다. 최신 이전 저장은 `save.backup.json`에 남깁니다. 손상·미지원 저장은 자동 초기화하지 않습니다. 새 조사나 가져오기로 교체하기 전에 원본을 보존하고, 보존에 실패하면 교체를 중단합니다. 진행 JSON은 256KiB 이하여야 합니다.
 
@@ -75,21 +77,21 @@ godot --path godot -- --legacy
 python scripts/prototype-test.py --godot "C:/path/to/Godot_v4.7.2-stable_win64_console.exe"
 ```
 
-새 시나리오 8개와 더미 장면의 이동·실제 장비 레이캐스트·UI 정지·저장 검사를 실행합니다. 매 시나리오 전이에서 입력 상태 불변성과 저장 복원을 확인합니다. Windows Native CI에도 같은 검사를 연결했습니다.
+새 시나리오 8개와 사무실 장면의 이동·실제 장비 레이캐스트·UI 정지·저장 검사를 실행합니다. 매 시나리오 전이에서 입력 상태 불변성과 저장 복원을 확인합니다. Windows Native CI에도 같은 검사를 연결했습니다.
 
 Linux에서 시나리오 8개·456개 검증과 실제 렌더링 장면 검사를 통과했습니다. 첫날 안내 완주, 대화창·메신저 분리, 카메라 복원, 명령 자동완성·이력, 파일 조회 권한, 상호작용 안내와 저장을 확인했습니다.
 
-Windows 빌드는 시나리오·더미 장면 검사 후 EXE만 별도 폴더로 옮겨 실행·저장·재실행을 확인합니다. 실제 렌더링으로 첫 화면·대화·터미널·메신저·노트·이동을 검사하고 화면 7개를 Actions 아티팩트에 보관합니다. 수동 플레이의 사용성 검토는 별도로 진행합니다.
+Windows 빌드는 시나리오·사무실 장면 검사 후 EXE만 별도 폴더로 옮겨 실행·저장·재실행을 확인합니다. 실제 렌더링으로 첫 화면·대화·터미널·메신저·노트·이동을 검사하고 화면 7개를 Actions 아티팩트에 보관합니다. 수동 플레이의 사용성 검토는 별도로 진행합니다.
 
 Android 빌드는 ARM64·x86_64를 포함합니다. Android 15 에뮬레이터에서 첫 화면·터치와 키보드·백그라운드 저장·동일 패키지 덮어 설치·재실행을 통과했습니다. 빈 화면도 검사 실패로 처리합니다. Windows와 Android 검사가 모두 통과한 같은 소스의 파일만 배포합니다. 실제 휴대폰의 화면·키보드·성능은 별도로 확인합니다.
 
 프로토타입 APK는 해시로 고정한 AOSP 공개 개발용 서명을 사용해 버전 간 설치를 유지합니다. 정식 Android 배포에는 별도의 비공개 서명을 사용해야 합니다. Android 패키지 ID는 `com.nu4ddi4.securitylab.prototype`입니다.
 
-프로토타입 전용 빌드는 임시 프로젝트에서 규칙·더미 장면을 검사합니다. 내보내기 후 임시 소스를 삭제하고 EXE만 별도 폴더로 복사해 검증합니다.
+프로토타입 전용 빌드는 임시 프로젝트에서 규칙·사무실 장면·진단·설치 서비스 연결을 검사합니다. 내보내기 후 임시 소스를 삭제하고 EXE만 별도 폴더로 복사해 검증합니다.
 
 ## 다음 작업 순서
 
 1. 더미 환경에서 1~4일차를 직접 플레이해 명령 발견·노트 대조·보고 작성의 사용성을 조정합니다.
 2. 5~6일차 질문과 감사 원본 대조를 확장하고, 증거 조건에 따른 최종 행위자 보고를 추가합니다.
 3. T-19와 잔여 경로 통제, 실제 전달 결과, 7일차 정식 결말을 구현합니다.
-4. Windows에서 프로토타입 EXE를 확인한 뒤 실제 맵과 연출을 연결합니다.
+4. beta에서 장시간 플레이·실제 PC와 휴대폰의 성능·기존 저장 호환성을 확인하고 안정화한 뒤 main에 병합합니다.

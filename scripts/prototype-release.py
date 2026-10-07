@@ -15,7 +15,7 @@ from ci_release import github
 def validate_build(run, jobs, artifacts, repository, sha, version):
     if (run.get('status') != 'completed' or run.get('conclusion') != 'success'
             or run.get('head_sha') != sha
-            or run.get('head_branch') != 'codex/godot-investigation-prototype'
+            or run.get('head_branch') != 'beta'
             or run.get('head_repository', {}).get('full_name') != repository
             or run.get('path') != '.github/workflows/godot-prototype.yml'
             or run.get('event') not in {'push', 'workflow_dispatch'}):
@@ -24,7 +24,7 @@ def validate_build(run, jobs, artifacts, repository, sha, version):
         raise ValueError('Windows and Android execution checks must both succeed')
     selected = {}
     for platform in ['Windows-x64', 'Android']:
-        name = 'SecurityLab-proto-' + version + '-' + platform
+        name = 'SecurityLab-beta-' + version + '-' + platform
         matching = [item for item in artifacts if item['name'] == name]
         if (len(matching) != 1 or matching[0].get('expired') is not False
                 or matching[0].get('size_in_bytes', 0) <= 0
@@ -42,6 +42,38 @@ def verified_file(directory, name):
     return path
 
 
+def version_key(version):
+    match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)-beta\.(\d+)', version)
+    if not match:
+        raise ValueError('Invalid beta channel version')
+    return tuple(map(int, match.groups()))
+
+
+def publish_channel(repository, tag_sha, manifest_file):
+    """Move only the beta product channel after its version payload is published."""
+    alias = 'beta-channel-beta'
+    prefix = 'repos/' + repository
+    manifest = json.loads(manifest_file.read_text(encoding='utf-8'))
+    previous_release = github(prefix + '/releases/tags/' + alias, missing_ok=True)
+    if previous_release:
+        with tempfile.TemporaryDirectory(prefix='beta-channel-') as temporary:
+            subprocess.run(['gh', 'release', 'download', alias, '--repo', repository,
+                            '--pattern', 'update.json', '--dir', temporary], check=True)
+            previous = json.loads((Path(temporary)/'update.json').read_text(encoding='utf-8'))
+        if previous.get('app_id') != 'security-lab-beta' or previous.get('channel') != 'beta':
+            raise ValueError('Foreign beta channel metadata')
+        if previous == manifest:
+            return
+        if version_key(previous['version']) >= version_key(manifest['version']):
+            raise ValueError('Beta channel cannot replace or move behind its current version')
+    else:
+        subprocess.run(['gh', 'release', 'create', alias, '--repo', repository,
+                        '--target', tag_sha, '--prerelease', '--latest=false',
+                        '--title', 'Security Lab Beta update channel',
+                        '--notes', 'Beta channel metadata. Installers are published in version releases.'], check=True)
+    subprocess.run(['gh', 'release', 'upload', alias, str(manifest_file), '--repo', repository, '--clobber'], check=True)
+
+
 def main():
     repository = os.environ['GITHUB_REPOSITORY']
     run_id = os.environ['PROTOTYPE_RUN_ID']
@@ -56,6 +88,10 @@ def main():
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
         raise ValueError('Use a prototype version in X.Y.Z form')
     metadata = json.loads(Path('godot/prototype/version.json').read_text(encoding='utf-8'))
+    if repository != 'nu4ddi4/security-lab-game' or os.environ.get('GITHUB_REF') != 'refs/heads/beta':
+        raise ValueError('Beta publication requires the original beta branch')
+    if metadata.get('tag_prefix') != 'SecurityLab-beta-':
+        raise ValueError('Expected beta product metadata')
     if version != metadata['version'] or metadata.get('prerelease') is not True:
         raise ValueError('Release version/channel differs from the prototype build')
     prefix = 'repos/' + repository
@@ -66,8 +102,9 @@ def main():
     subprocess.run(['git', 'merge-base', '--is-ancestor', sha, 'HEAD'], check=True)
     subprocess.run(['git', 'diff', '--quiet', sha, 'HEAD', '--', 'godot',
                     'scripts/prototype-build.py', 'scripts/prototype-android-build.py',
-                    'scripts/prototype-android-test.py', '.github/workflows/godot-prototype.yml'], check=True)
-    tag = 'SecurityLab-proto-' + version
+                    'scripts/prototype-android-test.py', 'scripts/beta-installer-build.py',
+                    'tests/native', 'installer', '.github/workflows/godot-prototype.yml'], check=True)
+    tag = 'SecurityLab-beta-' + version
     release = github(prefix + '/releases/tags/' + tag, missing_ok=True)
     reference = github(prefix + '/git/ref/tags/' + tag, missing_ok=True)
     if reference and reference['object']['sha'] != tag_sha:
@@ -88,6 +125,25 @@ def main():
                     raise ValueError('Downloaded Android test report does not confirm mobile input checks')
             destination = directory / original.name
             shutil.copyfile(original, destination)
+            files.append(destination)
+        windows = directory / 'Windows-x64'
+        updater_report = json.loads((windows/'beta-windows-updater.json').read_text(encoding='utf-8-sig'))
+        if updater_report.get('product')!='security-lab-beta' or updater_report.get('passed') is not True:
+            raise ValueError('Beta Windows installation and rollback checks must pass')
+        installer = verified_file(windows,'SecurityLabSetup.exe')
+        manifest = json.loads((windows/'update.json').read_text())
+        identity = json.loads((windows/'build_info.json').read_text())
+        if (manifest.get('app_id')!='security-lab-beta' or manifest.get('commit')!=sha
+                or manifest.get('channel')!='beta' or manifest.get('version')!=version+'-beta.1'
+                or manifest.get('sha256')!=hashlib.sha256(installer.read_bytes()).hexdigest()
+                or manifest.get('size')!=installer.stat().st_size
+                or manifest.get('exe_sha256')!=hashlib.sha256(files[0].read_bytes()).hexdigest()
+                or identity.get('commit')!=sha or identity.get('app_id')!='security-lab-beta'
+                or manifest.get('installer_url')!='https://github.com/'+repository+'/releases/download/'+tag+'/SecurityLabSetup.exe'):
+            raise ValueError('Beta installer/manifest differs from the verified Windows build')
+        for name in ['SecurityLabSetup.exe','update.json','build_info.json']:
+            destination = directory/name
+            shutil.copyfile(windows/name,destination)
             files.append(destination)
         exe = files[0]
         archive = exe.with_suffix('.zip')
@@ -112,11 +168,16 @@ def main():
             subprocess.run(['gh', 'release', 'create', tag, *map(str, files),
                             '--repo', repository, '--target', tag_sha, '--verify-tag', '--prerelease', '--latest=false',
                             '--title', tag, '--notes-file', str(notes)], check=True)
+        published = github(prefix + '/releases/tags/' + tag)
+        if not {path.name for path in files} <= {asset['name'] for asset in published['assets']
+                                               if asset.get('state')=='uploaded' and asset.get('size',0)>0}:
+            raise ValueError('Beta payload upload is incomplete; channel remains unchanged')
+        publish_channel(repository, tag_sha, directory/'update.json')
     release = github(prefix + '/releases/tags/' + tag)
     if (not release.get('prerelease') or release.get('draft')
             or release.get('tag_name') != tag or release.get('name') != tag):
         raise ValueError('Expected a published prototype prerelease')
-    expected = {tag + '.exe', tag + '.zip', tag + '.apk', 'SHA256SUMS.txt'}
+    expected = {tag + '.exe', tag + '.zip', tag + '.apk', 'SecurityLabSetup.exe', 'update.json', 'build_info.json', 'SHA256SUMS.txt'}
     uploaded = {item['name'] for item in release['assets']
                 if item.get('state') == 'uploaded' and item.get('size', 0) > 0}
     if not expected <= uploaded:

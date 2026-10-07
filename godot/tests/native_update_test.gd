@@ -48,7 +48,7 @@ func _init():
 		expect(not Policy.trusted_redirect(url,source,false),"redirect origin")
 	expect(Policy.trusted_redirect("https://release-assets.githubusercontent.com/a/b?sig=c&x=1",source,false),"GitHub asset redirect")
 	var updater = Updater.new()
-	expect(updater.state=="disabled" and not updater.enabled and not updater.install_on_exit,"idle source cannot update")
+	expect(updater.state=="disabled" and not updater.enabled and not updater.consent_granted,"idle source cannot update")
 	updater.free()
 	print("NATIVE_UPDATE_TEST ",JSON.stringify({"passed":failures.is_empty(),"assertions":assertions,"failures":failures}))
 	quit(0 if failures.is_empty() else 1)

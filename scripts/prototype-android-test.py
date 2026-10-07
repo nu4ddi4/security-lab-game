@@ -78,7 +78,7 @@ def main():
     args = parser.parse_args()
     directory = Path(args.directory)
     metadata = json.loads(Path('godot/prototype/version.json').read_text())
-    stem = 'SecurityLab-proto-' + metadata['version']
+    stem = 'SecurityLab-beta-' + metadata['version']
     apk, qa = directory / (stem + '.apk'), directory / (stem + '-qa.apk')
     adb('wait-for-device')
     print('ANDROID_STORAGE', adb('shell', 'df', '-h', '/data').strip(), flush=True)

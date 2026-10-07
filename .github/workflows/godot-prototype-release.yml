@@ -1,7 +1,7 @@
-name: Publish prototype beta
+name: Publish verified beta
 on:
   push:
-    branches: ['codex/godot-investigation-prototype']
+    branches: ['beta']
     paths: ['.github/workflows/godot-prototype-release.yml']
 permissions:
   contents: read
@@ -10,6 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
+    if: github.ref == 'refs/heads/beta' && contains(github.event.head_commit.message, 'Publish verified SecurityLab-beta-')
     runs-on: ubuntu-latest
     timeout-minutes: 6
     permissions:
@@ -17,9 +18,9 @@ jobs:
       actions: read
     env:
       GH_TOKEN: ${{ github.token }}
-      PROTOTYPE_RUN_ID: '37561505307'
-      PROTOTYPE_BUILD_SHA: 'edef452c71136428c3eb0ba9e0a59f9f97249542'
-      PROTOTYPE_VERSION: '0.2.0'
+      PROTOTYPE_RUN_ID: '0'
+      PROTOTYPE_BUILD_SHA: '0000000000000000000000000000000000000000'
+      PROTOTYPE_VERSION: '0.3.0'
     steps:
       - uses: actions/checkout@v4
         with:

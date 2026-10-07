@@ -35,6 +35,13 @@ class ScopeTests(unittest.TestCase):
     def test_unknown_paths_require_validation(self):
         self.assertEqual(classify(['new-runtime/game.dat'], True), {'web':True, 'godot':True})
 
+    def test_beta_changes_require_native_packaging(self):
+        event = {'ref':'refs/heads/beta', 'repository':{'default_branch':'main'}}
+        scope = select(['scripts/beta-installer-build.py'], event, True)
+        self.assertTrue(scope['godot'])
+        self.assertTrue(scope['windows_godot'])
+        self.assertFalse(scope['web'])
+
     def test_release_note_recovery_is_only_on_main(self):
         self.assertFalse(classify(['docs/RELEASE.md'], main_push=False)['web'])
         self.assertTrue(classify(['docs/RELEASE.md'], main_push=True)['web'])

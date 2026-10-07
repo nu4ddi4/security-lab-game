@@ -172,8 +172,7 @@ func run(game: InvestigationPrototype):
 	Input.action_release("forward")
 	if game.player.global_position.distance_to(start) < .2: failures.append("Dummy scene movement")
 	await capture(game,"06-field")
-	game.player.global_position = Vector3(0,.01,-2)
-	game.player.camera.look_at(Vector3(0,1.2,-3.85))
+	game.review_target("server_console") if game.detailed_world else _dummy_server_pose(game)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	if not game.player.target is InvestigationTarget or game.player.target.logical_id != "server_console": failures.append("Actual device raycast")
@@ -182,6 +181,22 @@ func run(game: InvestigationPrototype):
 		if game.context != "server_console" or game.ui.mode != "terminal": failures.append("Raycast F captures only its terminal")
 	game.ui.open_tablet()
 	if game.player.enabled: failures.append("Tablet freezes movement")
+	if game.detailed_world:
+		game.ui.close()
+		for id in game.targets:
+			game.review_target(id)
+			await get_tree().physics_frame
+			await get_tree().physics_frame
+			if not game.player.target is InvestigationTarget or game.player.target.logical_id != id:
+				failures.append("Detailed office target is reachable: "+id)
+		if game.world.doors.is_empty(): failures.append("Detailed office preserves interactive doors")
+		else:
+			game.player.target = game.world.doors.values()[0]
+			game.controls.set_touch(true)
+			game.controls._process(0)
+			if game.controls.buttons.tool.visible: failures.append("Doors do not offer investigation commands")
+			game.controls.set_touch(original_touch)
+		game.ui.open_tablet()
 	game.save_now()
 	if not game.store.load_state(game.content).has("state"): failures.append("Existing save format accepts the new UI flow")
 	var path = game.store.directory.path_join("save.json")
@@ -205,3 +220,7 @@ func run(game: InvestigationPrototype):
 	if report != null: report.store_string(JSON.stringify(summary))
 	print("INVESTIGATION_SMOKE ",JSON.stringify(summary))
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+func _dummy_server_pose(game):
+	game.player.global_position = Vector3(0,.01,-2)
+	game.player.camera.look_at(Vector3(0,1.2,-3.85))
