@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -48,8 +49,13 @@ def main():
             shutil.copytree(source / 'prototype', target / 'prototype')
             (target / 'assets/fonts').mkdir(parents=True)
             shutil.copyfile(source / 'assets/fonts/NotoSansKR.ttf', target / 'assets/fonts/NotoSansKR.ttf')
-        scene = 'run/main_scene="res://prototype/main.tscn"\n' if prototype else ''
-        (target / 'project.godot').write_text('config_version=5\n[application]\nconfig/name="Security Lab CI"\n' + scene + '[physics]\ncommon/physics_ticks_per_second=120\n', encoding='utf-8')
+        # UI assertions must use the real viewport and stretch settings too.
+        # Keep the lightweight file set; only the project configuration is shared.
+        project = (source / 'project.godot').read_text(encoding='utf-8')
+        project = re.sub(r'^config/name=.*$', 'config/name="Security Lab CI"', project, flags=re.MULTILINE)
+        scene = 'run/main_scene="res://prototype/main.tscn"' if prototype else ''
+        project = re.sub(r'^run/main_scene=.*$', scene, project, flags=re.MULTILINE)
+        (target / 'project.godot').write_text(project, encoding='utf-8')
         run(args.godot, target, ['--editor', '--import'])
         run(args.godot, target, ['--script', 'res://tests/unit.gd'], 'NATIVE_UNIT')
         if prototype:

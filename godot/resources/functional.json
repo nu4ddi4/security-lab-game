@@ -1,0 +1,589 @@
+{
+  "COLLIDER_Archive_Desk": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Chair_0": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Chair_1": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Chair_2": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Chair_3": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Corporate_Shared_Shelving": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Shared_Storage": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_SOC_Display_Stand": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Desk_0": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Desk_1": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Desk_2": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Desk_3": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_FileCabinets": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Network_Bench": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Partition_Center_Upper": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Partition_Left_Upper": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Partition_RecordRight_Upper": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Rack_0": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Rack_1": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Rack_2": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Rack_3": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Rack_4": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Rack_5": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Reveal_Main_Left": {
+    "extras": {
+      "collision": true,
+      "purpose": "New finished jamb; original collision proxies retained"
+    }
+  },
+  "COLLIDER_Reveal_Main_Right": {
+    "extras": {
+      "collision": true,
+      "purpose": "New finished jamb; original collision proxies retained"
+    }
+  },
+  "COLLIDER_Reveal_RecordsRoom_Left": {
+    "extras": {
+      "collision": true,
+      "purpose": "New finished jamb; original collision proxies retained"
+    }
+  },
+  "COLLIDER_Reveal_RecordsRoom_Right": {
+    "extras": {
+      "collision": true,
+      "purpose": "New finished jamb; original collision proxies retained"
+    }
+  },
+  "COLLIDER_Reveal_ServerRoom_Left": {
+    "extras": {
+      "collision": true,
+      "purpose": "New finished jamb; original collision proxies retained"
+    }
+  },
+  "COLLIDER_Reveal_ServerRoom_Right": {
+    "extras": {
+      "collision": true,
+      "purpose": "New finished jamb; original collision proxies retained"
+    }
+  },
+  "COLLIDER_Support_Printer_Cabinet": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Wall_East": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_Entry_2.2": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_Entry_-2.2": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_Entry_Back": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_North": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_Partition_Center": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_Partition_Header": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_Partition_Left": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_Partition_RecordRight": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_Records_Header": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_Server_Divider": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_South_Header": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_South_Left": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_South_Right": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_West_Lower": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Wall_West_Upper": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_West_Window": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Whiteboard": {
+    "extras": {
+      "collision": true
+    }
+  },
+  "COLLIDER_Corporate_Chair_13": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Desk_13": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_14": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Desk_14": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_15": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Desk_15": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_16": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Desk_16": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_17": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Desk_17": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_18": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Desk_18": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_19": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Desk_19": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_20": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Desk_20": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_21": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Desk_21": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_22": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_23": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_24": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Corporate_Chair_25": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "DOOR_Main_Leaf": {},
+  "DOOR_Main": {
+    "translation": [
+      -0.6399999856948853,
+      0,
+      9.859999656677246
+    ],
+    "extras": {
+      "openAngleDegrees": 100,
+      "interaction": "door",
+      "label": "출입문",
+      "width": 1.28,
+      "height": 2.3,
+      "collisionBounds": [
+        0,
+        -0.06,
+        0,
+        1.28,
+        0.06,
+        2.29
+      ]
+    }
+  },
+  "DOOR_RecordsRoom_Leaf": {},
+  "DOOR_RecordsRoom": {
+    "translation": [
+      4.659999847412109,
+      0,
+      -2.119999885559082
+    ],
+    "extras": {
+      "openAngleDegrees": 95,
+      "interaction": "door",
+      "label": "출입문",
+      "width": 1.28,
+      "height": 2.3,
+      "collisionBounds": [
+        0,
+        -0.06,
+        0,
+        1.28,
+        0.06,
+        2.29
+      ]
+    }
+  },
+  "DOOR_ServerRoom_Leaf": {},
+  "DOOR_ServerRoom": {
+    "translation": [
+      -5.940000057220459,
+      0,
+      -2.119999885559082
+    ],
+    "extras": {
+      "openAngleDegrees": 95,
+      "interaction": "door",
+      "label": "출입문",
+      "width": 1.28,
+      "height": 2.3,
+      "collisionBounds": [
+        0,
+        -0.06,
+        0,
+        1.28,
+        0.06,
+        2.29
+      ]
+    }
+  },
+  "INTERACT_AdminPC": {
+    "translation": [
+      -5,
+      0,
+      3
+    ],
+    "extras": {
+      "interaction": "admin",
+      "label": "관리 PC / 조사 도구"
+    }
+  },
+  "INTERACT_FileCabinet": {
+    "translation": [
+      7.400000095367432,
+      0,
+      -7.800000190734863
+    ],
+    "extras": {
+      "interaction": "files",
+      "label": "자료 보관함 / 파일 비교"
+    }
+  },
+  "INTERACT_Router": {
+    "translation": [
+      7,
+      0,
+      2
+    ],
+    "extras": {
+      "interaction": "settings",
+      "label": "네트워크 장비 / 방어 설정"
+    }
+  },
+  "INTERACT_ServerRack": {
+    "translation": [
+      -8,
+      0,
+      -5
+    ],
+    "extras": {
+      "interaction": "terminal",
+      "label": "자료 서버 / 가상 터미널"
+    }
+  },
+  "INTERACT_Whiteboard": {
+    "translation": [
+      2,
+      0,
+      -0.8199999928474426
+    ],
+    "extras": {
+      "interaction": "brief",
+      "label": "화이트보드 / 미션과 힌트"
+    }
+  },
+  "COLLIDER_Network_Training_Bench_02": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "SPAWN_Player": {
+    "translation": [
+      0,
+      0,
+      11.699999809265137
+    ],
+    "extras": {
+      "eyeHeight": 1.65,
+      "bodyHeight": 1.8,
+      "yaw": 0
+    }
+  },
+  "COLLIDER_Training_Chair_04": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Desk_04": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Chair_05": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Desk_05": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Chair_06": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Desk_06": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Chair_07": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Desk_07": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Chair_08": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Desk_08": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Chair_09": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Desk_09": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Chair_10": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Desk_10": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Chair_11": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Desk_11": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Chair_12": {
+    "extras": {
+      "collision": "solid"
+    }
+  },
+  "COLLIDER_Training_Desk_12": {
+    "extras": {
+      "collision": "solid"
+    }
+  }
+}

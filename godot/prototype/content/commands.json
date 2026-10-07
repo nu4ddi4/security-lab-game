@@ -1,0 +1,483 @@
+[
+  {
+    "text": "help",
+    "devices": [
+      "control_console",
+      "server_console",
+      "project_pc",
+      "maintenance_terminal",
+      "approval_archive",
+      "briefing_board"
+    ],
+    "action": "help",
+    "args": {},
+    "category": "기본",
+    "description": "현재 장비에서 사용할 수 있는 명령과 설명을 확인합니다."
+  },
+  {
+    "text": "status",
+    "devices": [
+      "control_console",
+      "server_console",
+      "project_pc",
+      "maintenance_terminal",
+      "approval_archive",
+      "briefing_board"
+    ],
+    "action": "status",
+    "args": {},
+    "category": "기본",
+    "description": "자료 서비스·검색·자동 작업의 현재 상태를 확인합니다."
+  },
+  {
+    "text": "logs tasks",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "tasks"
+    },
+    "category": "조회",
+    "description": "등록된 자동 작업과 실제 실행 이력을 확인합니다."
+  },
+  {
+    "text": "inspect T-17",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "task17"
+    },
+    "category": "조회",
+    "description": "자료 색인 점검 작업의 설정과 실행 이력을 확인합니다."
+  },
+  {
+    "text": "inspect T-19",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "task19"
+    },
+    "category": "조회",
+    "description": "정비 결과 전달 작업의 설정을 확인합니다."
+  },
+  {
+    "text": "logs access --task T-17",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "access"
+    },
+    "category": "원본",
+    "description": "T-17의 실제 파일 접근 원본을 조회합니다."
+  },
+  {
+    "text": "inspect staging",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "staging"
+    },
+    "category": "원본",
+    "description": "작업이 임시 보관한 문서 목록을 확인합니다."
+  },
+  {
+    "text": "logs backups",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "backup"
+    },
+    "category": "조회",
+    "description": "백업 구성과 변경 기록을 확인합니다."
+  },
+  {
+    "text": "inspect backups",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "backup"
+    },
+    "category": "조회",
+    "description": "백업 구성과 변경 기록을 확인합니다."
+  },
+  {
+    "text": "inspect account",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "account"
+    },
+    "category": "조회",
+    "description": "서비스 계정의 용도와 권한 원본을 확인합니다."
+  },
+  {
+    "text": "backup disable B-05",
+    "devices": [
+      "server_console"
+    ],
+    "action": "backup_disable",
+    "args": {},
+    "category": "복구",
+    "description": "중복 백업 B-05만 비활성화합니다. 필수 백업은 유지합니다."
+  },
+  {
+    "text": "backup enable B-05",
+    "devices": [
+      "server_console"
+    ],
+    "action": "backup_enable",
+    "args": {},
+    "category": "복구",
+    "description": "중복 백업 B-05를 다시 활성화합니다."
+  },
+  {
+    "text": "repair index",
+    "devices": [
+      "server_console"
+    ],
+    "action": "index_repair",
+    "args": {},
+    "category": "복구",
+    "description": "검색 색인을 복구합니다. 수집 작업은 별도로 통제해야 합니다."
+  },
+  {
+    "text": "snapshot T-17",
+    "devices": [
+      "server_console"
+    ],
+    "action": "snapshot",
+    "args": {},
+    "category": "통제",
+    "description": "실행 중인 T-17의 상태를 원본으로 보존합니다."
+  },
+  {
+    "text": "pause T-17",
+    "devices": [
+      "server_console"
+    ],
+    "action": "pause",
+    "args": {},
+    "category": "통제",
+    "description": "확인 후 T-17을 중지합니다. 기존 장애를 복구하지는 않습니다."
+  },
+  {
+    "text": "verify service",
+    "devices": [
+      "server_console"
+    ],
+    "action": "verify_service",
+    "args": {},
+    "category": "검증",
+    "description": "필수 백업과 자료 서비스가 정상인지 재검증합니다."
+  },
+  {
+    "text": "inspect files",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "files"
+    },
+    "category": "조회",
+    "description": "업무 PC의 실제 원본 파일을 확인합니다."
+  },
+  {
+    "text": "search LUMEN",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "search"
+    },
+    "category": "조회",
+    "description": "LUMEN 자료의 검색 결과를 확인합니다."
+  },
+  {
+    "text": "logs indexing",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "index"
+    },
+    "category": "원본",
+    "description": "검색 색인 변경·장애 기록을 확인합니다."
+  },
+  {
+    "text": "logs deployments",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "normal_jobs"
+    },
+    "category": "원본",
+    "description": "정상 배포 작업 원본을 확인합니다."
+  },
+  {
+    "text": "verify search",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "verify_search",
+    "args": {},
+    "category": "검증",
+    "description": "검색 서비스가 정상인지 재검증합니다."
+  },
+  {
+    "text": "inspect W-218",
+    "devices": [
+      "control_console",
+      "approval_archive",
+      "maintenance_terminal"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "approval"
+    },
+    "category": "원본",
+    "description": "유지보수 승인 범위 원본을 확인합니다."
+  },
+  {
+    "text": "logs submissions",
+    "devices": [
+      "control_console",
+      "maintenance_terminal"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "submissions"
+    },
+    "category": "감사",
+    "description": "승인 후 제출·적용 감사 원본을 조회합니다."
+  },
+  {
+    "text": "inspect PKG-218-R2",
+    "devices": [
+      "control_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "package"
+    },
+    "category": "감사",
+    "description": "승인 후 중앙 보관 패키지의 내용을 조회합니다."
+  },
+  {
+    "text": "inspect assignment",
+    "devices": [
+      "maintenance_terminal"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "approval"
+    },
+    "category": "원본",
+    "description": "정비 담당자의 장비 배정과 승인 범위를 확인합니다."
+  },
+  {
+    "text": "inspect checklist",
+    "devices": [
+      "briefing_board",
+      "control_console"
+    ],
+    "action": "checklist",
+    "args": {},
+    "category": "기본",
+    "description": "오늘 아직 마치지 않은 운영 확인을 표시합니다."
+  },
+  {
+    "text": "pwd",
+    "devices": [
+      "server_console",
+      "project_pc",
+      "control_console",
+      "approval_archive",
+      "maintenance_terminal",
+      "briefing_board"
+    ],
+    "action": "working_directory",
+    "args": {},
+    "category": "파일 탐색",
+    "description": "현재 장비의 작업 위치를 표시합니다."
+  },
+  {
+    "text": "ls",
+    "devices": [
+      "server_console",
+      "project_pc",
+      "control_console",
+      "approval_archive",
+      "maintenance_terminal",
+      "briefing_board"
+    ],
+    "action": "directory",
+    "args": {},
+    "category": "파일 탐색",
+    "description": "열람 가능한 파일 목록을 표시합니다. 원본은 cat으로 읽습니다."
+  },
+  {
+    "text": "cat tasks.log",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "tasks"
+    },
+    "category": "파일 탐색",
+    "description": "등록·실행 작업을 조회합니다."
+  },
+  {
+    "text": "cat account.txt",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "account"
+    },
+    "category": "파일 탐색",
+    "description": "서비스 계정 원본을 조회합니다."
+  },
+  {
+    "text": "cat backups.log",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "backup"
+    },
+    "category": "파일 탐색",
+    "description": "백업 구성과 변경을 조회합니다."
+  },
+  {
+    "text": "cat access-t17.log",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "access"
+    },
+    "category": "파일 탐색",
+    "description": "작업별 파일 접근을 조회합니다."
+  },
+  {
+    "text": "cat staging.log",
+    "devices": [
+      "server_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "staging"
+    },
+    "category": "파일 탐색",
+    "description": "임시 보관 목록을 조회합니다."
+  },
+  {
+    "text": "cat files.txt",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "files"
+    },
+    "category": "파일 탐색",
+    "description": "원본 파일 목록을 조회합니다."
+  },
+  {
+    "text": "cat index.log",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "index"
+    },
+    "category": "파일 탐색",
+    "description": "검색 색인 기록을 조회합니다."
+  },
+  {
+    "text": "cat deployments.log",
+    "devices": [
+      "project_pc"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "normal_jobs"
+    },
+    "category": "파일 탐색",
+    "description": "정상 배포 기록을 조회합니다."
+  },
+  {
+    "text": "cat scope.txt",
+    "devices": [
+      "control_console",
+      "approval_archive",
+      "maintenance_terminal"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "approval"
+    },
+    "category": "파일 탐색",
+    "description": "유지보수 승인 범위을 조회합니다."
+  },
+  {
+    "text": "cat submissions.log",
+    "devices": [
+      "control_console",
+      "maintenance_terminal"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "submissions"
+    },
+    "category": "파일 탐색",
+    "description": "제출·적용 감사 원본을 조회합니다."
+  },
+  {
+    "text": "cat package.txt",
+    "devices": [
+      "control_console"
+    ],
+    "action": "read",
+    "args": {
+      "kind": "package"
+    },
+    "category": "파일 탐색",
+    "description": "중앙 보관 패키지을 조회합니다."
+  },
+  {
+    "text": "cat checklist.txt",
+    "devices": [
+      "briefing_board"
+    ],
+    "action": "checklist",
+    "args": {},
+    "category": "파일 탐색",
+    "description": "오늘 남은 점검을 조회합니다."
+  }
+]

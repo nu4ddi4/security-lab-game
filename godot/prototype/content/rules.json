@@ -1,0 +1,24 @@
+{
+  "report": {
+    "claim": "unauthorized_collection",
+    "scope": "E01",
+    "access": "E06",
+    "collection": "E07"
+  },
+  "lateFollowupDay": 5,
+  "maxMemoLength": 4000,
+  "claims": [
+    {
+      "id": "unauthorized_collection",
+      "label": "승인되지 않은 프로젝트 문서 수집"
+    },
+    {
+      "id": "access_only",
+      "label": "자료 접근 기록만 확인"
+    },
+    {
+      "id": "account_owner",
+      "label": "계정 담당자를 행위자로 판단"
+    }
+  ]
+}

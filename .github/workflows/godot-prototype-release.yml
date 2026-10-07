@@ -1,0 +1,31 @@
+name: Publish prototype beta
+on:
+  push:
+    branches: ['codex/godot-investigation-prototype']
+    paths: ['.github/workflows/godot-prototype-release.yml']
+permissions:
+  contents: read
+concurrency:
+  group: prototype-beta-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PROTOTYPE_RUN_ID: '37561505307'
+      PROTOTYPE_BUILD_SHA: 'edef452c71136428c3eb0ba9e0a59f9f97249542'
+      PROTOTYPE_VERSION: '0.2.0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publish verified Windows and Android files
+        run: python scripts/prototype-release.py

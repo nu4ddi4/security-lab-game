@@ -12,3 +12,10 @@ __pycache__/
 /build/
 dist/
 *.spec
+godot/.godot/
+godot/builds/
+godot/tests/results/
+prototype-dist/
+prototype-android-dist/
+godot/assets/models/Interior_07_Godot_*.jpg
+godot/assets/models/Interior_07_Godot_*.png

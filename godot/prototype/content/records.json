@@ -1,0 +1,204 @@
+{
+  "approval": {
+    "title": "승인서 W-218",
+    "source": "승인서 보관함",
+    "body": "허용 범위: 상태 조회, 진단 로그 수집, 임시 파일 정리.\nLUMEN 프로젝트 문서 수집은 승인 범위에 없습니다.\nSUPPORT-07 배정: 협력업체 정비 담당 서유진.",
+    "evidence": "E01",
+    "facts": {
+      "workOrder": "W-218",
+      "collectionAllowed": false
+    },
+    "time": {
+      "dayOffset": -14,
+      "minute": 900
+    },
+    "initial": true
+  },
+  "account": {
+    "title": "svc_release 계정 역할",
+    "source": "서버 계정 목록",
+    "body": "svc_release는 자동 배포·유지보수 작업의 실행 계정입니다.\n업무 담당자는 한지우이며, 계정 이름만으로 작업 제출자를 알 수 없습니다.",
+    "evidence": "E02",
+    "facts": {
+      "account": "svc_release",
+      "owner": "한지우"
+    },
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": true
+  },
+  "backup": {
+    "title": "백업 설정과 지연",
+    "source": "서버 백업 기록",
+    "body": "B-01: 필수 자료 백업. B-05: 이관 때 함께 활성화된 중복 백업.\n같은 자료를 같은 시간에 처리합니다. T-17과는 다른 작업입니다.",
+    "evidence": "E03",
+    "facts": {
+      "duplicate": "B-05"
+    },
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": true
+  },
+  "run": {
+    "title": "T-17 실행 기록",
+    "source": "서버 작업 기록",
+    "body": "23:10 자료 색인 점검이 svc_release로 시작됐습니다.\n등록 작업: T-17. 실행 경로: 이전 유지보수 경로.",
+    "evidence": "E04",
+    "facts": {
+      "task": "T-17",
+      "account": "svc_release"
+    },
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false
+  },
+  "index_damage": {
+    "title": "색인 처리 오류",
+    "source": "업무 PC 색인 기록",
+    "body": "T-17 정리 동작과 같은 시각에 검색 색인이 변경됐습니다.\n원본 파일은 존재하며 검색 색인을 복구할 수 있습니다.",
+    "evidence": "E05",
+    "facts": {
+      "task": "T-17",
+      "originalsExist": true
+    },
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false
+  },
+  "access": {
+    "title": "LUMEN 자료 접근",
+    "source": "서버 접근 기록",
+    "body": "T-17 / svc_release가 LUMEN 비공개 문서를 읽었습니다.\n읽기 기록은 접근을 보여주며 보관·외부 전달 여부는 별도 확인해야 합니다.",
+    "evidence": "E06",
+    "facts": {
+      "task": "T-17",
+      "account": "svc_release",
+      "project": "LUMEN"
+    },
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false
+  },
+  "staging": {
+    "title": "임시 보관 목록",
+    "source": "서버 staging 기록",
+    "body": "T-17이 읽은 LUMEN 비공개 자료가 내부 임시 보관 위치에 모였습니다.\n이 기록은 수집을 보여주며 외부 전달 성공을 의미하지 않습니다.",
+    "evidence": "E07",
+    "facts": {
+      "task": "T-17",
+      "project": "LUMEN",
+      "nonpublic": true
+    },
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false
+  },
+  "submissions": {
+    "title": "패키지 제출·적용 감사",
+    "source": "관제 감사 기록",
+    "body": "시작 전날 16:35 / SUPPORT-07 제출 세션 / PKG-218-R2 적용.\nT-17 수정과 T-19 등록이 같은 적용 기록에 연결됩니다.\n배정 장비만으로 제출 내용과 행위자 결론을 확정하지 마세요.",
+    "evidence": "E08",
+    "facts": {
+      "package": "PKG-218-R2",
+      "device": "SUPPORT-07"
+    },
+    "time": {
+      "dayOffset": -1,
+      "minute": 995
+    },
+    "initial": true
+  },
+  "normal_jobs": {
+    "title": "정상 배포·운영 비교",
+    "source": "업무 PC 배포 기록",
+    "body": "한지우의 정상 배포와 박도윤의 백업 설정 이력은 별도 기록입니다.\n실행 계정, 업무 담당자, 패키지 제출자를 구분해야 합니다.",
+    "evidence": "E09",
+    "facts": {},
+    "time": {
+      "dayOffset": -2,
+      "minute": 930
+    },
+    "initial": true
+  },
+  "package": {
+    "title": "보관 패키지 PKG-218-R2",
+    "source": "관제 패키지 보관함",
+    "body": "원래 작업: 상태·로그 조회와 임시 파일 정리.\n수정본: LUMEN 비공개 문서 선택 → 내부 staging 보관.\n후속 등록 작업 T-19는 보관 자료를 협력업체 전달 경로로 보내도록 설정됐습니다.\n이 내용은 계획이며 전달 완료 기록은 아닙니다.",
+    "evidence": "E10",
+    "facts": {
+      "package": "PKG-218-R2",
+      "task": "T-17"
+    },
+    "time": {
+      "dayOffset": -1,
+      "minute": 995
+    },
+    "initial": true
+  },
+  "message": {
+    "title": "정비 채널 제출 메시지",
+    "source": "유지보수 업무 메신저",
+    "body": "시작 전날 16:20 / 서유진: 진단 항목을 수정했습니다.\n첨부: PKG-218-R2. 중앙 적용 기록·보관 원본과 패키지 식별값을 대조할 수 있습니다.",
+    "evidence": "E11",
+    "facts": {
+      "sender": "서유진",
+      "package": "PKG-218-R2"
+    },
+    "time": {
+      "dayOffset": -1,
+      "minute": 980
+    },
+    "initial": true
+  },
+  "transfer": {
+    "title": "T-19 전달 설정",
+    "source": "서버 작업 상세",
+    "body": "T-19 / 정비 결과 전달 / 7일차 17:30 예정.\n대상: 내부 staging. 경로: 협력업체 접수 채널.\n아직 실제 전달 결과는 없습니다. T-17 중지와 이 전달 작업 통제는 다른 조치입니다.",
+    "evidence": "E12",
+    "facts": {
+      "task": "T-19",
+      "destination": "contractor-channel"
+    },
+    "time": {
+      "dayOffset": -1,
+      "minute": 995
+    },
+    "initial": true
+  },
+  "snapshot": {
+    "title": "보존한 T-17 실행 상태",
+    "source": "서버 실행 상태",
+    "body": "현재 실행 중인 T-17의 작업·계정·보관 상태를 보존했습니다. 핵심 중앙 기록은 중지 이후에도 남습니다.",
+    "evidence": "",
+    "facts": {},
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false
+  },
+  "backup_change": {
+    "title": "백업 설정 변경 기록",
+    "source": "서버 설정 이력",
+    "body": "B-05 설정을 변경했습니다. 필수 B-01은 유지됩니다. 변경 이후 자료 서비스 정상 상태를 다시 검증해야 합니다.",
+    "evidence": "E03",
+    "facts": {},
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false
+  }
+}
