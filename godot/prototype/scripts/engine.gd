@@ -70,6 +70,16 @@ func parse(command: String, device: String, s: Dictionary) -> Dictionary:
 			return {"type":row.action,"deviceId":device,"payload":row.args.duplicate(true)}
 	return {"type":"invalid","code":"UNKNOWN_COMMAND"}
 
+func investigation_assigned(s: Dictionary) -> bool:
+	# The day-four team-lead message assigns investigation. Approved older
+	# saves have already received the expanded assignment.
+	return s.day >= 4 or s.report.approved
+
+func command_visible(s: Dictionary, row: Dictionary) -> bool:
+	var kind = row.args.get("kind","")
+	if kind in ["submissions","package"] and not s.report.approved: return false
+	return investigation_assigned(s) or (kind not in ["access","staging"] and row.action not in ["snapshot","pause"])
+
 func step(original: Dictionary, action: Dictionary) -> Dictionary:
 	var kind = action.get("type","")
 	var payload = action.get("payload",{})
@@ -91,12 +101,13 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 			for file in content.case.devices[device].files:
 				var command = parse(file.command,device,s)
 				if not s.report.approved and command.payload.get("kind","") in ["submissions","package"]: continue
+				if not investigation_assigned(s) and command.payload.get("kind","") in ["access","staging"]: continue
 				rows.append(file.name+"  —  "+file.description)
 			result = _result(s,"DIRECTORY","\n".join(rows))
 		"help":
 			var rows = []
 			for row in content.commands:
-				if device in row.devices and (s.report.approved or row.args.get("kind","") not in ["submissions","package"]): rows.append(row.text + "  —  " + row.get("description",""))
+				if device in row.devices and command_visible(s,row): rows.append(row.text + "  —  " + row.get("description",""))
 			result = _result(s,"HELP", "\n".join(rows))
 		"status":
 			if device == "server_console" and "service" not in s.baseline: s.baseline.append("service")

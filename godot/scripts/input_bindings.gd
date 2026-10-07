@@ -130,9 +130,12 @@ static func key_names(action: String) -> String:
 	display_cache[action] = result
 	return result
 
-static func summary() -> String:
+static func summary(unified = false) -> String:
 	var rows: PackedStringArray = []
-	for action in ACTIONS: rows.append(action.label+" · "+key_names(action.id))
+	for action in ACTIONS:
+		if unified and action.id == "inspect": continue
+		var title = "상호작용" if unified and action.id == "tool" else "일시정지 / 휴대 단말" if unified and action.id == "pause" else action.label
+		rows.append(title+" · "+key_names(action.id))
 	return "\n".join(rows)
 
 static func hint(text: String) -> String:

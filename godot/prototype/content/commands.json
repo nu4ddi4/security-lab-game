@@ -153,7 +153,7 @@
     "action": "index_repair",
     "args": {},
     "category": "복구",
-    "description": "검색 색인을 복구합니다. 수집 작업은 별도로 통제해야 합니다."
+    "description": "검색 색인을 복구한 뒤 검색 서비스의 정상 상태를 재검증합니다."
   },
   {
     "text": "snapshot T-17",

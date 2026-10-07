@@ -51,9 +51,11 @@ func _ready():
 	rows.add_theme_constant_override("separation",8)
 	scroll.add_child(rows)
 	for action in LabInputBindings.ACTIONS:
+		if player.unified_interaction and action.id == "inspect": continue
 		var row = HBoxContainer.new()
 		rows.add_child(row)
-		var label = add_label(row,action.label,18)
+		var title = "상호작용" if player.unified_interaction and action.id == "tool" else "일시정지 / 휴대 단말" if player.unified_interaction and action.id == "pause" else action.label
+		var label = add_label(row,title,18)
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var control = add_button(row,LabInputBindings.names(draft[action.id]),func(): begin_capture(action.id))
 		control.custom_minimum_size = Vector2(230,34)
