@@ -101,7 +101,7 @@ jobs:
           target: default
           profile: pixel_2
           disk-size: 6G
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -wipe-data -partition-size 6144 -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader -no-snapshot -wipe-data -partition-size 6144 -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: python3 scripts/prototype-android-test.py
       - name: Read prototype version
@@ -121,6 +121,7 @@ jobs:
           path: |
             prototype-android-dist/android-startup.png
             prototype-android-dist/android-smoke.json
+            prototype-android-dist/android-log.txt
             prototype-android-dist/ui/*.png
           if-no-files-found: ignore
           retention-days: 14

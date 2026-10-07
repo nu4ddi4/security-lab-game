@@ -60,9 +60,9 @@ def capture_startup(directory):
         data = adb('exec-out', 'screencap', '-p', binary=True)
         (directory / 'android-startup.png').write_bytes(data)
         if rendered_image(data):
-            return
+            return True
         time.sleep(1)
-    raise ValueError('Android did not present the game screen')
+    return False
 
 
 def main():
@@ -84,7 +84,7 @@ def main():
     if ready.get('day') != 1:
         raise ValueError('Fresh Android investigation did not start on day 1')
     wait_for('PROTOTYPE_FRAME_READY')
-    capture_startup(directory)
+    presented = capture_startup(directory)
     # Android suspends apps without a desktop close request. Ensure this saves.
     adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
     time.sleep(1)
@@ -115,6 +115,8 @@ def main():
     resumed = wait_for('PROTOTYPE_READY')
     if resumed.get('day') != ready.get('day') or read_save() != original:
         raise ValueError('Reinstall/relaunch did not retain the original save')
+    if not presented:
+        raise ValueError('Android did not present the game screen')
     print('ANDROID_APK_VERIFIED', json.dumps({'passed': True, 'version': metadata['version'],
           'install': True, 'render': True, 'touch': True, 'keyboard': True, 'updateRetainsSave': True, 'relaunch': True}))
     if os.environ.get('GITHUB_STEP_SUMMARY'):
@@ -123,4 +125,14 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception:
+        try:
+            pid = adb('shell', 'pidof', PACKAGE).strip().split()[0]
+            logs = adb('logcat', '-d', '-v', 'brief', '--pid=' + pid)
+            Path('prototype-android-dist/android-log.txt').write_text(logs, encoding='utf-8')
+            print(logs[-16000:])
+        except Exception as error:
+            print('Could not retain Android app diagnostics:', error)
+        raise
