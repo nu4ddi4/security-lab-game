@@ -14,13 +14,14 @@ var release_key = 0
 var held_keys = {}
 var previous_blocked = false
 var previous_mouse_mode = Input.MOUSE_MODE_VISIBLE
+var player_released = false
 
 func configure(profile: LabInputBindings, actor: LabPlayer):
 	bindings = profile
 	player = actor
 	draft = bindings.bindings.duplicate(true)
 
-func _ready():
+func prepare_window():
 	title = "조작키"
 	size = Vector2i(690,660)
 	transient = true
@@ -34,6 +35,9 @@ func _ready():
 	close_requested.connect(close_editor)
 	focus_exited.connect(cancel_capture)
 	window_input.connect(handle_input)
+
+func _ready():
+	prepare_window()
 	var margin = MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left","right","top","bottom"]: margin.add_theme_constant_override("margin_"+side,20)
@@ -83,7 +87,7 @@ func add_label(parent: Node, text: String, font_size: int) -> Label:
 func add_button(parent: Node, text: String, callback: Callable) -> Button:
 	var control = Button.new()
 	control.text = text
-	control.pressed.connect(callback)
+	if callback.is_valid(): control.pressed.connect(callback)
 	parent.add_child(control)
 	return control
 
@@ -154,7 +158,11 @@ func close_editor():
 	queue_free()
 
 func _exit_tree():
-	if not is_instance_valid(player): return
+	release_player()
+
+func release_player():
+	if player_released or not is_instance_valid(player): return
+	player_released = true
 	player.settings_input_blocked = previous_blocked
 	player.release_keys = held_keys.keys().filter(func(key): return LabInputBindings.valid_key(key))
 	for action in LabInputBindings.ACTIONS: Input.action_release(action.id)

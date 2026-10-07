@@ -17,8 +17,15 @@ def adb(*args, binary=False):
 
 def wait_for(marker, timeout=75):
     deadline = time.monotonic() + timeout
+    logs = ''
     while time.monotonic() < deadline:
-        logs = adb('logcat', '-d', '-v', 'brief')
+        try:
+            logs = adb('logcat', '-d', '-v', 'brief')
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            # A boot-time ADB disconnect must not force a new APK build. Retry
+            # only this read; the existing deadline still fails a broken emulator.
+            time.sleep(1)
+            continue
         if 'SCRIPT ERROR:' in logs or 'FATAL EXCEPTION' in logs:
             raise RuntimeError(logs[-16000:])
         for line in logs.splitlines():
