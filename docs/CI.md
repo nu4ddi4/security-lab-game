@@ -46,3 +46,5 @@ Godot 브랜치에서는 다음 검사도 실행할 수 있습니다.
 ```sh
 python scripts/ci-godot-test.py --godot /path/to/Godot-4.7.2
 ```
+
+릴리스 게시는 `Publish verified portable`의 수동 실행으로만 진행한다. main 병합·Test 성공만으로 릴리스를 자동 게시하지 않는다. 명시적 배포 요청 시 검증된 main 실행 ID와 해당 버전 태그를 입력하여 기존 artifact를 재사용한다.
