@@ -10,10 +10,13 @@ var displays: Dictionary = {}
 var last_visual_state = ""
 var world: LabWorld
 
+const GOOD = Color(.25,.72,.63)
+const WARNING = Color(.9,.6,.25)
+
 class EquipmentDisplay extends Control:
 	var heading = ""
 	var rows: Array = []
-	var tone = Color(.25,.72,.63)
+	var tone = GOOD
 	var font = preload("res://assets/fonts/NotoSansKR.ttf")
 	var paper_board = false
 
@@ -21,16 +24,16 @@ class EquipmentDisplay extends Control:
 		if paper_board:
 			_draw_whiteboard()
 			return
-		draw_rect(Rect2(0,0,640,360),Color(.018,.031,.043))
+		draw_rect(Rect2(0,0,640,360),InvestigationTheme.BACKDROP)
 		draw_rect(Rect2(0,0,640,7),tone)
-		draw_string(font,Vector2(27,40),"SECURITY OPERATIONS   /   LOCAL SYSTEM",HORIZONTAL_ALIGNMENT_LEFT,600,15,Color(.46,.62,.66))
-		draw_string(font,Vector2(27,83),heading,HORIZONTAL_ALIGNMENT_LEFT,585,28,Color(.83,.89,.90))
+		draw_string(font,Vector2(27,40),"SECURITY OPERATIONS   /   LOCAL SYSTEM",HORIZONTAL_ALIGNMENT_LEFT,600,15,InvestigationTheme.TEXT_FAINT)
+		draw_string(font,Vector2(27,83),heading,HORIZONTAL_ALIGNMENT_LEFT,585,28,InvestigationTheme.TEXT)
 		for i in rows.size():
 			var y = 128+i*43
 			draw_rect(Rect2(28,y-19,5,23),tone)
-			draw_string(font,Vector2(47,y),str(rows[i]),HORIZONTAL_ALIGNMENT_LEFT,560,21,Color(.68,.77,.81))
-		draw_line(Vector2(28,315),Vector2(610,315),Color(.12,.22,.28),1)
-		draw_string(font,Vector2(28,342),"원본 기록과 조작은 현장 단말에서 확인",HORIZONTAL_ALIGNMENT_LEFT,600,16,Color(.45,.61,.65))
+			draw_string(font,Vector2(47,y),str(rows[i]),HORIZONTAL_ALIGNMENT_LEFT,560,21,InvestigationTheme.TEXT_DIM)
+		draw_line(Vector2(28,315),Vector2(610,315),InvestigationTheme.BORDER,1)
+		draw_string(font,Vector2(28,342),"원본 기록과 조작은 현장 단말에서 확인",HORIZONTAL_ALIGNMENT_LEFT,600,16,InvestigationTheme.TEXT_FAINT)
 
 	func _draw_whiteboard():
 		var ink = Color(.055,.15,.23)
@@ -154,8 +157,6 @@ func sync(state: Dictionary):
 	var signature = JSON.stringify(visual)
 	if signature == last_visual_state: return
 	last_visual_state = signature
-	var good = Color(.25,.72,.63)
-	var warning = Color(.82,.55,.23)
 	var service = "자료 서비스 지연" if visual.delay else "자료 서비스 정상"
 	var search = "검색 색인 점검 필요" if not visual.index else "검색 색인 정상"
 	var data = {
@@ -170,7 +171,7 @@ func sync(state: Dictionary):
 		var display = displays[id]
 		display.canvas.heading = data[id][0]
 		display.canvas.rows = data[id][1]
-		display.canvas.tone = warning if (id in ["server_console","control_console","briefing_board"] and visual.delay or id in ["project_pc","control_console","briefing_board"] and not visual.index) else good
+		display.canvas.tone = WARNING if (id in ["server_console","control_console","briefing_board"] and visual.delay or id in ["project_pc","control_console","briefing_board"] and not visual.index) else GOOD
 		display.canvas.queue_redraw()
 		display.viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 

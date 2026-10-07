@@ -6,9 +6,9 @@ signal changed
 class Stick extends Control:
 	var axes = Vector2.ZERO
 	func _draw():
-		draw_circle(Vector2(60,60),56,Color(.08,.14,.18,.65))
-		draw_arc(Vector2(60,60),56,0,TAU,64,Color(.5,.85,.85,.7),3)
-		draw_circle(Vector2(60,60)+axes*40,22,Color(.5,.85,.85,.8))
+		draw_circle(Vector2(60,60),56,Color(InvestigationTheme.BACKDROP,.6))
+		draw_arc(Vector2(60,60),56,0,TAU,64,Color(InvestigationTheme.ACCENT,.55),3)
+		draw_circle(Vector2(60,60)+axes*40,22,Color(InvestigationTheme.ACCENT,.75))
 
 var mobile = OS.has_feature("mobile") or "--mobile-qa" in OS.get_cmdline_user_args()
 var touch_enabled = false
@@ -58,7 +58,7 @@ func _add_button(id: String, text: String, callback: Callable, action = ""):
 	root.add_child(node)
 	var background = Polygon2D.new()
 	background.polygon = PackedVector2Array([Vector2(-70,-29),Vector2(70,-29),Vector2(70,29),Vector2(-70,29)])
-	background.color = Color(.08,.2,.24,.8)
+	background.color = Color(InvestigationTheme.ACCENT_FILL,.8)
 	node.add_child(background)
 	var text_label = Label.new()
 	text_label.text = text
@@ -67,7 +67,7 @@ func _add_button(id: String, text: String, callback: Callable, action = ""):
 	text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	text_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text_label.add_theme_font_override("font",load("res://assets/fonts/NotoSansKR.ttf"))
+	text_label.add_theme_font_override("font",InvestigationTheme.font(InvestigationTheme.BOLD_WEIGHT))
 	text_label.add_theme_font_size_override("font_size",18)
 	node.add_child(text_label)
 	if callback.is_valid(): node.pressed.connect(callback)
@@ -182,5 +182,5 @@ func _process(_delta):
 		buttons[id].position = positions[id]
 		button_rects[id] = Rect2(positions[id]-Vector2(70,29),Vector2(140,58))
 	var target = game.player.target
-	buttons.tool.get_child(0).color = Color(.08,.32,.32,.95) if target != null else Color(.08,.12,.16,.55)
+	buttons.tool.get_child(0).color = Color(.08,.34,.34,.95) if target != null else Color(InvestigationTheme.RAISED,.55)
 	buttons.tool.get_child(1).text = "상호작용" if target != null else "대상을 가리키세요"

@@ -4,7 +4,6 @@ extends Node3D
 # MultiMeshes. No per-window lights, reflections, new passes, or imported assets.
 const GROUND = -64.0
 var random_state = 831
-var building_count = 0
 var instance_count = 0
 
 func rand() -> float:
@@ -110,7 +109,6 @@ func _ready():
 			var seed = rand()*999
 			var occupancy = .25+rand()*.25 if family in [0,3] else .36+rand()*.25
 			families[family].append(record(Vector3(x,GROUND+height/2,z),Vector3(depth,height,width),seed,occupancy))
-			building_count += 1
 			if band<2:
 				var cap_height = 2+rand()*6; var cap_depth = depth*(.46+rand()*.3); var cap_width = width*(.42+rand()*.3)
 				families[family].append(record(Vector3(x+(rand()-.5)*2,GROUND+height+cap_height/2,z),Vector3(cap_depth,cap_height,cap_width),seed,occupancy))

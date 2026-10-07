@@ -136,7 +136,8 @@ func _show_loading():
 	loading.layer = 100
 	add_child(loading)
 	var background = ColorRect.new()
-	background.color = Color(.025,.045,.065)
+	background.color = InvestigationTheme.BACKDROP
+	background.theme = InvestigationTheme.build(false)
 	loading.add_child(background)
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var center = CenterContainer.new()
@@ -144,15 +145,25 @@ func _show_loading():
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var body = VBoxContainer.new()
 	body.custom_minimum_size.x = 360
-	body.add_theme_constant_override("separation",24)
+	body.add_theme_constant_override("separation",18)
 	center.add_child(body)
+	var brand = HBoxContainer.new()
+	brand.alignment = BoxContainer.ALIGNMENT_CENTER
+	brand.add_theme_constant_override("separation",14)
+	brand.add_child(InvestigationTheme.brand_mark())
+	var title = Label.new()
+	title.theme_type_variation = "TitleLabel"
+	title.text = "SECURITY LAB"
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	brand.add_child(title)
+	body.add_child(brand)
 	loading_text = Label.new()
-	loading_text.add_theme_font_override("font",load("res://assets/fonts/NotoSansKR.ttf"))
-	loading_text.add_theme_font_size_override("font_size",22)
+	loading_text.theme_type_variation = "CaptionLabel"
 	loading_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	loading_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(loading_text)
 	loading_bar = ProgressBar.new()
-	loading_bar.custom_minimum_size.y = 16
+	loading_bar.custom_minimum_size.y = 8
 	loading_bar.show_percentage = false
 	body.add_child(loading_bar)
 

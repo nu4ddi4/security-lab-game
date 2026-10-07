@@ -4,10 +4,8 @@ extends Node3D
 var model: Node3D
 var doors: Dictionary = {}
 var protected_nodes: Dictionary = {}
-var collider_count = 0
 var environment: WorldEnvironment
 var player: LabPlayer
-var meshes: Array[MeshInstance3D] = []
 var functional: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/functional.json"))
 var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/native-layout.json"))
 
@@ -29,7 +27,6 @@ func setup(actor: LabPlayer, office: PackedScene = null):
 			if "Upper" in id and "Partition" in id or id in ["COLLIDER_West_Window"]: body.collision_layer = 1
 			node.add_child(body)
 			box_collision(body, node.mesh.get_aabb())
-			collider_count += 1
 		elif id.begins_with("DOOR_") and functional[id].get("extras",{}).get("interaction") == "door":
 			var door = LabDoor.new()
 			door.name = "NativeDoor"
@@ -62,7 +59,6 @@ func collect(node: Node):
 				node.set_meta("source_name",source_id)
 				protected_nodes[source_id] = node
 	if node is MeshInstance3D:
-		meshes.append(node)
 		for surface in range(node.mesh.get_surface_count()):
 			var material = node.mesh.surface_get_material(surface)
 			if material is StandardMaterial3D:
@@ -80,16 +76,6 @@ func collect(node: Node):
 					glass.refraction_enabled = false
 					node.set_surface_override_material(surface,glass)
 	for child in node.get_children(): collect(child)
-
-func node_bounds(node: Node3D) -> AABB:
-	var result = AABB()
-	var initialized = false
-	for mesh in meshes:
-		if node == mesh or node.is_ancestor_of(mesh):
-			var box = mesh.global_transform * mesh.mesh.get_aabb()
-			result = result.merge(box) if initialized else box
-			initialized = true
-	return result
 
 func box_collision(body: CollisionObject3D, box: AABB):
 	var shape = BoxShape3D.new()

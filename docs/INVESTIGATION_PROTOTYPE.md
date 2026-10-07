@@ -66,6 +66,7 @@ Interior 07의 고품질 사무실과 기존 Native 배치 보정을 그대로 �
 | `prototype/scripts/save_codec.gd` | 버전·ID·기록 참조·날짜 이력 검증, JSON 변환 |
 | `prototype/scripts/store.gd` | 파일 저장·백업·보존·가져오기 |
 | `prototype/scripts/game.gd` · `ui.gd` · `target.gd` | 사무실 환경, UI, 논리 장비 ID 연결 |
+| `prototype/scripts/theme.gd` | 모든 2D 화면(HUD·휴대 단말·터미널·대화·설정·터치 버튼·로딩)이 공유하는 팔레트·폰트·Theme |
 | `prototype/tests/scenarios.json` | 엔진 교체 시 재사용할 입력·기대 결과 시나리오 |
 
 `LabPlayer`는 프로토타입의 혼합 입력을 유지하고, `LabWorld`는 맵·문·충돌·외관에 재사용합니다. 구 학습 미션·저장 코드는 제거했습니다. 기존 장비 ID를 유지해 사건 엔진과 저장을 그대로 사용합니다. 다른 런타임은 같은 JSON·논리 ID·시나리오를 사용할 수 있습니다.
