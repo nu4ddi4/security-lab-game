@@ -425,9 +425,9 @@ func guide_info() -> Dictionary:
 		if remaining.is_empty(): target = ""
 		return {"title":"%d일차 · 운영 점검" % state.day,"text":remaining[0] if not remaining.is_empty() else "오늘의 운영 확인을 마쳤습니다. 휴대 단말에서 기록·연락을 확인하고 업무를 종료하세요.","target":target}
 	if "oh_intro" not in state.statements: return {"title":"1 / 8 · 담당 업무 인계","text":"눈앞의 보안팀장 오세진과 대화하세요. 가까이서 %s 대화를 시작합니다." % ("상호작용 버튼을 눌러" if game.controls.touch_enabled else "F를 눌러"),"target":"oh"}
-	if "park_intro" not in state.statements: return {"title":"2 / 8 · 서버 담당자","text":"중앙 서버실 입구의 박도윤에게 운영 업무를 인계받으세요.","target":"park"}
+	if "park_intro" not in state.statements: return {"title":"2 / 8 · 서버 담당자","text":"서버실 입구 옆의 박도윤에게 운영 업무를 인계받으세요.","target":"park"}
 	for item in [["service","status","자료 서비스"],["account","inspect account","실행 계정"],["tasks","logs tasks","자동 작업"]]:
-		if item[0] not in state.baseline: return {"title":"3 / 8 · 서버 기준 상태","text":"중앙 서버실의 서버 단말에서 %s 상호작용을 시작하세요. %s을 확인합니다. 명령은 help로 확인하세요." % ["상호작용 버튼으로" if game.controls.touch_enabled else "F로",item[2]],"target":"server_console"}
+		if item[0] not in state.baseline: return {"title":"3 / 8 · 서버 기준 상태","text":"서버실 운영 랙의 서버 단말에서 %s 상호작용을 시작하세요. %s을 확인합니다. 명령은 help로 확인하세요." % ["상호작용 버튼으로" if game.controls.touch_enabled else "F로",item[2]],"target":"server_console"}
 	if "han_intro" not in state.statements: return {"title":"4 / 8 · 프로젝트 담당자","text":"오른쪽 업무 구역의 한지우에게 LUMEN 자료를 인계받으세요.","target":"han"}
 	if "files" not in state.baseline: return {"title":"5 / 8 · 원본 자료 확인","text":"오른쪽 업무 PC에서 실제 원본 파일을 확인하세요. 명령은 help로 확인하세요.","target":"project_pc"}
 	if "seo_intro" not in state.statements: return {"title":"6 / 8 · 정비 담당자","text":"업무 구역의 서유진에게 유지보수 범위를 확인하세요. 이전 제출 자료는 휴대 단말의 메신저에서 볼 수 있습니다.","target":"seo"}

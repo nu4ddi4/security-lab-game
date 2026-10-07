@@ -1,6 +1,10 @@
 Security Lab Native
 
 Original game code and generated assets: Security Lab contributors.
+Investigation characters: Business Man and Woman Casual by Quaternius (CC0 1.0).
+https://poly.pizza/m/JFrLIKqvCH / https://poly.pizza/m/jpKRgGDxhk
+https://creativecommons.org/publicdomain/zero/1.0/
+Adapted neutral poses, workwear colours, badges and role props.
 Asset attribution: assets/credits.txt
 Korean font: assets/fonts/OFL.txt (Noto project, SIL OFL 1.1)
 Procedural audio: project-generated.

@@ -20,7 +20,7 @@ jobs:
           key: native-lfs-${{ hashFiles('godot/assets/models/*.glb', 'assets/models/security_lab.glb') }}
       - name: Fetch native and baseline runtime
         shell: pwsh
-        run: git lfs pull --include="godot/assets/models/Interior_07_Godot.glb,assets/models/security_lab.glb" --exclude=""
+        run: git lfs pull --include="godot/assets/models/*.glb,assets/models/security_lab.glb" --exclude=""
       - uses: actions/setup-node@v4
         with:
           node-version: 24

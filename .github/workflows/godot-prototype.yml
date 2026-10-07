@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Fetch the verified detailed office asset
-        run: git lfs pull --include="godot/assets/models/Interior_07_Godot.glb" --exclude=""
+        run: git lfs pull --include="godot/assets/models/*.glb" --exclude=""
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -85,7 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Fetch the verified detailed office asset
-        run: git lfs pull --include="godot/assets/models/Interior_07_Godot.glb" --exclude=""
+        run: git lfs pull --include="godot/assets/models/*.glb" --exclude=""
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

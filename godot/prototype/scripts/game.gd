@@ -15,6 +15,7 @@ var settings = null
 var bindings = LabInputBindings.new()
 var qa_mode = false
 var world: LabWorld
+var investigation_environment: InvestigationEnvironment
 var detailed_world = false
 var context = ""
 var blocked_save = false
@@ -247,7 +248,7 @@ func frame_speaker(id: String):
 		dialogue_camera_fov = 72.0
 		dialogue_camera_active = true
 	if dialogue_camera_tween != null: dialogue_camera_tween.kill()
-	var head = targets[id].global_position + Vector3(0,.55,0)
+	var head = investigation_environment.speaker_position(id) if detailed_world else targets[id].global_position + Vector3(0,.55,0)
 	var pose = player.camera.global_transform.looking_at(head,Vector3.UP)
 	dialogue_camera_tween = create_tween().set_parallel(true)
 	dialogue_camera_tween.tween_property(player.camera,"global_transform",pose,.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -272,6 +273,7 @@ func dispatch(action: Dictionary) -> Dictionary:
 	var result = engine.step(state,action)
 	var changed = result.state != state
 	state = result.state
+	if investigation_environment != null: investigation_environment.sync(state)
 	if action.get("type") != "memo": ui.refresh()
 	if changed: save_timer.start()
 	return result
@@ -300,6 +302,7 @@ func save_now() -> bool:
 func new_game():
 	if not store.preserve(): ui.notice(store.error); return
 	state = engine.create_state()
+	if investigation_environment != null: investigation_environment.sync(state)
 	blocked_save = false
 	context = ""
 	ui.reset_session()
@@ -315,6 +318,7 @@ func transfer_file(path: String, exporting: bool):
 	if candidate.has("error"): ui.notice(candidate.error); return
 	if not store.preserve(): ui.notice(store.error); return
 	state = candidate.state
+	if investigation_environment != null: investigation_environment.sync(state)
 	blocked_save = false
 	ui.reset_session()
 	ui.sync_memo()
@@ -431,19 +435,19 @@ func _build_office_world():
 		get_viewport().msaa_3d = Viewport.MSAA_DISABLED
 		world.get_node("WindowSunset").shadow_enabled = false
 	detailed_world = true
-	var positions = {"control_console":Vector3(-5,1.8,3.62),"server_console":Vector3(-8,1.6,-4.32),"approval_archive":Vector3(8.5,1.75,-7.25),"maintenance_terminal":Vector3(7,1.45,2.72)}
-	var computer = world.model.find_child("CORP_Staff_Computer_0",true,false)
-	positions.project_pc = world.node_bounds(computer).get_center()+Vector3(0,.25,.22) if computer!=null else Vector3(-1,1.1,5)
-	positions.briefing_board = world.node_bounds(world.protected_nodes.INTERACT_Whiteboard).get_center()+Vector3(0,0,.3)
-	for id in positions: _target(id,"device",positions[id],content.case.devices[id].label)
-	var people = {"oh":Vector3(-4,1,6.4),"park":Vector3(-6,1,-1.3),"han":Vector3(2,1,6.8),"seo":Vector3(6,1,-1.3)}
-	for id in people:
-		var p = people[id]
-		_box(p,Vector3(.6,1.7,.6),Color(.6,.45,.25))
-		_target(id,"npc",p+Vector3(0,0,.4),content.case.npcs[id].name+" · "+content.case.npcs[id].role)
-	review_target("oh")
+	investigation_environment = InvestigationEnvironment.new()
+	investigation_environment.name = "InvestigationEnvironment"
+	add_child(investigation_environment)
+	investigation_environment.setup(world,content)
+	targets = investigation_environment.targets
+	for target in targets.values(): target.used.connect(_use)
+	investigation_environment.sync(state)
+	investigation_environment.spawn(player)
 
 func review_target(id: String):
+	if investigation_environment != null:
+		investigation_environment.review_target(player,id)
+		return
 	var point = targets[id].global_position
 	player.global_position = Vector3(point.x,.01,point.z+1.7)
 	player.velocity = Vector3.ZERO

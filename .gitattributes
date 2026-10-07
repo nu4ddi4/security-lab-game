@@ -5,3 +5,4 @@ assets/authoring/Security_Lab_Interior_06.blend filter=lfs diff=lfs merge=lfs -t
 vendor/three/** -whitespace
 assets/authoring/Security_Lab_Interior_07.blend filter=lfs diff=lfs merge=lfs -text
 godot/assets/models/*.glb filter=lfs diff=lfs merge=lfs -text
+assets/authoring/Security_Lab_Investigation.blend filter=lfs diff=lfs merge=lfs -text
