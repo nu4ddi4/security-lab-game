@@ -91,6 +91,10 @@ func _ready():
 	add_child(ui)
 	ui.setup(self)
 	controls.setup(self)
+	settings = LabSettings.new()
+	settings.values.quality = 2
+	add_child(settings)
+	settings.setup(self)
 	diagnostics = InvestigationDiagnostics.new()
 	add_child(diagnostics)
 	diagnostics.setup(self)
@@ -429,7 +433,7 @@ func _build_office_world():
 	world = LabWorld.new()
 	world.name = "InvestigationOffice"
 	add_child(world)
-	world.setup(null,player,office_scene)
+	world.setup(player,office_scene)
 	if OS.has_feature("mobile") or "--mobile-qa" in OS.get_cmdline_user_args():
 		get_viewport().scaling_3d_scale = .65
 		get_viewport().msaa_3d = Viewport.MSAA_DISABLED

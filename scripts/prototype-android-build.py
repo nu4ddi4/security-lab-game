@@ -1,5 +1,6 @@
 """Export a signed, self-contained prototype APK and a matching emulator QA APK."""
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
@@ -11,6 +12,8 @@ import subprocess
 import tempfile
 import urllib.request
 import zipfile
+
+from release_version import android_code, build_version, channel, tag
 
 PACKAGE = 'com.nu4ddi4.securitylab.prototype'
 # AOSP publishes these development-only test keys. Using the pinned certificate
@@ -24,13 +27,15 @@ TEST_KEY_HASHES = {
 
 
 def version_code(version):
-    parts = [int(part) for part in version.split('.')]
-    if len(parts) != 3 or any(part < 0 or part > 999 for part in parts):
-        raise ValueError('Android versions require three components from 0 to 999')
-    code = parts[0] * 1_000_000 + parts[1] * 1_000 + parts[2]
-    if code < 1:
-        raise ValueError('Android version code must be positive')
-    return code
+    return android_code(version)
+
+
+def require_private_signing():
+    names = ['ANDROID_KEYSTORE_BASE64', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS']
+    if any(not os.environ.get(name) for name in names):
+        raise ValueError('Main release requires Actions secrets: ' + ', '.join(names))
+    if not base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True):
+        raise ValueError('Android signing keystore is empty')
 
 
 def make_test_keystore(directory):
@@ -62,7 +67,8 @@ def configure_editor(sdk, java):
     settings.write_text(text, encoding='utf-8')
 
 
-def preset(version, keystore, qa=False):
+def preset(version, keystore, qa=False, alias="androiddebugkey", password="android"):
+    signing = "debug" if qa or channel(version) == "beta" else "release"
     return '''[preset.0]
 name="Android Prototype"
 platform="Android"
@@ -84,14 +90,14 @@ version/name="{version}"
 package/unique_name="{package}"
 package/name="Security Lab Beta"
 package/signed=true
-keystore/debug={keystore}
-keystore/debug_user="androiddebugkey"
-keystore/debug_password="android"
+keystore/{signing}={keystore}
+keystore/{signing}_user={alias}
+keystore/{signing}_password={password}
 screen/immersive_mode=true
 permissions/internet=true
 command_line/extra_args="{args}"
 '''.format(code=version_code(version), version=version, package=PACKAGE,
-           keystore=json.dumps(str(keystore)), args='--audio-driver Dummy -- --prototype-smoke --prototype-capture-dir=user://qa-ui' if qa else '')
+           keystore=json.dumps(str(keystore)), signing=signing, alias=json.dumps(alias), password=json.dumps(password), args='--audio-driver Dummy -- --prototype-smoke --prototype-capture-dir=user://qa-ui' if qa else '')
 
 
 def main():
@@ -106,10 +112,9 @@ def main():
     if not subprocess.check_output([godot, '--version'], text=True).startswith('4.7.2.stable'):
         raise SystemExit('Godot 4.7.2 stable is required.')
     root = Path(__file__).resolve().parents[1]
-    metadata = json.loads((root / 'godot/prototype/version.json').read_text())
-    if metadata.get('prerelease') is not True:
-        raise SystemExit('Public development signing is only allowed for prototype prereleases.')
-    version = build.prototype_version(root / 'godot')
+    version = build_version(root / 'godot')
+    if channel(version) == 'stable':
+        require_private_signing()
     sdk = Path(os.environ.get('ANDROID_HOME', os.environ.get('ANDROID_SDK_ROOT', '')))
     java = Path(os.environ['JAVA_HOME'])
     signer = sdk / 'build-tools/35.0.1/apksigner'
@@ -136,13 +141,25 @@ def main():
         (target / 'project.godot').write_text(project, encoding='utf-8')
         build.check(godot, target)
         configure_editor(sdk, java)
-        keystore = make_test_keystore(directory)
+        if channel(version) == 'stable':
+            keystore = directory / 'release.keystore'
+            keystore.write_bytes(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True))
+            keystore.chmod(0o600)
+            alias, password = os.environ['ANDROID_KEY_ALIAS'], os.environ['ANDROID_KEYSTORE_PASSWORD']
+            certificate = subprocess.check_output(['keytool', '-exportcert', '-keystore', str(keystore),
+                '-alias', alias, '-storepass:env', 'ANDROID_KEYSTORE_PASSWORD'], stderr=subprocess.PIPE)
+            cert_hash = hashlib.sha256(certificate).hexdigest()
+        else:
+            keystore = make_test_keystore(directory)
+            alias, password, cert_hash = 'androiddebugkey', 'android', None
         for qa in [False, True]:
-            name = 'SecurityLab-beta-' + version + ('-qa' if qa else '') + '.apk'
+            name = tag(version) + ('-qa' if qa else '') + '.apk'
             apk = output / name
-            (target / 'export_presets.cfg').write_text(preset(version, keystore, qa), encoding='utf-8')
-            build.run([godot, '--headless', '--path', str(target), '--export-debug', 'Android Prototype', str(apk)], target, timeout=180)
-            subprocess.run([str(signer), 'verify', '--verbose', '--print-certs', str(apk)], check=True)
+            (target / 'export_presets.cfg').write_text(preset(version, keystore, qa, alias, password), encoding='utf-8')
+            build.run([godot, '--headless', '--path', str(target), '--export-release' if channel(version) == 'stable' and not qa else '--export-debug', 'Android Prototype', str(apk)], target, timeout=180)
+            certificates = subprocess.check_output([str(signer), 'verify', '--print-certs', str(apk)], text=True)
+            if cert_hash and 'Signer #1 certificate SHA-256 digest: ' + cert_hash not in certificates:
+                raise ValueError('APK certificate differs from the configured private signing key')
             with zipfile.ZipFile(apk) as bundle:
                 print('APK_SIZE', json.dumps({'file': name, 'compressed': apk.stat().st_size,
                       'uncompressed': sum(info.file_size for info in bundle.infolist()),

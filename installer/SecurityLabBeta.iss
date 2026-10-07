@@ -16,12 +16,12 @@
 
 [Setup]
 AppId=SecurityLabBeta-{#Channel}
-AppName=Security Lab Beta ({#Channel})
+AppName=Security Lab ({#Channel})
 AppVersion={#AppVersion}
 AppPublisher=Security Lab contributors
 AppPublisherURL=https://github.com/nu4ddi4/security-lab-game
 DefaultDirName={localappdata}\Programs\SecurityLabBeta-{#Channel}
-DefaultGroupName=Security Lab Beta ({#Channel})
+DefaultGroupName=Security Lab ({#Channel})
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
 UsePreviousAppDir=yes
@@ -37,8 +37,8 @@ Compression=lzma2/fast
 SolidCompression=yes
 WizardStyle=modern
 VersionInfoVersion={#BinaryVersion}
-VersionInfoDescription=Security Lab Windows Beta Installer ({#Channel})
-VersionInfoProductName=Security Lab Beta
+VersionInfoDescription=Security Lab Windows Installer ({#Channel})
+VersionInfoProductName=Security Lab
 VersionInfoProductVersion={#BinaryVersion}
 
 [Languages]

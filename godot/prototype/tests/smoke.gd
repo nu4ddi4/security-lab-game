@@ -132,6 +132,10 @@ func run(game: InvestigationPrototype):
 	game.ui.touch_setting.button_pressed = true
 	if not game.controls.touch_enabled: failures.append("Settings enable touch without disabling keyboard")
 	await capture(game,"07-settings")
+	for category in ["general","display","sound"]:
+		game.ui.settings_screen.select_category(category)
+		await capture(game,"07-settings-"+category)
+	game.ui.settings_screen.select_category("controls")
 	game.ui.close()
 	await get_tree().process_frame
 	var dimensions = get_viewport().get_visible_rect().size
@@ -171,7 +175,7 @@ func run(game: InvestigationPrototype):
 	if game.controls.look_finger != -1 or not game.player.touch_axes.is_zero_approx(): failures.append("Opening UI releases all touch state")
 	game.ui.close()
 	game.updates._completed(HTTPRequest.RESULT_CANT_CONNECT,0,PackedStringArray(),PackedByteArray())
-	if game.updates.busy or not game.player.enabled or game.ui.update_download.visible: failures.append("Update failures leave gameplay available and hide stale downloads")
+	if game.updates.busy or not game.player.enabled or (is_instance_valid(game.ui.update_download) and game.ui.update_download.visible): failures.append("Update failures leave gameplay available and hide stale downloads")
 	game.controls.set_touch(original_touch)
 	game.player.global_position = Vector3(0,.01,7)
 	game.player.camera.rotation = Vector3.ZERO
@@ -392,6 +396,9 @@ func responsive_checks(game, failures: Array):
 		await get_tree().process_frame
 		await get_tree().process_frame
 		var viewport = get_viewport().get_visible_rect()
+		var settings = game.ui.settings_screen
+		if not is_instance_valid(settings) or not settings.visible or not viewport.grow(1).encloses(Rect2(Vector2(settings.position),Vector2(settings.size))): failures.append("Embedded settings fit the viewport at "+str(dimensions))
+		await capture(game,"settings-%dx%d" % [dimensions.x,dimensions.y])
 		for panel in [game.ui.modal,game.ui.terminal_panel,game.ui.dialogue_panel,game.ui.briefing_panel]:
 			if panel == game.ui.modal: game.ui.open_tablet(4)
 			elif panel == game.ui.terminal_panel: game._use("server_console","device",true)

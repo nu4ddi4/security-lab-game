@@ -164,7 +164,7 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         $inventory = @(Get-UpdateTree $installRoot)
         Copy-UpdateTree $installRoot $backupRoot $inventory
         $saveSnapshot = @()
-        $saveNames = if ($beta) {@('investigation/save.json','investigation/save.backup.json','controls.cfg','beta-update-settings-beta.json')} else {@('progress.json','progress.backup.json')}
+        $saveNames = if ($beta) {@('investigation/save.json','investigation/save.backup.json','controls.cfg',('beta-update-settings-'+$channel+'.json'))} else {@('progress.json','progress.backup.json')}
         foreach ($saveName in $saveNames) {
             $savePath = Join-Path $progressRoot $saveName
             $exists = Test-Path -LiteralPath $savePath

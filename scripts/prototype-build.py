@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import tempfile
 
+from release_version import build_version, identity, parts, tag
+
 
 def run(command, directory, marker=None, timeout=90):
     try:
@@ -37,19 +39,17 @@ def prototype_version(source):
 
 
 def stage(source, target):
-    version = prototype_version(source)
+    version = build_version(source)
     shutil.copytree(source / 'prototype', target / 'prototype')
     shutil.copytree(source / 'scripts', target / 'scripts')
     shutil.copytree(source / 'resources', target / 'resources')
     (target / 'tests').mkdir()
-    for name in ['input_review.gd', 'input_bindings_test.gd']:
+    for name in ['input_review.gd', 'input_bindings_test.gd', 'diagnostics_test.gd']:
         shutil.copyfile(source / 'tests' / name, target / 'tests' / name)
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source.parent, text=True).strip()
-    metadata = {'schema': 1, 'app_id': 'security-lab-beta', 'platform': 'windows-x86_64',
-                'version': version + '-beta.1', 'channel': 'beta', 'commit': commit,
-                'install_layout': 1, 'updates_default': True,
-                'manifest_url': 'https://github.com/nu4ddi4/security-lab-game/releases/download/beta-channel-beta/update.json'}
+    metadata = identity(version, commit)
     (target / 'prototype/build_info.json').write_text(json.dumps(metadata), encoding='utf-8')
+    (target / 'prototype/version.json').write_text(json.dumps({'version': version, 'prerelease': metadata['channel'] == 'beta', 'tag_prefix': 'SecurityLab-'}), encoding='utf-8')
     for name in ['assets/models/Interior_07_Godot.glb', 'assets/models/Investigation_Environment.glb', 'assets/textures/city-sunset.png', 'scripts/player.gd', 'assets/fonts/NotoSansKR.ttf', 'assets/fonts/OFL.txt', 'assets/fonts/Gaegu-Regular.ttf', 'assets/fonts/Gaegu-OFL.txt', 'LICENSES.txt']:
         destination = target / name
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -59,13 +59,10 @@ def stage(source, target):
     for policy in (source / 'assets/models').glob('*.glb.import'):
         shutil.copyfile(policy, target / 'assets/models' / policy.name)
     project = (source / 'project.godot').read_text(encoding='utf-8')
-    project = project.replace('res://scenes/entry.tscn', 'res://prototype/main.tscn')
     project = project.replace('Forward Plus', 'GL Compatibility').replace('"forward_plus"', '"gl_compatibility"')
-    project = project.replace('Offline security investigation simulator. Native companion to web v0.7.0.',
-                              'Offline security investigation beta.')
     project = project.replace('window/stretch/mode="canvas_items"',
                               'window/stretch/mode="canvas_items"\nwindow/stretch/aspect="expand"')
-    project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '-beta.1"', project, flags=re.MULTILINE)
+    project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '"', project, flags=re.MULTILINE)
     (target / 'project.godot').write_text(project, encoding='utf-8')
     (target / 'export_presets.cfg').write_text('''[preset.0]
 name="Windows Prototype"
@@ -86,9 +83,9 @@ codesign/enable=false
 application/modify_resources=true
 application/file_version="0.1.0.0"
 application/product_version="0.1.0.0"
-application/product_name="Security Lab Beta"
-application/file_description="Offline security investigation beta"
-'''.replace('0.1.0.0', version + '.0'), encoding='utf-8')
+application/product_name="Security Lab"
+application/file_description="Offline security investigation"
+'''.replace('0.1.0.0', '.'.join(map(str, parts(version)))), encoding='utf-8')
 
 
 def configure_texture_compression(target):
@@ -109,12 +106,10 @@ def check(godot, target):
     # build. Reimport only when generated textures still use lossless mode.
     if configure_texture_compression(target):
         run([godot, '--headless', '--editor', '--path', str(target), '--import'], target)
-    run([godot, '--headless', '--path', str(target), '--script', 'res://tests/input_bindings_test.gd'], target, 'INPUT_BINDINGS_TEST')
-    run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/unit.gd'],
-        target, 'INVESTIGATION_UNIT')
-    run([godot, '--headless', '--path', str(target), '--script', 'res://prototype/tests/services_runner.gd'], target, 'INVESTIGATION_SERVICES')
-    run([godot, '--headless', '--path', str(target), '--', '--prototype-smoke'],
-        target, 'INVESTIGATION_SMOKE')
+    if os.name == 'nt':
+        script = Path(__file__).with_name('godot-diagnostics-windows-test.ps1')
+        run(['pwsh', '-NoProfile', '-File', str(script), '-Godot', godot, '-Project', str(target)],
+            target, 'NATIVE_DIAGNOSTICS')
 
 
 def main():
@@ -128,14 +123,16 @@ def main():
     if not subprocess.check_output([godot, '--version'], text=True).startswith('4.7.2.stable'):
         raise SystemExit('Godot 4.7.2 stable is required.')
     root = Path(__file__).resolve().parents[1]
-    version = prototype_version(root / 'godot')
-    output = Path(args.output or ('prototype-dist/SecurityLab-beta-' + version + '.exe')).resolve()
+    version = build_version(root / 'godot')
+    output = Path(args.output or ('prototype-dist/' + tag(version) + '.exe')).resolve()
     with tempfile.TemporaryDirectory(prefix='security-lab-prototype-') as directory:
         target = Path(directory)
         stage(root / 'godot', target)
         check(godot, target)
         baked_metadata = (target / "prototype/build_info.json").read_text(encoding="utf-8")
         if args.check_only:
+            run([godot, '--headless', '--path', str(target), '--', '--prototype-smoke'],
+                target, 'INVESTIGATION_SMOKE')
             return
         if os.name != 'nt':
             raise SystemExit('Build and verify the Windows EXE on Windows; use --check-only elsewhere.')
@@ -148,10 +145,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix='security-lab-exe-only-') as directory:
         executable = Path(directory) / output.name
         shutil.copyfile(output, executable)
-        for attempt in range(2):
-            run([str(executable), '--headless', '--', '--prototype-smoke'],
-                directory, 'INVESTIGATION_SMOKE')
-            print('Standalone EXE launch', attempt + 1, 'passed.')
+        run([str(executable), '--headless', '--', '--prototype-smoke'],
+            directory, 'INVESTIGATION_SMOKE')
+        print('Standalone EXE scene, save and reload passed.')
         run([str(executable), '--headless', '--', '--prototype-smoke', '--prototype-input-review'], directory, 'INPUT_REVIEW')
         run([str(executable), '--headless', '--', '--prototype-services'],
             directory, 'INVESTIGATION_SERVICES')

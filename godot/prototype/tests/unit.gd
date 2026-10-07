@@ -36,7 +36,9 @@ func _initialize():
 	incomplete.assets = []
 	check(InvestigationUpdates.select_release([release_fixture("0.3.0",false),incomplete],installed,"Android").url == "","Do not offer an older APK when the newest release is incomplete")
 	check(InvestigationUpdates.select_release([null,{},"bad"],installed,"Android").is_empty(),"Malformed release entries are ignored")
-	check(not InvestigationUpdates.newer("0.2.0-beta.1","0.2.0"),"Unexpected version formats are rejected")
+	check(InvestigationUpdates.newer("0.8.0-beta.2","0.8.0-beta.1"),"Beta sequence increases within the same target version")
+	check(InvestigationUpdates.newer("0.8.0","0.8.0-beta.2"),"Stable version follows all beta sequences")
+	check(not InvestigationUpdates.newer("0.2.0-beta.1","0.2.0"),"A beta never replaces the same stable version")
 	check(InvestigationUpdates.select_release(candidates,installed,"Linux").url == "","Unavailable platform files are never replaced with Windows assets")
 	var content = InvestigationContent.load_case()
 	check(not content.has("error"),"Content loads")
