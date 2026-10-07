@@ -1,0 +1,115 @@
+name: Native update package
+on:
+  push:
+    branches: [feature/native-auto-update]
+    tags: ['native-stable-v*', 'native-beta-v*', 'native-dev-v*']
+  workflow_dispatch:
+    inputs:
+      channel:
+        type: choice
+        options: [dev, beta, stable]
+        default: dev
+        required: true
+      version:
+        description: SemVer; beta/dev require beta.N/dev.N suffix
+        type: string
+        default: 0.7.0-dev.0
+        required: true
+      publish:
+        description: Publish only from godot-port or a verified native version tag
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: native-update-${{ inputs.channel || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    outputs:
+      channel: ${{ steps.select.outputs.channel }}
+      version: ${{ steps.select.outputs.version }}
+      publish: ${{ steps.select.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify channel and publication provenance
+        id: select
+        run: python scripts/godot-update-release.py --select
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: ./.github/actions/godot-setup
+        with:
+          export: 'true'
+      - uses: ./.github/actions/inno-setup
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs/objects
+          key: native-lfs-${{ hashFiles('godot/assets/models/*.glb', 'assets/models/security_lab.glb') }}
+      - name: Fetch native and baseline runtime
+        run: git lfs pull --include="godot/assets/models/Interior_07_Godot.glb,assets/models/security_lab.glb" --exclude=""
+      - uses: actions/cache@v4
+        with:
+          path: |
+            godot/.godot
+            godot/assets/models/Interior_07_Godot_*.jpg
+            godot/assets/models/Interior_07_Godot_*.png
+          key: native-import-4.7.2-${{ runner.os }}-${{ hashFiles('godot/assets/**', 'godot/project.godot') }}
+          restore-keys: native-import-4.7.2-${{ runner.os }}-
+      - name: Native updater policy and real Windows rollback tests
+        shell: pwsh
+        run: |
+          python scripts/ci-godot-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tests/native/security_windows_updater.ps1 -Iscc $env:SECURITY_LAB_ISCC
+          python scripts/godot-update-network-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build SecurityLabSetup and channel metadata
+        shell: pwsh
+        env:
+          NATIVE_CHANNEL: ${{ steps.select.outputs.channel }}
+          NATIVE_VERSION: ${{ steps.select.outputs.version }}
+        run: |
+          ./scripts/godot-update-build.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE -Iscc $env:SECURITY_LAB_ISCC -Channel $env:NATIVE_CHANNEL -Version $env:NATIVE_VERSION -Commit $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $env:SECURITY_LAB_GODOT_CONSOLE --headless --path godot -- --qa
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecurityLab-Native-Update-${{ steps.select.outputs.channel }}
+          path: |
+            godot/builds/package/${{ steps.select.outputs.channel }}/SecurityLabSetup.exe
+            godot/builds/package/${{ steps.select.outputs.channel }}/build_info.json
+            godot/builds/package/${{ steps.select.outputs.channel }}/update.json
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    needs: package
+    if: needs.package.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: native-publish-${{ needs.package.outputs.channel }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: SecurityLab-Native-Update-${{ needs.package.outputs.channel }}
+          path: native-release
+      - name: Publish immutable installer then this channel's manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/godot-update-release.py --directory native-release

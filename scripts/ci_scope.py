@@ -11,7 +11,7 @@ def classify(paths, has_godot=False, main_push=False):
     for path in paths:
         if path in {'.github/workflows/ci.yml', '.gitattributes', 'package.json', 'package-lock.json', 'scripts/ci_scope.py'}:
             web = godot = True
-        elif path.startswith(('godot/', 'scripts/godot-', 'scripts/prototype-', 'scripts/ci-godot-', '.github/actions/godot-setup/', '.github/workflows/godot-')):
+        elif path.startswith(('godot/', 'installer/', 'tests/native/', 'scripts/godot-', 'scripts/prototype-', 'scripts/ci-godot-', '.github/actions/godot-setup/', '.github/actions/inno-setup/', '.github/workflows/native-update.yml', '.github/workflows/godot-')):
             godot = True
         elif path.startswith('assets/authoring/'):
             continue
