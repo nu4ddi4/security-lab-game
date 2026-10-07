@@ -1,6 +1,6 @@
 # 개발 규칙
 
-- 웹 학습 게임의 기획은 `docs/PLAN.md`이다. Godot 프로젝트가 있는 브랜치의 조사 계획은 `docs/INVESTIGATION_PROTOTYPE.md`이다. CI 운영은 `docs/CI.md`를 따른다.
+- 웹 학습 게임의 기획은 `docs/PLAN.md`이다. Godot 프로젝트가 있는 브랜치의 조사 계획은 `docs/INVESTIGATION_PROTOTYPE.md`이다. CI 운영은 `docs/CI.md`, 버전 관리는 `docs/VERSIONING.md`를 따른다.
 - 실제 IP·URL로 요청하지 않는다. 명령어는 허용 목록만 해석한다.
 - `eval`, `Function`, 사용자 입력 기반 `fetch`, 소켓, 셸 실행을 도입하지 않는다.
 - 웹 동적 출력에는 `textContent`를 사용한다. 개인 파일·실제 비밀번호는 받지 않는다.
