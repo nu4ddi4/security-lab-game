@@ -7,3 +7,5 @@
 - `SecurityLab-beta-0.3.0.exe`는 설치 없이 실행합니다. 자동 설치를 사용하려면 `SecurityLabSetup.exe`로 설치하세요. ZIP에는 같은 EXE 한 개만 들어 있습니다.
 - Android는 `SecurityLab-beta-0.3.0.apk`를 기존 앱 위에 설치합니다. 기존 패키지 ID·개발 서명·저장 위치를 유지합니다.
 - 베타는 테스트·안정화용 사전 릴리즈입니다. 기존 정식 Latest와 main은 유지합니다. 실기기 성능·사용성 및 장기 플레이 확인은 계속 진행합니다.
+
+Windows·Android [패키지 검증](https://github.com/nu4ddi4/security-lab-game/actions/runs/37588539463)과 기존 Native [회귀 검사](https://github.com/nu4ddi4/security-lab-game/actions/runs/37588965893)를 통과했습니다. 상세 결과와 안정화 후 main 반영 조건은 [검증 기록](https://github.com/nu4ddi4/security-lab-game/blob/beta/docs/BETA_VALIDATION.md)에 남겼습니다.

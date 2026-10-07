@@ -18,8 +18,8 @@ jobs:
       actions: read
     env:
       GH_TOKEN: ${{ github.token }}
-      PROTOTYPE_RUN_ID: '0'
-      PROTOTYPE_BUILD_SHA: '0000000000000000000000000000000000000000'
+      PROTOTYPE_RUN_ID: '37588539463'
+      PROTOTYPE_BUILD_SHA: '12414875df2afa7ca7f0d8a030d30b8870776c23'
       PROTOTYPE_VERSION: '0.3.0'
     steps:
       - uses: actions/checkout@v4
