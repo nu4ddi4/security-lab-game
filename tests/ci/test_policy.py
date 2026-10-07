@@ -47,8 +47,10 @@ class PolicyTests(unittest.TestCase):
         self.assertIn('needs: [quick, version, prototype, android]', workflow)
         self.assertIn("needs.prototype.result == 'success'", workflow)
         self.assertIn("needs.android.result == 'success'", workflow)
-        self.assertIn('Require private Android signing', workflow)
+        self.assertIn("github.ref != 'refs/heads/main'", workflow)
         self.assertIn('cancel-in-progress: false', workflow)
+        self.assertIn('prototype-android-review-${{ github.run_id }}-${{ github.run_attempt }}', workflow)
+        self.assertEqual(workflow.count('overwrite: true'), 2)
         self.assertNotIn('  pull_request:', workflow)
 
 

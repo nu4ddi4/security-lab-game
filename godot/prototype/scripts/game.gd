@@ -91,6 +91,10 @@ func _ready():
 	add_child(ui)
 	ui.setup(self)
 	controls.setup(self)
+	settings = LabSettings.new()
+	settings.values.quality = 2
+	add_child(settings)
+	settings.setup(self)
 	diagnostics = InvestigationDiagnostics.new()
 	add_child(diagnostics)
 	diagnostics.setup(self)

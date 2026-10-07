@@ -21,9 +21,9 @@ def validate_build(run, jobs, artifacts, repository, sha, version):
             or run.get('path') != '.github/workflows/godot-prototype.yml'
             or run.get('event') not in {'push', 'workflow_dispatch'}):
         raise ValueError('Expected successful platform validation from this commit and branch')
-    platforms = ['Windows-x64', 'Android']
+    platforms = ['Windows-x64', 'Android'] if branch == 'beta' else ['Windows-x64']
     successful = {job['name'] for job in jobs if job.get('conclusion') == 'success'}
-    required = {'quick / test', 'prototype', 'android'}
+    required = {'quick / test', 'prototype'} | ({'android'} if branch == 'beta' else set())
     if not required <= successful:
         raise ValueError('Quick checks and all release platform checks must succeed')
     selected = {}

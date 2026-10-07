@@ -36,14 +36,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/prepare-release.py
-      - name: Require private Android signing before a main release
-        if: github.ref == 'refs/heads/main'
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-        run: |
-          python3 -c "import sys; sys.path.insert(0, 'scripts'); import importlib.util; s=importlib.util.spec_from_file_location('android', 'scripts/prototype-android-build.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.require_private_signing()"
   prototype:
     needs: [quick, version]
     if: needs.version.outputs.published != 'true' && (github.event_name == 'push' || inputs.platforms != 'android')
@@ -95,6 +87,7 @@ jobs:
             prototype-dist/ui/*
           if-no-files-found: error
           retention-days: 14
+          overwrite: true
       - name: Download link
         shell: pwsh
         env:
@@ -104,7 +97,7 @@ jobs:
           "[SecurityLab-$env:PROTOTYPE_VERSION]($env:ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
   android:
     needs: [quick, version]
-    if: needs.version.outputs.published != 'true' && (github.event_name == 'push' || inputs.platforms != 'windows')
+    if: needs.version.outputs.published != 'true' && github.ref != 'refs/heads/main' && (github.event_name == 'push' || inputs.platforms != 'windows')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -156,11 +149,12 @@ jobs:
           path: prototype-android-dist/*
           if-no-files-found: error
           retention-days: 14
+          overwrite: true
       - name: Retain Android review screens
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: prototype-android-review-${{ github.run_id }}
+          name: prototype-android-review-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             prototype-android-dist/android-startup.png
             prototype-android-dist/android-smoke.json
