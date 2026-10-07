@@ -69,7 +69,7 @@ func run(root: Node):
 		game.ui.open_tablet()
 		game.ui.tabs.current_tab = 4
 	else: game.settings.show_menu()
-	button_named(game.ui.root,"조작키 변경…").pressed.emit()
+	if not prototype: button_named(game.ui.root,"조작키 변경…").pressed.emit()
 	await get_tree().process_frame
 	editor = window_in(game.ui.root)
 	check(editor != null and editor.visible and editor.buttons.size() == (9 if prototype else 10),"Both settings paths expose their active actions in the shared editor")
@@ -108,12 +108,15 @@ func run(root: Node):
 	await capture("jump",KEY_ESCAPE)
 	check(editor.visible,"Assigning Escape does not close the settings window")
 	check(game.bindings.bindings.jump == [KEY_SPACE],"Draft changes are not active before Save")
+	if prototype: editor.get("fields").sensitivity.value = .0022
 	if DisplayServer.get_name() != "headless":
 		await RenderingServer.frame_post_draw
 		editor.get_texture().get_image().save_png(directory.path_join("input-rebinding.png"))
 	editor.save_button.pressed.emit()
 	await get_tree().process_frame
 	check(not game.player.settings_input_blocked and game.bindings.bindings.pause == [KEY_P],"Save applies bindings and restores input lock")
+	if prototype:
+		check(is_equal_approx(game.player.sensitivity,.0022) and is_equal_approx(JSON.parse_string(FileAccess.get_file_as_string(game.settings.path)).sensitivity,.0022),"Settings Save applies and persists the mouse slider with the key profile")
 	var restarted = LabInputBindings.new()
 	restarted.path = game.bindings.path
 	restarted.load_profile()
@@ -139,7 +142,7 @@ func run(root: Node):
 		game.ui.open_tablet()
 		game.ui.tabs.current_tab = 4
 	else: game.settings.show_menu()
-	button_named(game.ui.root,"조작키 변경…").pressed.emit()
+	if not prototype: button_named(game.ui.root,"조작키 변경…").pressed.emit()
 	await get_tree().process_frame
 	editor = window_in(game.ui.root)
 	var saved_path = game.bindings.path

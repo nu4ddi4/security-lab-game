@@ -52,6 +52,8 @@ var update_status: Label
 var update_check: Button
 var update_download: Button
 var binding_summary: Label
+var settings_screen: InvestigationSettingsScreen
+var settings_backdrop: Texture2D
 
 func setup(controller: InvestigationPrototype):
 	game = controller
@@ -172,6 +174,8 @@ func _build_tablet():
 		box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		box.add_theme_constant_override("separation",12)
 		scroll.add_child(box)
+	tabs.tab_changed.connect(func(index):
+		if index == 4 and modal_open and game.settings != null and settings_screen == null: open_rebinding())
 	label(tab(0),"확보한 원본 · 장비에서 조회한 기록과 받은 첨부만 표시됩니다.")
 	notes = VBoxContainer.new()
 	tab(0).add_child(notes)
@@ -230,37 +234,7 @@ func _build_tablet():
 	button(tab(3),"진행 내보내기",func(): file_dialog(true))
 	button(tab(3),"진행 가져오기",func(): file_dialog(false))
 	new_session_button = button(tab(3),"새 업무 시작",func(): confirm("현재 진행을 보관하고 새 업무를 시작할까요?",game.new_game))
-	touch_setting = CheckButton.new()
-	touch_setting.text = "터치 조작 사용\n키보드 입력도 함께 사용"
-	touch_setting.button_pressed = game.controls.touch_enabled
-	tab(4).add_child(touch_setting)
-	touch_setting.toggled.connect(game.controls.set_touch)
-	input_status = label(tab(4),"")
-	label(tab(4),"터치: 왼쪽 엄지 이동 · 오른쪽 쓸어 시점 · 장비를 탭해 선택한 뒤 상호작용")
-	if OS.get_name() == "Windows" or game.qa_mode:
-		label(tab(4),"조작키 · 키보드")
-		binding_summary = label(tab(4),LabInputBindings.summary(true))
-		button(tab(4),"조작키 변경…",open_rebinding)
-	update_setting = CheckButton.new()
-	update_setting.text = "시작할 때 업데이트 확인"
-	update_setting.button_pressed = game.controls.automatic_updates
-	tab(4).add_child(update_setting)
-	update_setting.toggled.connect(game.controls.set_automatic_updates)
-	label(tab(4),"%s · %s 채널" % [game.updates.installed.get("version","개발"),"사전 릴리즈" if game.updates.installed.get("prerelease",true) else "안정"])
-	update_status = label(tab(4),"")
-	update_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	update_check = button(tab(4),"업데이트 확인",func():
-		if game.updater!=null: game.updater.check()
-		else: game.updates.check())
-	update_download = button(tab(4),"업데이트 확인하고 설치…",func():
-		if game.updater!=null: game.updater.request_install()
-		else: confirm("업데이트가 있습니다. 새 버전을 다운로드할까요? 설치 전 게임을 닫으세요. 저장은 유지됩니다.",game.updates.open_download))
-	var diagnostic_status = label(tab(4),"")
-	if OS.get_name()=="Windows":
-		button(tab(4),"진단 정보 복사",func(): diagnostic_status.text = game.diagnostics.copy_information().message)
-		button(tab(4),"지원 패키지 만들기",func(): diagnostic_status.text = game.diagnostics.create_package().message)
-		button(tab(4),"지원 패키지 폴더 열기",func():
-			if not game.diagnostics.last_package.is_empty(): OS.shell_open(game.diagnostics.last_package.get_base_dir()))
+	button(tab(4),"설정 열기",open_rebinding)
 
 func _build_terminal():
 	terminal_panel = panel(.08,.09,.92,.91)
@@ -620,6 +594,9 @@ func print_output(command: String, text: String):
 	terminal.scroll_to_line(maxi(0,terminal.get_line_count()-1))
 
 func _show(next_mode: String, window: Control):
+	if is_instance_valid(settings_screen): settings_screen.close_editor()
+	if mode == "field" and DisplayServer.get_name() != "headless":
+		settings_backdrop = ImageTexture.create_from_image(get_viewport().get_texture().get_image())
 	scroll_finger = -1
 	touch_scroll = null
 	hide_keyboard()
@@ -639,6 +616,7 @@ func _show(next_mode: String, window: Control):
 func open_tablet(index = 3):
 	_show("tablet",modal)
 	tabs.current_tab = 3 if index == 2 and not investigation_assigned() else index
+	if index == 4 and settings_screen == null: open_rebinding()
 	refresh()
 
 func open_briefing(): _show("briefing",briefing_panel)
@@ -663,6 +641,9 @@ func open_dialogue(id: String):
 	game.frame_speaker(id)
 
 func close():
+	if is_instance_valid(settings_screen) and settings_screen.visible:
+		settings_screen.close_editor()
+		return
 	if game.blocked_save: return
 	var focused = get_viewport().gui_get_focus_owner()
 	if focused != null: focused.release_focus()
@@ -795,7 +776,10 @@ func fit_screen():
 	command_sidebar.visible = not compact and help_sessions.get(game.context,false)
 	command_input.custom_minimum_size.y = 48 if game.controls.mobile else 0
 	for control in [touch_setting,update_setting,claim,contact_picker]:
-		control.custom_minimum_size.y = 48 if game.controls.mobile else 0
+		if is_instance_valid(control): control.custom_minimum_size.y = 48 if game.controls.mobile else 0
+	if is_instance_valid(settings_screen):
+		settings_screen.size = Vector2i(safe.size)
+		settings_screen.position = Vector2i(safe.position)
 	for item in [modal,terminal_panel,briefing_panel,dialogue_panel]:
 		if compact:
 			item.anchor_left = .02
@@ -810,10 +794,23 @@ func fit_screen():
 func hide_keyboard():
 	if DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD): DisplayServer.virtual_keyboard_hide()
 func open_rebinding():
-	var editor = LabInputRebinding.new()
+	if is_instance_valid(settings_screen): return
+	var editor = InvestigationSettingsScreen.new()
+	editor.game = game
+	editor.original_controls = {}
+	for key in ["touch_setting","update_setting","input_status","update_status","update_check","update_download"]: editor.original_controls[key] = get(key)
 	editor.configure(game.bindings,game.player)
+	editor.theme = root.theme
+	settings_screen = editor
+	get_viewport().gui_embed_subwindows = true
 	root.add_child(editor)
-	editor.popup_centered()
+	editor.background.texture = settings_backdrop
+	editor.preview_image.texture = settings_backdrop
+	modal.hide()
+	editor.popup()
+	editor.size = Vector2i(game.safe_rect().size)
+	editor.position = Vector2i(game.safe_rect().position)
+	refresh_settings()
 
 func refresh_input_hints():
 	refresh_settings()

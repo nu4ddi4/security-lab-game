@@ -1,15 +1,17 @@
 class_name LabSettings
 extends Node
 
-var values = {"resolution":0,"fullscreen":false,"vsync":true,"quality":1,"master":0.65,"sfx":0.55,"sensitivity":0.0018,"fov":72.0}
+const DEFAULT_VALUES = {"resolution":0,"fullscreen":false,"vsync":true,"quality":1,"master":0.65,"sfx":0.55,"sensitivity":0.0018,"fov":72.0}
+var values = DEFAULT_VALUES.duplicate()
 var game: Node
 var panel: Window
 var path = "user://settings.json"
 var binding_summary: Label
 
-func setup(root: Node):
+func setup(root: Node, connect_menu = true):
 	game = root
 	if game.qa_mode: path = "user://qa/settings.json"
+	if game is InvestigationPrototype: path = "user://investigation-qa/settings.json" if game.qa_mode else "user://beta-settings.json"
 	var raw = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
 	if raw is Dictionary:
 		for key in values:
@@ -24,9 +26,10 @@ func setup(root: Node):
 		AudioServer.add_bus()
 		AudioServer.set_bus_name(AudioServer.bus_count-1,"SFX")
 		AudioServer.set_bus_send(AudioServer.bus_count-1,"Master")
-	apply()
-	game.ui.settings_requested.connect(show_menu)
-	game.bindings.changed.connect(bindings_changed)
+	if not game is InvestigationPrototype or raw is Dictionary: apply()
+	if connect_menu:
+		game.ui.settings_requested.connect(show_menu)
+		game.bindings.changed.connect(bindings_changed)
 
 func bindings_changed():
 	if is_instance_valid(binding_summary): binding_summary.text = LabInputBindings.summary()
@@ -43,6 +46,16 @@ func apply():
 	viewport.msaa_3d = [Viewport.MSAA_DISABLED,Viewport.MSAA_2X,Viewport.MSAA_4X,Viewport.MSAA_8X][quality]
 	viewport.scaling_3d_scale = .8 if quality == 0 else 1.0
 	var native_advanced = RenderingServer.get_current_rendering_method() == "forward_plus"
+	if game.world != null: apply_graphics(quality,native_advanced)
+	AudioServer.set_bus_volume_db(0,linear_to_db(maxf(values.master,.0001)))
+	AudioServer.set_bus_mute(0,values.master <= 0)
+	var sfx = AudioServer.get_bus_index("SFX")
+	AudioServer.set_bus_volume_db(sfx,linear_to_db(maxf(values.sfx,.0001)))
+	AudioServer.set_bus_mute(sfx,values.sfx <= 0)
+	game.player.sensitivity = values.sensitivity
+	game.player.camera.fov = values.fov
+
+func apply_graphics(quality: int, native_advanced: bool):
 	var env = game.world.environment.environment
 	env.ssao_enabled = native_advanced and quality >= 1
 	env.ssao_radius = .6
@@ -53,13 +66,22 @@ func apply():
 	env.glow_enabled = native_advanced and quality >= 2
 	env.glow_intensity = .15
 	if game.world.has_node("OfficeReflection"): game.world.get_node("OfficeReflection").visible = native_advanced and quality >= 1
-	AudioServer.set_bus_volume_db(0,linear_to_db(maxf(values.master,.0001)))
-	AudioServer.set_bus_mute(0,values.master <= 0)
-	var sfx = AudioServer.get_bus_index("SFX")
-	AudioServer.set_bus_volume_db(sfx,linear_to_db(maxf(values.sfx,.0001)))
-	AudioServer.set_bus_mute(sfx,values.sfx <= 0)
-	game.player.sensitivity = values.sensitivity
-	game.player.camera.fov = values.fov
+
+func save_values(candidate: Dictionary) -> Dictionary:
+	var temporary = path+".tmp"
+	var file = FileAccess.open(temporary,FileAccess.WRITE)
+	if file == null: return {"ok":false,"message":"환경 설정 저장 실패 · "+error_string(FileAccess.get_open_error())}
+	file.store_string(JSON.stringify(candidate,"\t"))
+	file.flush()
+	var error = file.get_error()
+	file.close()
+	if error == OK: error = DirAccess.rename_absolute(temporary,path)
+	if error != OK:
+		DirAccess.remove_absolute(temporary)
+		return {"ok":false,"message":"환경 설정 저장 실패 · "+error_string(error)}
+	values = candidate.duplicate(true)
+	apply()
+	return {"ok":true,"message":"설정을 저장했습니다."}
 
 func show_menu():
 	if panel != null: panel.popup_centered(); return
