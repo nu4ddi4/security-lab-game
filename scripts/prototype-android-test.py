@@ -1,10 +1,12 @@
 """Install, run, update and relaunch APKs on the active Android emulator."""
 import argparse
+import io
 import json
 import os
 from pathlib import Path
 import subprocess
 import time
+from PIL import Image
 
 PACKAGE = 'com.nu4ddi4.securitylab.prototype'
 
@@ -43,6 +45,26 @@ def read_save():
     return json.loads(text)
 
 
+def rendered_image(data):
+    with Image.open(io.BytesIO(data)) as image:
+        sample = image.convert('RGB').resize((160, 90))
+        colors = sample.getcolors(maxcolors=16)
+        return colors is None and any(high - low > 32 for low, high in sample.getextrema())
+
+
+def capture_startup(directory):
+    # The render loop can precede Android's first surface presentation. Wait for
+    # actual visible pixels, so a black screenshot cannot count as rendered UI.
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        data = adb('exec-out', 'screencap', '-p', binary=True)
+        (directory / 'android-startup.png').write_bytes(data)
+        if rendered_image(data):
+            return
+        time.sleep(1)
+    raise ValueError('Android did not present the game screen')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--directory', default='prototype-android-dist')
@@ -52,6 +74,7 @@ def main():
     stem = 'SecurityLab-proto-' + metadata['version']
     apk, qa = directory / (stem + '.apk'), directory / (stem + '-qa.apk')
     adb('wait-for-device')
+    print('ANDROID_STORAGE', adb('shell', 'df', '-h', '/data').strip(), flush=True)
     # Avoid Android's one-time system fullscreen tutorial covering review images.
     adb('shell', 'settings', 'put', 'secure', 'immersive_mode_confirmations', 'confirmed')
     adb('install', '-r', str(apk))
@@ -61,7 +84,7 @@ def main():
     if ready.get('day') != 1:
         raise ValueError('Fresh Android investigation did not start on day 1')
     wait_for('PROTOTYPE_FRAME_READY')
-    (directory / 'android-startup.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
+    capture_startup(directory)
     # Android suspends apps without a desktop close request. Ensure this saves.
     adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
     time.sleep(1)
@@ -79,6 +102,8 @@ def main():
         if not data.startswith(b'\x89PNG\r\n\x1a\n'):
             raise ValueError('Missing Android rendered UI capture: ' + name)
         (captures / (name + '.png')).write_bytes(data)
+        if not rendered_image(data):
+            raise ValueError('Android rendered an empty UI capture: ' + name)
     if result.get('platform') != 'Android' or not result.get('passed') or not result.get('mobile') or not result.get('touchDefault') or not result.get('keyboardDetected'):
         raise ValueError('Android gameplay/input smoke failed: ' + json.dumps(result))
     if read_save() != original:
