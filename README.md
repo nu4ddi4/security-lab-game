@@ -1,6 +1,20 @@
 # Security Lab
 
-단서 조사 → 원인 설명 → 방어 적용 → 재검증으로 진행하는 보안 학습 게임.
+보안 학습 게임과 Godot 조사 프로토타입.
+
+## Godot 베타
+
+현재 개발 목표는 **0.8.0**이며 빌드 버전은 **0.8.0-beta.1**입니다. [버전 관리 규칙](docs/VERSIONING.md)을 확인하세요. 아래 릴리스는 표시 이름만 맞췄으며 다운로드 파일의 내부 버전은 검증된 0.4.0 그대로입니다.
+
+`beta`는 **잔여 권한** 프로토타입의 사건·저장·대화 흐름에 검증한 `godot-port` 맵과 진단·업데이트 기능을 합친 테스트·안정화 브랜치입니다. Godot 4.7.2에서 `godot/project.godot`을 열고 F5로 실행합니다.
+
+사무실 맵의 장비·NPC에서 조사하고 터미널·노트·보고로 사건을 진행합니다. 1~4일차 핵심 흐름과 5~7일차 기본 진행을 구현했습니다. 정식 결말은 후속 작업입니다. [실행·구조·다음 단계](docs/INVESTIGATION_PROTOTYPE.md).
+
+[SecurityLab-0.8.0-beta.1](https://github.com/nu4ddi4/security-lab-game/releases/tag/SecurityLab-beta-0.4.0)에서 Windows EXE·ZIP·설치 파일과 Android APK를 받습니다. 설치형 Windows 업데이트는 알림에 동의한 뒤에만 다운로드·저장·종료·설치·재실행합니다. 설정에서 로컬 진단을 복사하고 지원 ZIP을 만들 수 있습니다.
+
+개발 중인 상호작용·모바일·로딩 변경과 검증 범위는 [개선 기록](docs/BETA_UX_MOBILE_PLAN.md)을 참고하세요.
+
+기존 Godot 학습 게임은 소스에서 `--legacy`로 실행합니다. 아래 릴리즈 안내는 기존 웹 버전입니다.
 
 ## 실행
 

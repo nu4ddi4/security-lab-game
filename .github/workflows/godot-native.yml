@@ -20,7 +20,7 @@ jobs:
           key: native-lfs-${{ hashFiles('godot/assets/models/*.glb', 'assets/models/security_lab.glb') }}
       - name: Fetch native and baseline runtime
         shell: pwsh
-        run: git lfs pull --include="godot/assets/models/Interior_07_Godot.glb,assets/models/security_lab.glb" --exclude=""
+        run: git lfs pull --include="godot/assets/models/*.glb,assets/models/security_lab.glb" --exclude=""
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -39,13 +39,20 @@ jobs:
           key: native-import-4.7.2-${{ runner.os }}-${{ hashFiles('godot/assets/**', 'godot/project.godot') }}
           restore-keys: native-import-4.7.2-${{ runner.os }}-
       - name: Build and validate native EXE
+        id: native-exe
         shell: pwsh
-        run: ./scripts/godot-build.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE
+        run: |
+          ./scripts/godot-build.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "exe_bytes=$((Get-Item -LiteralPath 'godot/builds/Windows/SecurityLab.exe').Length)" >> $env:GITHUB_OUTPUT
       - name: Native scene binding smoke
         shell: pwsh
         run: |
           & $env:SECURITY_LAB_GODOT_CONSOLE --headless --path godot -- --qa
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native diagnostics Windows privacy boundaries
+        shell: pwsh
+        run: ./scripts/godot-diagnostics-windows-test.ps1 -Godot $env:SECURITY_LAB_GODOT_CONSOLE
       - name: Investigation prototype
         shell: pwsh
         run: |
@@ -53,9 +60,27 @@ jobs:
             python scripts/prototype-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+      - name: Exported native diagnostics ZIP smoke
+        shell: pwsh
+        run: ./scripts/godot-diagnostics-export-test.ps1 -Headless
       - uses: actions/upload-artifact@v4
+        id: native-artifact
         with:
           name: SecurityLab-Native-Windows-x64
           path: godot/builds/Windows/SecurityLab.exe
           if-no-files-found: error
           retention-days: 14
+      - name: Native artifact summary
+        shell: pwsh
+        env:
+          EXE_BYTES: ${{ steps.native-exe.outputs.exe_bytes }}
+          ARTIFACT_URL: ${{ steps.native-artifact.outputs.artifact-url }}
+        run: |
+          @"
+          ### Native Windows test build
+          [SecurityLab-Native-Windows-x64]($env:ARTIFACT_URL)
+
+          Contains SecurityLab.exe ($env:EXE_BYTES bytes), with an embedded PCK.
+          Native engine and scene checks passed. No Chrome or Python is needed to play.
+          This workflow does not create a GitHub release or tag.
+          "@ >> $env:GITHUB_STEP_SUMMARY

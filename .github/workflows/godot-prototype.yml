@@ -1,0 +1,143 @@
+name: Investigation beta builds
+on:
+  workflow_dispatch:
+  push:
+    branches: ['beta']
+    paths:
+      - godot/**
+      - installer/**
+      - scripts/prototype-*.py
+      - scripts/beta-*.py
+      - tests/native/**
+      - .github/actions/godot-setup/**
+      - .github/actions/inno-setup/**
+      - .github/workflows/godot-prototype.yml
+permissions:
+  contents: read
+concurrency:
+  group: prototype-windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  prototype:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the verified detailed office asset
+        run: git lfs pull --include="godot/assets/models/*.glb" --exclude=""
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: ./.github/actions/godot-setup
+        with:
+          export: 'true'
+      - name: Read prototype version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content godot/prototype/version.json -Raw | ConvertFrom-Json).version
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Reuse the same verified Windows build
+        id: windows_cache
+        uses: actions/cache@v4
+        with:
+          path: prototype-dist
+          key: beta-windows-4.7.2-${{ github.sha }}
+      - name: Export and check standalone prototype
+        if: steps.windows_cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          python scripts/prototype-build.py --rendered-check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: ./.github/actions/inno-setup
+      - name: Package the beta installer and verify updater behavior
+        shell: pwsh
+        run: |
+          python scripts/beta-installer-build.py --iscc $env:SECURITY_LAB_ISCC
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tests/native/security_windows_updater.ps1 -Iscc $env:SECURITY_LAB_ISCC
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tests/native/security_windows_updater.ps1 -Beta -Iscc $env:SECURITY_LAB_ISCC -Results prototype-dist/beta-windows-updater.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/godot-update-network-test.py --godot $env:SECURITY_LAB_GODOT_CONSOLE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        id: artifact
+        with:
+          name: SecurityLab-beta-${{ steps.version.outputs.version }}-Windows-x64
+          path: |
+            prototype-dist/*.exe
+            prototype-dist/*.json
+            prototype-dist/*.sha256
+            prototype-dist/ui/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Download link
+        shell: pwsh
+        env:
+          ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
+          PROTOTYPE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          "[SecurityLab-beta-$env:PROTOTYPE_VERSION]($env:ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the verified detailed office asset
+        run: git lfs pull --include="godot/assets/models/*.glb" --exclude=""
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools build-tools;35.0.1 platforms;android-35'
+          log-accepted-android-sdk-licenses: 'false'
+      - uses: ./.github/actions/godot-setup
+        with:
+          export: 'true'
+      - name: Export signed APK and matching QA APK
+        run: python3 scripts/prototype-android-build.py
+      - name: Install screen verification dependency
+        run: python3 -m pip install Pillow==11.3.0
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install, play, update and relaunch on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: default
+          profile: pixel_2
+          disk-size: 6G
+          emulator-options: -no-window -gpu swangle -no-snapshot -wipe-data -partition-size 6144 -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: python3 scripts/prototype-android-test.py
+      - name: Read prototype version
+        id: version
+        run: python3 -c 'import json,os; print("version="+json.load(open("godot/prototype/version.json"))["version"],file=open(os.environ["GITHUB_OUTPUT"],"a"))'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecurityLab-beta-${{ steps.version.outputs.version }}-Android
+          path: prototype-android-dist/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain Android review screens
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prototype-android-review-${{ github.run_id }}
+          path: |
+            prototype-android-dist/android-startup.png
+            prototype-android-dist/android-smoke.json
+            prototype-android-dist/android-log.txt
+            prototype-android-dist/ui/*.png
+          if-no-files-found: ignore
+          retention-days: 14

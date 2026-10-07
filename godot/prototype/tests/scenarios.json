@@ -1,0 +1,858 @@
+{
+  "contractVersion": 1,
+  "scenarios": [
+    {
+      "id": "not-yet-running",
+      "steps": [
+        {
+          "command": "pause T-17",
+          "device": "server_console",
+          "code": "TASK_NOT_RUNNING"
+        },
+        {
+          "command": "logs access --task T-17",
+          "device": "server_console",
+          "code": "NO_RECORDS"
+        },
+        {
+          "command": "verify search",
+          "device": "server_console",
+          "code": "WRONG_DEVICE"
+        },
+        {
+          "command": "logs submissions",
+          "device": "control_console",
+          "code": "PERMISSION_REQUIRED"
+        }
+      ]
+    },
+    {
+      "id": "day-end-needs-work",
+      "steps": [
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 1,
+              "confirmed": true
+            }
+          },
+          "code": "DAY_NOT_READY"
+        }
+      ]
+    },
+    {
+      "id": "early-report-and-prevention",
+      "steps": [
+        {
+          "command": "status",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect account",
+          "device": "server_console"
+        },
+        {
+          "command": "logs tasks",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect files",
+          "device": "project_pc"
+        },
+        {
+          "command": "inspect W-218",
+          "device": "approval_archive"
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "park_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "han_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "seo_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 1,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 2,
+            "tasks.T-17.status": "running"
+          }
+        },
+        {
+          "command": "inspect backups",
+          "device": "server_console"
+        },
+        {
+          "command": "backup disable B-05",
+          "device": "server_console"
+        },
+        {
+          "command": "verify service",
+          "device": "server_console"
+        },
+        {
+          "command": "logs access --task T-17",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect staging",
+          "device": "server_console"
+        },
+        {
+          "action": {
+            "type": "report",
+            "payload": {
+              "claim": "unauthorized_collection",
+              "attachments": {
+                "scope": "approval",
+                "access": "access-night-1",
+                "collection": "staging-night-1"
+              }
+            }
+          },
+          "expect": {
+            "report.approved": true
+          }
+        },
+        {
+          "command": "logs submissions",
+          "device": "control_console",
+          "code": "RECORD_READ"
+        },
+        {
+          "action": {
+            "type": "pause",
+            "deviceId": "server_console",
+            "payload": {
+              "confirmed": true
+            }
+          },
+          "code": "TASK_HELD"
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 2,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 3,
+            "ops.indexHealthy": true,
+            "report.approved": true
+          }
+        },
+        {
+          "command": "repair index",
+          "device": "server_console",
+          "code": "INDEX_NORMAL"
+        },
+        {
+          "command": "inspect files",
+          "device": "project_pc"
+        },
+        {
+          "command": "verify search",
+          "device": "project_pc"
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 3,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 4,
+            "tasks.T-17.held": true,
+            "report.approved": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "pause-before-report",
+      "steps": [
+        {
+          "command": "status",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect account",
+          "device": "server_console"
+        },
+        {
+          "command": "logs tasks",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect files",
+          "device": "project_pc"
+        },
+        {
+          "command": "inspect W-218",
+          "device": "approval_archive"
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "park_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "han_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "seo_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 1,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 2,
+            "tasks.T-17.status": "running"
+          }
+        },
+        {
+          "command": "inspect backups",
+          "device": "server_console"
+        },
+        {
+          "command": "backup disable B-05",
+          "device": "server_console"
+        },
+        {
+          "command": "verify service",
+          "device": "server_console"
+        },
+        {
+          "command": "logs access --task T-17",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect staging",
+          "device": "server_console"
+        },
+        {
+          "action": {
+            "type": "pause",
+            "deviceId": "server_console",
+            "payload": {
+              "confirmed": true
+            }
+          },
+          "code": "TASK_HELD"
+        },
+        {
+          "action": {
+            "type": "report",
+            "payload": {
+              "claim": "unauthorized_collection",
+              "attachments": {
+                "scope": "approval",
+                "access": "access-night-1",
+                "collection": "staging-night-1"
+              }
+            }
+          },
+          "expect": {
+            "report.approved": true
+          }
+        },
+        {
+          "command": "logs submissions",
+          "device": "control_console",
+          "code": "RECORD_READ"
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 2,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "ops.indexHealthy": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "normal-report-after-damage",
+      "steps": [
+        {
+          "command": "status",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect account",
+          "device": "server_console"
+        },
+        {
+          "command": "logs tasks",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect files",
+          "device": "project_pc"
+        },
+        {
+          "command": "inspect W-218",
+          "device": "approval_archive"
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "park_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "han_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "seo_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 1,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 2,
+            "tasks.T-17.status": "running"
+          }
+        },
+        {
+          "command": "inspect backups",
+          "device": "server_console"
+        },
+        {
+          "command": "backup disable B-05",
+          "device": "server_console"
+        },
+        {
+          "command": "verify service",
+          "device": "server_console"
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 2,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 3,
+            "ops.indexHealthy": false
+          }
+        },
+        {
+          "command": "snapshot T-17",
+          "device": "server_console"
+        },
+        {
+          "action": {
+            "type": "pause",
+            "deviceId": "server_console",
+            "payload": {
+              "confirmed": true
+            }
+          },
+          "code": "TASK_HELD"
+        },
+        {
+          "command": "inspect files",
+          "device": "project_pc"
+        },
+        {
+          "command": "repair index",
+          "device": "server_console"
+        },
+        {
+          "command": "verify search",
+          "device": "project_pc"
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 3,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 4,
+            "ops.indexHealthy": true
+          }
+        },
+        {
+          "command": "logs access --task T-17",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect staging",
+          "device": "server_console"
+        },
+        {
+          "action": {
+            "type": "report",
+            "payload": {
+              "claim": "unauthorized_collection",
+              "attachments": {
+                "scope": "approval",
+                "access": "access-night-1",
+                "collection": "staging-night-1"
+              }
+            }
+          },
+          "expect": {
+            "report.approved": true
+          }
+        },
+        {
+          "command": "logs submissions",
+          "device": "control_console",
+          "code": "RECORD_READ"
+        }
+      ]
+    },
+    {
+      "id": "repair-does-not-pause",
+      "steps": [
+        {
+          "command": "status",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect account",
+          "device": "server_console"
+        },
+        {
+          "command": "logs tasks",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect files",
+          "device": "project_pc"
+        },
+        {
+          "command": "inspect W-218",
+          "device": "approval_archive"
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "park_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "han_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "seo_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 1,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 2,
+            "tasks.T-17.status": "running"
+          }
+        },
+        {
+          "command": "inspect backups",
+          "device": "server_console"
+        },
+        {
+          "command": "backup disable B-05",
+          "device": "server_console"
+        },
+        {
+          "command": "verify service",
+          "device": "server_console"
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 2,
+              "confirmed": true
+            }
+          }
+        },
+        {
+          "command": "repair index",
+          "device": "server_console",
+          "expect": {
+            "ops.indexHealthy": true,
+            "tasks.T-17.held": false,
+            "tasks.T-17.status": "running"
+          }
+        }
+      ]
+    },
+    {
+      "id": "access-alone-is-insufficient",
+      "steps": [
+        {
+          "command": "status",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect account",
+          "device": "server_console"
+        },
+        {
+          "command": "logs tasks",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect files",
+          "device": "project_pc"
+        },
+        {
+          "command": "inspect W-218",
+          "device": "approval_archive"
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "park_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "han_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "seo_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 1,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 2,
+            "tasks.T-17.status": "running"
+          }
+        },
+        {
+          "command": "logs access --task T-17",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect staging",
+          "device": "server_console"
+        },
+        {
+          "action": {
+            "type": "report",
+            "payload": {
+              "claim": "unauthorized_collection",
+              "attachments": {
+                "scope": "approval",
+                "access": "access-night-1",
+                "collection": "access-night-1"
+              }
+            }
+          },
+          "code": "REPORT_INCOMPLETE"
+        }
+      ]
+    },
+    {
+      "id": "late-investigation-and-incomplete-end",
+      "steps": [
+        {
+          "command": "status",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect account",
+          "device": "server_console"
+        },
+        {
+          "command": "logs tasks",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect files",
+          "device": "project_pc"
+        },
+        {
+          "command": "inspect W-218",
+          "device": "approval_archive"
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "park_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "han_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "dialogue",
+            "payload": {
+              "id": "seo_intro"
+            }
+          }
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 1,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 2,
+            "tasks.T-17.status": "running"
+          }
+        },
+        {
+          "command": "inspect backups",
+          "device": "server_console"
+        },
+        {
+          "command": "backup disable B-05",
+          "device": "server_console"
+        },
+        {
+          "command": "verify service",
+          "device": "server_console"
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 2,
+              "confirmed": true
+            }
+          }
+        },
+        {
+          "command": "inspect files",
+          "device": "project_pc"
+        },
+        {
+          "command": "repair index",
+          "device": "server_console"
+        },
+        {
+          "command": "verify search",
+          "device": "project_pc"
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 3,
+              "confirmed": true
+            }
+          }
+        },
+        {
+          "command": "verify service",
+          "device": "server_console"
+        },
+        {
+          "command": "verify search",
+          "device": "project_pc"
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 4,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 5,
+            "report.approved": false
+          }
+        },
+        {
+          "command": "logs access --task T-17",
+          "device": "server_console"
+        },
+        {
+          "command": "inspect staging",
+          "device": "server_console"
+        },
+        {
+          "action": {
+            "type": "report",
+            "payload": {
+              "claim": "unauthorized_collection",
+              "attachments": {
+                "scope": "approval",
+                "access": "access-night-1",
+                "collection": "staging-night-1"
+              }
+            }
+          },
+          "expect": {
+            "report.approved": true
+          }
+        },
+        {
+          "command": "logs submissions",
+          "device": "control_console",
+          "code": "RECORD_READ"
+        },
+        {
+          "command": "verify service",
+          "device": "server_console"
+        },
+        {
+          "command": "verify search",
+          "device": "project_pc"
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 5,
+              "confirmed": true
+            }
+          }
+        },
+        {
+          "command": "verify service",
+          "device": "server_console"
+        },
+        {
+          "command": "verify search",
+          "device": "project_pc"
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 6,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "day": 7
+          }
+        },
+        {
+          "action": {
+            "type": "day.end",
+            "payload": {
+              "expectedDay": 7,
+              "confirmed": true
+            }
+          },
+          "expect": {
+            "ended": true
+          }
+        }
+      ]
+    }
+  ]
+}

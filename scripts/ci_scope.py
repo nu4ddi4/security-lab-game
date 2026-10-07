@@ -11,7 +11,7 @@ def classify(paths, has_godot=False, main_push=False):
     for path in paths:
         if path in {'.github/workflows/ci.yml', '.gitattributes', 'package.json', 'package-lock.json', 'scripts/ci_scope.py'}:
             web = godot = True
-        elif path.startswith(('godot/', 'scripts/godot-', 'scripts/prototype-', 'scripts/ci-godot-', '.github/actions/godot-setup/')) or path == '.github/workflows/godot-native.yml':
+        elif path.startswith(('godot/', 'installer/', 'tests/native/', 'scripts/godot-', 'scripts/prototype-', 'scripts/beta-', 'scripts/ci-godot-', '.github/actions/godot-setup/', '.github/actions/inno-setup/', '.github/workflows/native-update.yml', '.github/workflows/godot-')):
             godot = True
         elif path.startswith('assets/authoring/'):
             continue
@@ -37,7 +37,7 @@ def select(paths, event, has_godot):
     default = event.get('repository', {}).get('default_branch', 'main')
     main_push = event.get('ref') == 'refs/heads/' + default and 'pull_request' not in event
     scope = classify(paths, has_godot, main_push)
-    package = main_push or ('pull_request' in event and not event['pull_request'].get('draft', False))
+    package = main_push or event.get('ref') == 'refs/heads/beta' or ('pull_request' in event and not event['pull_request'].get('draft', False))
     scope.update({'windows_web': scope['web'] and package, 'windows_godot': scope['godot'] and package})
     return scope
 

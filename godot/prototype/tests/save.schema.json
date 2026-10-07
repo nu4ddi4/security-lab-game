@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Investigation save envelope",
+  "type": "object",
+  "required": [
+    "format",
+    "schemaVersion",
+    "contractVersion",
+    "caseId",
+    "contentVersion",
+    "state"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "security-lab-investigation"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "contractVersion": {
+      "const": 1
+    },
+    "caseId": {
+      "const": "residual-permissions"
+    },
+    "contentVersion": {
+      "type": "string"
+    },
+    "state": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "day",
+        "revision",
+        "ended",
+        "ops",
+        "tasks",
+        "records",
+        "known",
+        "evidence",
+        "baseline",
+        "introduced",
+        "statements",
+        "eventIds",
+        "documents",
+        "messages",
+        "report",
+        "memo"
+      ],
+      "properties": {
+        "day": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "memo": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -34,7 +35,7 @@ def main():
     source = Path(args.project).resolve()
     with tempfile.TemporaryDirectory(prefix='security-lab-ci-') as temporary:
         target = Path(temporary)
-        for name in ['scripts/missions.gd', 'scripts/save_manager.gd', 'scripts/player.gd', 'tests/unit.gd']:
+        for name in ['scripts/missions.gd', 'scripts/save_manager.gd', 'scripts/player.gd', 'scripts/update_policy.gd', 'scripts/update_manager.gd', 'tests/native_update_test.gd', 'tests/unit.gd', 'scripts/diagnostics.gd', 'scripts/diagnostics_serializer.gd', 'tests/diagnostics_test.gd']:
             destination = target / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source / name, destination)
@@ -43,18 +44,31 @@ def main():
                 destination = target / path.relative_to(source)
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(path, destination)
+        shutil.copytree(source / 'scripts', target / 'scripts', dirs_exist_ok=True)
         prototype = (source / 'prototype/main.tscn').exists()
         if prototype:
             shutil.copytree(source / 'prototype', target / 'prototype')
             (target / 'assets/fonts').mkdir(parents=True)
             shutil.copyfile(source / 'assets/fonts/NotoSansKR.ttf', target / 'assets/fonts/NotoSansKR.ttf')
-        scene = 'run/main_scene="res://prototype/main.tscn"\n' if prototype else ''
-        (target / 'project.godot').write_text('config_version=5\n[application]\nconfig/name="Security Lab CI"\n' + scene + '[physics]\ncommon/physics_ticks_per_second=120\n', encoding='utf-8')
+        # UI assertions must use the real viewport and stretch settings too.
+        # Keep the lightweight file set; only the project configuration is shared.
+        project = (source / 'project.godot').read_text(encoding='utf-8')
+        project = re.sub(r'^config/name=.*$', 'config/name="Security Lab CI"', project, flags=re.MULTILINE)
+        scene = 'run/main_scene="res://prototype/main.tscn"' if prototype else ''
+        project = re.sub(r'^run/main_scene=.*$', scene, project, flags=re.MULTILINE)
+        (target / 'project.godot').write_text(project, encoding='utf-8')
         run(args.godot, target, ['--editor', '--import'])
         run(args.godot, target, ['--script', 'res://tests/unit.gd'], 'NATIVE_UNIT')
+        run(args.godot, target, ['--script', 'res://tests/native_update_test.gd'], 'NATIVE_UPDATE_TEST')
+        run(args.godot, target, ['--script', 'res://tests/diagnostics_test.gd'], 'NATIVE_DIAGNOSTICS')
+        shutil.copyfile(source / 'tests/input_bindings_test.gd', target / 'tests/input_bindings_test.gd')
+        shutil.copyfile(source / 'tests/input_review.gd', target / 'tests/input_review.gd')
+        run(args.godot, target, ['--script', 'res://tests/input_bindings_test.gd'], 'INPUT_BINDINGS_TEST')
         if prototype:
             run(args.godot, target, ['--script', 'res://prototype/tests/unit.gd'], 'INVESTIGATION_UNIT')
-            run(args.godot, target, ['--', '--prototype-smoke'], 'INVESTIGATION_SMOKE')
+            run(args.godot, target, ['--script', 'res://prototype/tests/services_runner.gd'], 'INVESTIGATION_SERVICES')
+            run(args.godot, target, ['--', '--prototype-smoke', '--prototype-dummy'], 'INVESTIGATION_SMOKE')
+            run(args.godot, target, ['--', '--prototype-smoke', '--prototype-dummy', '--prototype-input-review'], 'INPUT_REVIEW')
 
 
 if __name__ == '__main__':

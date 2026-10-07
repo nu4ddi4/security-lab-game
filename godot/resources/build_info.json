@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "app_id": "security-lab-native",
+  "platform": "windows-x86_64",
+  "version": "0.7.0-dev.0",
+  "channel": "dev",
+  "commit": "d9c573dae2099c4caf0138f5183654509a76a949",
+  "install_layout": 1,
+  "updates_default": false,
+  "manifest_url": "https://github.com/nu4ddi4/security-lab-game/releases/download/native-channel-dev/update.json"
+}
