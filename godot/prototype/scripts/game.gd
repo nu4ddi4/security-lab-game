@@ -54,6 +54,9 @@ func _ready():
 	save_timer.wait_time = .4
 	save_timer.timeout.connect(save_now)
 	add_child(save_timer)
+	get_window().focus_exited.connect(save_now)
+	# Persist a fresh investigation before Android can suspend its render loop.
+	if not loaded.has("state") and not blocked_save: save_now()
 	if blocked_save: ui.notice(loaded.error + "\n새 조사를 시작하기 전 원본을 보존합니다.")
 	print("PROTOTYPE_READY ",JSON.stringify({"day":state.day,"dummy":true,"devices":content.case.devices.size(),"npcs":content.case.npcs.size(),"isolatedSave":store.directory}))
 	if DisplayServer.get_name() != "headless": _report_first_frame.call_deferred()
