@@ -33,19 +33,16 @@ func setup(id: String, manager: LabMissions, box: AABB):
 	update_placard()
 
 func update_placard():
-	var action = missions.action()
-	var inspected = device_id in missions.progress().get("spatial",{}).get("inspected",[])
-	placard.text = display_name + "\n" + ("E · 재확인" if action.device == device_id and action.mode == "recheck" else "현장 단서 확보" if inspected else "E 조사 / F 도구")
-	placard.modulate = Color(.86,.70,.47) if action.device == device_id and action.mode == "recheck" else Color(.72,.87,.88)
+	var status = missions.device_status(device_id)
+	placard.text = display_name + "\n" + ("다음 · " + status.action + "\n" if status.objective else "") + status.text
+	placard.modulate = LabUI.STATUS_COLORS[status.tone]
+	placard.outline_size = 13 if status.objective else 10
 
 func get_interaction_prompt() -> String:
-	return "E · 변경 후 상태 재확인 / F · 상세 도구" if missions.action().mode == "recheck" and missions.action().device == device_id else "E · 현장 조사 / F · " + ("접근 정책" if device_id == "INTERACT_Router" else "파일 비교" if device_id == "INTERACT_FileCabinet" else "조사 노트 · 도구")
+	return display_name + "\nE · " + ("변경 결과 재확인" if missions.device_status(device_id).tone == "pending" else missions.device_task(device_id)) + " / F · " + missions.device_tool(device_id).label
 
 func inspect():
 	missions.inspect(device_id)
 
 func open_tool() -> String:
-	if device_id == "INTERACT_Router": return "Settings"
-	if device_id == "INTERACT_FileCabinet": return "Files"
-	if device_id == "INTERACT_Whiteboard": return "Notes"
-	return "Terminal" if missions.mission().id in ["tutorial", "services"] else "Files" if missions.mission().id == "integrity" else "Settings"
+	return missions.device_tool(device_id).tab

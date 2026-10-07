@@ -46,7 +46,7 @@ func _ready():
 	add_child(audio)
 	audio.setup(self)
 	player.inspect_requested.connect(func(target): target.inspect())
-	player.tool_requested.connect(func(target): ui.open_tool(target.open_tool()))
+	player.tool_requested.connect(func(target): ui.open_tool(target.open_tool(),target.device_id))
 	player.pause_requested.connect(ui.pause)
 	ui.reset_position_requested.connect(player.respawn)
 	ui.save_requested.connect(save_now)
@@ -60,7 +60,7 @@ func _ready():
 	loaded_ms = (Time.get_ticks_usec()-startup_usec)/1000.0
 	print("NATIVE_READY ",JSON.stringify({"godot":Engine.get_version_info().string,"load_ms":loaded_ms,"functional":world.protected_nodes.size(),"colliders":world.collider_count,"doors":world.doors.size(),"devices":world.devices.size(),"screens":equipment.screen_bindings,"leds":equipment.leds.size(),"renderer":RenderingServer.get_current_rendering_method()}))
 	if qa_mode and "--qa-manual" not in OS.get_cmdline_user_args():
-		var script = "res://tests/physical_slice.gd" if "--qa-physical" in OS.get_cmdline_user_args() or "--qa-nav" in OS.get_cmdline_user_args() else "res://tests/review.gd" if "--qa-review" in OS.get_cmdline_user_args() else "res://tests/vertical_slice.gd"
+		var script = "res://tests/layout_review.gd" if "--qa-layout" in OS.get_cmdline_user_args() else "res://tests/ux_review.gd" if "--qa-ux" in OS.get_cmdline_user_args() else "res://tests/physical_slice.gd" if "--qa-physical" in OS.get_cmdline_user_args() or "--qa-nav" in OS.get_cmdline_user_args() else "res://tests/review.gd" if "--qa-review" in OS.get_cmdline_user_args() else "res://tests/vertical_slice.gd"
 		var qa = load(script).new()
 		add_child(qa)
 		qa.run.call_deferred(self)

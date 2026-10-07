@@ -11,6 +11,7 @@ var player: LabPlayer
 var missions: LabMissions
 var meshes: Array[MeshInstance3D] = []
 var functional: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/functional.json"))
+var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/native-layout.json"))
 
 func setup(manager: LabMissions, actor: LabPlayer):
 	missions = manager
@@ -25,6 +26,9 @@ func setup(manager: LabMissions, actor: LabPlayer):
 			var body = StaticBody3D.new()
 			body.name = "NativeCollision"
 			body.collision_layer = 5
+			for chair in layout.chairs:
+				if chair.collider == id:
+					body.position = node.global_basis.inverse() * Vector3(chair.shift_world[0],chair.shift_world[1],chair.shift_world[2])
 			if "Upper" in id and "Partition" in id or id in ["COLLIDER_West_Window"]: body.collision_layer = 1
 			node.add_child(body)
 			box_collision(body, node.mesh.get_aabb())
@@ -57,7 +61,8 @@ func setup(manager: LabMissions, actor: LabPlayer):
 	add_child(ceiling)
 	box_collision(ceiling, AABB(Vector3(-12.2,3.4,-10.2),Vector3(24.4,.2,20.4)))
 	if protected_nodes.has("SPAWN_Player"):
-		player.global_position = protected_nodes.SPAWN_Player.global_position - Vector3(0,1.65,0) + Vector3(0,.01,0)
+		# The authored anchor is at the feet; the player camera supplies eye height.
+		player.global_position = protected_nodes.SPAWN_Player.global_position + Vector3(0,.01,0)
 	lighting()
 	add_child(preload("res://scripts/exterior.gd").new())
 

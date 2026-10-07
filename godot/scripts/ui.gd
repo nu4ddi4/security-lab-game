@@ -6,6 +6,7 @@ signal reset_position_requested
 signal save_requested
 signal settings_requested
 signal import_requested(path: String)
+const STATUS_COLORS = {"neutral":Color(.70,.77,.79),"pending":Color(.88,.76,.46),"warning":Color(.84,.64,.48),"normal":Color(.47,.74,.64)}
 var missions: LabMissions
 var player: LabPlayer
 var root: Control
@@ -13,8 +14,25 @@ var hud: VBoxContainer
 var title: Label
 var detail: Label
 var next_action: Label
+var objective: Label
+var action_reason: Label
+var location: Label
 var prompt: Label
+var prompt_panel: PanelContainer
 var observation_text: Label
+var observation_panel: PanelContainer
+var observation_title: Label
+var observation_status: Label
+var observation_record: Label
+var observation_next: Label
+var observation_result: Dictionary = {}
+var onboarding: PanelContainer
+var onboarding_goal: Label
+var onboarding_seen = false
+var onboarding_remaining = 0.0
+var tool_source: Label
+var tool_device = ""
+var recheck_notice: Label
 var modal: PanelContainer
 var panel_content: VBoxContainer
 var tabs: TabContainer
@@ -26,7 +44,6 @@ var current_tab = "Notes"
 var results_text: RichTextLabel
 var status = "새 조사"
 var toast: Label
-var observations_timeout = 0.0
 
 func setup(manager: LabMissions, actor: LabPlayer, load_status: String):
 	missions = manager
@@ -68,21 +85,62 @@ func setup(manager: LabMissions, actor: LabPlayer, load_status: String):
 	hud_panel.add_child(hud)
 	title = label(hud,"SECURITY LAB",24)
 	title.modulate = Color(.69,.86,.87)
+	label(hud,"목표",14).modulate = STATUS_COLORS.neutral
+	objective = wrapped_label(hud,"",17,450)
 	detail = label(hud,"",17)
+	label(hud,"다음 행동",14).modulate = STATUS_COLORS.neutral
 	next_action = label(hud,"",18)
 	next_action.custom_minimum_size.x = 450
 	next_action.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	prompt = label(root,"",20)
-	prompt.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	prompt.offset_top = -88
+	action_reason = wrapped_label(hud,"",15,450)
+	action_reason.modulate = STATUS_COLORS.neutral
+	location = wrapped_label(hud,"",15,450)
+	location.modulate = STATUS_COLORS.neutral
+	prompt_panel = PanelContainer.new()
+	prompt_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	prompt_panel.offset_left = -350
+	prompt_panel.offset_right = 350
+	prompt_panel.offset_top = -130
+	prompt_panel.offset_bottom = -45
+	prompt_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(prompt_panel)
+	prompt = wrapped_label(prompt_panel,"",20,650)
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var crosshair = label(root,"·",26)
 	crosshair.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	crosshair.position -= Vector2(5,20)
-	observation_text = label(root,"",17)
-	observation_text.position = Vector2(24,650)
-	observation_text.custom_minimum_size = Vector2(570,180)
-	observation_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	observation_panel = PanelContainer.new()
+	observation_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	observation_panel.offset_left = -466
+	observation_panel.offset_right = -24
+	observation_panel.offset_top = 100
+	observation_panel.offset_bottom = 100
+	observation_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(observation_panel)
+	var observation_body = VBoxContainer.new()
+	observation_body.add_theme_constant_override("separation",10)
+	observation_panel.add_child(observation_body)
+	observation_title = wrapped_label(observation_body,"",22,400)
+	observation_status = wrapped_label(observation_body,"",17,400)
+	observation_text = wrapped_label(observation_body,"",17,400)
+	observation_record = wrapped_label(observation_body,"",14,400)
+	observation_record.modulate = STATUS_COLORS.neutral
+	observation_next = wrapped_label(observation_body,"",17,400)
+	observation_panel.hide()
+	onboarding = PanelContainer.new()
+	onboarding.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	onboarding.offset_left = 24
+	onboarding.offset_top = -235
+	onboarding.offset_right = 444
+	onboarding.offset_bottom = -55
+	onboarding.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(onboarding)
+	var onboarding_body = VBoxContainer.new()
+	onboarding.add_child(onboarding_body)
+	wrapped_label(onboarding_body,"WASD 이동 · 마우스 시점\nE · 현장 근거 조사 / F · 상세 도구",17,380)
+	wrapped_label(onboarding_body,"F로 열기만 하면 현장 단서는 기록되지 않습니다.",15,380).modulate = STATUS_COLORS.neutral
+	onboarding_goal = wrapped_label(onboarding_body,"",16,380)
+	onboarding.hide()
 	toast = label(root,"",16)
 	toast.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	toast.offset_top = -30
@@ -102,6 +160,10 @@ func setup(manager: LabMissions, actor: LabPlayer, load_status: String):
 	var logo = label(heading,"SECURITY LAB  /  NATIVE",25)
 	logo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button(heading,"탐색 계속 · Esc",close_tool)
+	tool_source = wrapped_label(panel_content,"",16,0)
+	tool_source.modulate = STATUS_COLORS.neutral
+	recheck_notice = wrapped_label(panel_content,"",17,0)
+	recheck_notice.modulate = STATUS_COLORS.pending
 	tabs = TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel_content.add_child(tabs)
@@ -171,6 +233,12 @@ func label(parent: Node, text: String, size = 19) -> Label:
 	parent.add_child(node)
 	return node
 
+func wrapped_label(parent: Node, text: String, size: int, width: float) -> Label:
+	var node = label(parent,text,size)
+	node.custom_minimum_size.x = width
+	node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return node
+
 func button(parent: Node, text: String, callback: Callable) -> Button:
 	var node = Button.new()
 	node.text = text
@@ -188,8 +256,16 @@ func refresh():
 	var m = missions.mission()
 	var p = missions.progress()
 	title.text = "%02d / 04   %s" % [missions.state.active+1,m.title]
+	objective.text = "관제 PC에서 조사 권한을 확인하고 허용된 범위를 선택하세요." if m.id == "tutorial" else m.objective
 	detail.text = "%s  ·  근거 %d/%d  ·  %d점" % [missions.stage(), m.evidence.filter(func(key): return key in p.clues).size(),m.evidence.size(),missions.score()]
-	next_action.text = missions.action().text
+	var action = missions.action()
+	next_action.text = action.text
+	action_reason.text = action.reason
+	detail.modulate = STATUS_COLORS.pending if action.mode == "recheck" else STATUS_COLORS.normal if p.verified else STATUS_COLORS.neutral
+	recheck_notice.visible = action.mode == "recheck"
+	recheck_notice.text = action.text + " F로 도구를 열어도 현장 재확인은 완료되지 않습니다." if action.mode == "recheck" else ""
+	onboarding_goal.text = "지금 목표 · " + definitions_label(action.device) + " · " + ("F" if action.mode in ["tool","verify"] else "E") if action.device != "" else ""
+	tool_source.text = (missions.definitions.devices[tool_device].zone + " / " + definitions_label(tool_device) + " · " if tool_device != "" else "조사 노트 · ") + "F 상세 도구 / 현장 조사는 E · 닫으면 같은 위치로 복귀"
 	clear_children(answers)
 	for i in range(m.answers.size()):
 		var option = button(answers,("✓  " if p.answer == i else "○  ") + m.answers[i],func(): missions.apply_answer(i))
@@ -209,7 +285,11 @@ func refresh():
 		var snapshot = p.observations[key]
 		label(comparison,("변경 전" if key == "before" else "변경 후") + "\n" + (JSON.stringify(snapshot,"  ") if snapshot != null else "아직 관찰하지 않았습니다."),18)
 	label(comparison,"설정 변경 후 E 현장 재확인: " + ("완료" if p.get("spatial",{}).get("rechecked",false) else "필요" if p.observations.changed else "설정 변경 전"))
-	observation_text.text = ""
+	observation_result.clear()
+	observation_panel.hide()
+
+func definitions_label(id: String) -> String:
+	return missions.definitions.devices.get(id,{}).get("label","")
 
 func refresh_settings():
 	var body = tab_body("Settings")
@@ -263,12 +343,16 @@ func execute(command: String):
 	terminal.scroll_to_line(terminal.get_line_count()-1)
 	results_text.text += "\n" + output if command == "verify" else ""
 
-func open_tool(tab: String):
+func open_tool(tab: String, device = ""):
+	tool_device = device
 	current_tab = tab
 	tabs.current_tab = ["Terminal","Settings","Files","Comparison","Notes"].find(tab)
 	modal.show()
 	modal_open = true
 	player.set_enabled(false)
+	onboarding.hide()
+	observation_panel.hide()
+	if device != "": onboarding_remaining = 0
 	refresh()
 
 func close_tool():
@@ -277,6 +361,9 @@ func close_tool():
 	modal.hide()
 	modal_open = false
 	player.set_enabled(true)
+	if not onboarding_seen:
+		onboarding_seen = true
+		onboarding_remaining = 9.0
 	resume_requested.emit()
 
 func pause():
@@ -284,8 +371,15 @@ func pause():
 	else: open_tool("Notes")
 
 func show_observation(result: Dictionary):
-	observation_text.text = result.label + "  /  " + result.status + "\n" + "\n".join(result.findings).substr(0,480) + "\n" + ("노트에 기록되었습니다.  " if result.recorded else "") + result.next
-	observations_timeout = 14.0
+	observation_result = result.duplicate(true)
+	observation_title.text = result.label
+	observation_status.text = result.status
+	observation_status.modulate = STATUS_COLORS[result.tone]
+	observation_text.text = "\n".join(result.findings)
+	observation_record.text = "현장 단서 → 조사 노트에 기록됨 · 근거 %d/%d" % [result.evidenceFound,result.evidenceTotal] if result.recorded else "현장 단서 추가 없음"
+	observation_next.text = "다음 · " + result.next
+	onboarding_remaining = 0
+	onboarding.hide()
 
 func show_import():
 	var dialog = FileDialog.new()
@@ -301,6 +395,7 @@ func _process(delta):
 	if player == null or missions == null: return
 	if not modal_open:
 		prompt.text = player.target.get_interaction_prompt() if player.target != null else "WASD 이동  ·  E 현장 조사  ·  F 상세 도구  ·  Esc 노트"
+		prompt.modulate = STATUS_COLORS[missions.device_status(player.target.device_id).tone] if player.target is LabDevice else Color(.90,.94,.95)
 		var action = missions.action()
 		var direction = ""
 		if action.device != "":
@@ -309,7 +404,10 @@ func _process(delta):
 				var point = target.global_transform * target.get_child(0).position
 				var local = player.camera.global_basis.inverse() * (point-player.camera.global_position)
 				var arrow = "앞" if abs(local.x) < abs(local.z)*.45 and local.z < 0 else "뒤" if abs(local.x) < abs(local.z)*.45 else "오른쪽" if local.x > 0 else "왼쪽"
-				direction = "\n%s · %s · 직선 %.1fm" % [target.zone,arrow,player.global_position.distance_to(point)]
-		next_action.text = action.text + direction
-	observations_timeout -= delta
-	if observations_timeout <= 0: observation_text.text = ""
+				direction = "%s · %s · 직선 %.1fm" % [target.zone,arrow,player.global_position.distance_to(point)]
+		location.text = direction
+		onboarding_remaining = maxf(0,onboarding_remaining-delta)
+	onboarding.visible = not modal_open and onboarding_remaining > 0
+	observation_panel.visible = not modal_open and player.target is LabDevice and observation_result.get("device","") == player.target.device_id
+	prompt.visible = not modal_open
+	prompt_panel.visible = not modal_open and player.target != null

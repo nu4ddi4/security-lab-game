@@ -1,7 +1,9 @@
-// Offline lossless decompression of the shipped v0.7.0 base mesh. Godot runs no
+// Offline lossless decompression of the protected v0.7.0 base, followed by
+// native-only decorative workstation corrections. Godot runs no
 // web decoder, browser LOD selector, batching system or JavaScript at runtime.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import {refineNativeLayout} from './godot-layout.mjs';
 import {MeshoptDecoder} from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 await MeshoptDecoder.ready;
 const source='assets/models/security_lab.glb',destination='godot/assets/models/Interior_07_Godot.glb';
@@ -23,9 +25,11 @@ for(const field of ['extensionsUsed','extensionsRequired'])doc[field]=doc[field]
 doc.buffers=[{byteLength:offset}];
 const protectedNodes=Object.fromEntries(doc.nodes.filter(n=>/^(INTERACT_|DOOR_|COLLIDER_|SPAWN_)/.test(n.name)).map(n=>[n.name,Object.fromEntries(['matrix','translation','rotation','scale','extras'].filter(k=>k in n).map(k=>[k,n[k]]))]));
 doc.asset.extras={nativeBaseSourceSHA256:crypto.createHash('sha256').update(input).digest('hex'),baseErrorMetres:.0012,protectedNodes:Object.keys(protectedNodes).length,nativeLOD:'Godot importer'};
-const json=Buffer.from(JSON.stringify(doc));const jsonPad=Buffer.concat([json,Buffer.alloc((-json.length)&3,32)]),bin=Buffer.concat(parts),binPad=Buffer.concat([bin,Buffer.alloc((-bin.length)&3)]);
+const bin=Buffer.concat(parts),layout=refineNativeLayout(doc,bin);
+const json=Buffer.from(JSON.stringify(doc));const jsonPad=Buffer.concat([json,Buffer.alloc((-json.length)&3,32)]),binPad=Buffer.concat([bin,Buffer.alloc((-bin.length)&3)]);
 const header=Buffer.alloc(20);header.writeUInt32LE(0x46546c67);header.writeUInt32LE(2,4);header.writeUInt32LE(28+jsonPad.length+binPad.length,8);header.writeUInt32LE(jsonPad.length,12);header.writeUInt32LE(0x4e4f534a,16);
 const binHeader=Buffer.alloc(8);binHeader.writeUInt32LE(binPad.length);binHeader.writeUInt32LE(0x004e4942,4);
 fs.mkdirSync('godot/assets/models',{recursive:true});fs.writeFileSync(destination,Buffer.concat([header,jsonPad,binHeader,binPad]));
 fs.writeFileSync('godot/resources/functional.json',JSON.stringify(protectedNodes,null,2)+'\n');
+fs.writeFileSync('godot/resources/native-layout.json',JSON.stringify(layout,null,2)+'\n');
 console.log(JSON.stringify({bytes:fs.statSync(destination).size,sourceSHA256:doc.asset.extras.nativeBaseSourceSHA256,protectedNodes:Object.keys(protectedNodes).length}));

@@ -14,3 +14,25 @@ for(const [name,expected] of Object.entries(baseline.geometry)){
  assert.equal(hash.digest('hex'),expected,name);
 }
 console.log(`Native source: ${nodes.length} unchanged functional interfaces; ${Object.keys(baseline.geometry).length} exact indexed geometry hashes.`);
+
+// Verify the visible long spacebar itself, rather than trusting layout metadata.
+const layout=JSON.parse(fs.readFileSync('godot/resources/native-layout.json'));
+assert.equal(layout.keyboards.length,26);assert.equal(layout.chairs.length,26);
+for(const keyboard of layout.keyboards){
+ const node=doc.nodes.find(n=>n.name===keyboard.name),points=new Map(),parent=[];
+ const point=v=>{const key=Array.from(v).map(x=>x.toFixed(5)).join('/');if(!points.has(key)){const id=parent.length;parent.push(id);points.set(key,{id,v:Array.from(v)});}return points.get(key).id;};
+ const find=i=>parent[i]===i?i:(parent[i]=find(parent[i]));
+ for(const p of doc.meshes[node.mesh].primitives){
+  const positions=array(p.attributes.POSITION),idx=array(p.indices);
+  for(let i=0;i<idx.length;i+=3){
+   const v=[0,1,2].map(k=>positions.subarray(idx[i+k]*3,idx[i+k]*3+3));
+   if(v.every(a=>a[1]>.84&&a[1]<.849)&&Math.max(...v.map(a=>a[1]))-Math.min(...v.map(a=>a[1]))<.0015){const ids=v.map(point);parent[find(ids[1])]=find(ids[0]);parent[find(ids[2])]=find(ids[0]);}
+  }
+ }
+ const groups=new Map();for(const {id,v}of points.values()){const root=find(id);if(!groups.has(root))groups.set(root,[]);groups.get(root).push(v);}
+ const bars=[...groups.values()].filter(v=>{const width=Math.max(...v.map(a=>a[0]))-Math.min(...v.map(a=>a[0]));return width>.14&&width<.20;});
+ assert.equal(bars.length,1,keyboard.name+' long spacebar');
+ const center=bars[0].reduce((sum,v)=>sum+v[2],0)/bars[0].length;
+ assert.ok(center>keyboard.center[1]+.025,keyboard.name+' spacebar faces operator');
+}
+console.log('Native layout: 26 operator-facing spacebars, 26 coordinated chair/collider offsets.');
