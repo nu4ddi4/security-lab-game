@@ -120,9 +120,11 @@ def main():
         directory = Path(temporary)
         target = directory / 'project'
         target.mkdir()
-        build.stage(root / 'godot', target)
+        # Data packs are a Windows feature: Android keeps the game scene as its main scene.
+        build.stage(root / 'godot', target, '.'.join(subprocess.check_output([godot, '--version'], text=True).split('.')[:3]), launcher=False)
         identity_path = target / 'prototype/build_info.json'
         identity = json.loads(identity_path.read_text(encoding='utf-8'))
+        identity.pop('compat', None)
         identity['platform'] = 'android'
         identity['commit'] = source_sha
         identity_path.write_text(json.dumps(identity), encoding='utf-8')

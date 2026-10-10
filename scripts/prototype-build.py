@@ -39,7 +39,7 @@ def prototype_version(source):
     return version
 
 
-def stage(source, target, godot_version):
+def stage(source, target, godot_version, launcher=True):
     version = build_version(source)
     shutil.copytree(source / 'prototype', target / 'prototype')
     shutil.copytree(source / 'scripts', target / 'scripts')
@@ -63,8 +63,9 @@ def stage(source, target, godot_version):
     project = project.replace('window/stretch/mode="canvas_items"',
                               'window/stretch/mode="canvas_items"\nwindow/stretch/aspect="expand"')
     project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '"', project, flags=re.MULTILINE)
-    # Exported builds start in the launcher, which mounts an approved data pack before the game.
-    project = project.replace('run/main_scene="res://prototype/main.tscn"', 'run/main_scene="res://prototype/bootstrap.tscn"')
+    # Windows builds start in the launcher, which mounts an approved data pack before the game.
+    if launcher:
+        project = project.replace('run/main_scene="res://prototype/main.tscn"', 'run/main_scene="res://prototype/bootstrap.tscn"')
     (target / 'project.godot').write_text(project, encoding='utf-8')
     executable_preset = '''[preset.0]
 name="Windows Prototype"
