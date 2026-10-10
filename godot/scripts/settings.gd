@@ -1,7 +1,7 @@
 class_name LabSettings
 extends Node
 
-const DEFAULT_VALUES = {"resolution":0,"fullscreen":false,"vsync":true,"quality":1,"master":0.65,"sfx":0.55,"sensitivity":0.0018,"fov":72.0}
+const DEFAULT_VALUES = {"display_version":1,"resolution":0,"fullscreen":true,"vsync":true,"quality":1,"master":0.65,"sfx":0.55,"sensitivity":0.0018,"fov":72.0}
 var values = DEFAULT_VALUES.duplicate()
 var game: Node
 var path = "user://settings.json"
@@ -11,6 +11,8 @@ func setup(root: Node):
 	path = "user://investigation-qa/settings.json" if game.qa_mode else "user://beta-settings.json"
 	var raw = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
 	if raw is Dictionary:
+		# Settings saved before full screen became the default are moved over once.
+		if not raw.has("display_version"): raw.fullscreen = true
 		for key in values:
 			if raw.has(key) and (typeof(raw[key]) == typeof(values[key]) or (raw[key] is float or raw[key] is int) and not values[key] is bool): values[key] = raw[key]
 	values.resolution = clampi(int(values.resolution),0,2)
@@ -24,12 +26,17 @@ func setup(root: Node):
 		AudioServer.set_bus_name(AudioServer.bus_count-1,"SFX")
 		AudioServer.set_bus_send(AudioServer.bus_count-1,"Master")
 	if raw is Dictionary: apply()
+	elif not game.qa_mode: apply_window()
+
+# Window mode and sync only; a first start has no saved quality to apply.
+func apply_window():
+	if DisplayServer.get_name() == "headless" or OS.has_feature("mobile"): return
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if values.fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+	if not values.fullscreen: DisplayServer.window_set_size([Vector2i(1600,900),Vector2i(1280,720),Vector2i(1920,1080)][values.resolution])
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if values.vsync else DisplayServer.VSYNC_DISABLED)
 
 func apply():
-	if DisplayServer.get_name() != "headless":
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if values.fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
-		if not values.fullscreen: DisplayServer.window_set_size([Vector2i(1600,900),Vector2i(1280,720),Vector2i(1920,1080)][values.resolution])
-		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if values.vsync else DisplayServer.VSYNC_DISABLED)
+	apply_window()
 	var quality = int(values.quality)
 	var viewport = get_viewport()
 	viewport.msaa_3d = [Viewport.MSAA_DISABLED,Viewport.MSAA_2X,Viewport.MSAA_4X,Viewport.MSAA_8X][quality]

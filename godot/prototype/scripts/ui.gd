@@ -16,6 +16,7 @@ var prompt: Label
 var prompt_panel: PanelContainer
 var dot: Crosshair
 var checklist: VBoxContainer
+var report_hint: Label
 var toast: PanelContainer
 var message: Label
 var source: Label
@@ -32,6 +33,9 @@ var new_session_button: Button
 var scroll_finger = -1
 var touch_scroll: Range
 var terminal_buffers = {}
+const ERROR_CODES = ["DEVICE_REQUIRED","UNKNOWN_COMMAND","WRONG_DEVICE","PERMISSION_REQUIRED","NO_RECORDS","INVALID_ACTION","QUESTION_UNAVAILABLE","REPORT_INCOMPLETE","DAY_NOT_READY","STALE_ACTION","SAVE_BLOCKED"]
+const GOOD_WORDS = ["정상","완료","허용","승인","확인됨"]
+const WARNING_WORDS = ["지연","필요","비활성","실패","오류","없음","미확인","불가","중단"]
 var command_history = {}
 var history_index = 0
 var notes: VBoxContainer
@@ -234,17 +238,22 @@ func _build_tablet():
 	thread.add_child(messenger)
 	report = tab(2)
 	label(report,"승인 범위와 실제 행동을 대조하고, 확인한 원본을 직접 첨부하세요. 실행 계정과 실제 사람, 내부 수집과 외부 반출은 구분합니다.","CaptionLabel")
+	var claim_box = card_box(report)
+	label(claim_box,"주장","SectionLabel")
 	claim = OptionButton.new()
 	claim.add_item("주장 선택")
 	for item in game.content.rules.claims:
 		claim.add_item(item.label)
 		claim.set_item_metadata(claim.item_count-1,item.id)
-	report.add_child(claim)
+	claim_box.add_child(claim)
+	var evidence_box = card_box(report)
+	label(evidence_box,"근거 원본","SectionLabel")
+	report_hint = label(evidence_box,"아직 첨부할 원본이 없습니다. 장비에서 원본을 조회하면 이곳에서 선택할 수 있습니다.","CaptionLabel")
 	for slot in ["scope","access","collection"]:
-		label(report,{"scope":"허용 범위 근거","access":"실제 접근 근거","collection":"실제 수집 근거"}[slot],"SectionLabel")
+		label(evidence_box,{"scope":"허용 범위 근거","access":"실제 접근 근거","collection":"실제 수집 근거"}[slot])
 		var option = OptionButton.new()
 		attachments[slot] = option
-		report.add_child(option)
+		evidence_box.add_child(option)
 	button(report,"발생 보고 제출",submit_report,"PrimaryButton")
 	var summary = PanelContainer.new()
 	summary.theme_type_variation = "CardPanel"
@@ -292,7 +301,8 @@ func _build_terminal():
 	terminal.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	terminal.custom_minimum_size = Vector2(0,80 if game.controls.mobile else 180)
 	terminal.selection_enabled = not game.controls.mobile
-	terminal.add_theme_color_override("default_color",InvestigationTheme.TERMINAL_TEXT)
+	terminal.bbcode_enabled = true
+	terminal.add_theme_color_override("default_color",Color(.8,.92,.88))
 	terminal.add_theme_stylebox_override("normal",InvestigationTheme.box(InvestigationTheme.INSET,InvestigationTheme.BORDER,8,12))
 	session.add_child(terminal)
 	var row = HBoxContainer.new()
@@ -312,7 +322,7 @@ func _build_terminal():
 	var tools = HBoxContainer.new()
 	terminal_tools = tools
 	session.add_child(tools)
-	button(tools,"복사",func(): DisplayServer.clipboard_set(terminal.text))
+	button(tools,"복사",func(): DisplayServer.clipboard_set(terminal.get_parsed_text()))
 	button(tools,"지우기",clear_terminal)
 	if not game.controls.mobile:
 		var hint = label(tools,"↑↓ 이력 · Tab 자동완성 · Ctrl+L 지우기","CaptionLabel")
@@ -387,6 +397,15 @@ func _build_briefing():
 		label(card,game.content.case.briefing[key])
 	button(body,"현장 점검 시작",close,"PrimaryButton")
 	button(body,"휴대 단말에서 업무 확인",func(): open_tablet(3))
+
+func card_box(parent: Node) -> VBoxContainer:
+	var panel = PanelContainer.new()
+	panel.theme_type_variation = "CardPanel"
+	parent.add_child(panel)
+	var box = VBoxContainer.new()
+	box.add_theme_constant_override("separation",8)
+	panel.add_child(box)
+	return box
 
 func tab(index: int) -> VBoxContainer:
 	return tabs.get_child(index).find_child("Body",true,false)
@@ -508,6 +527,7 @@ func refresh():
 		open_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		open_note.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button(row,"메모에 인용",func(): memo.text += "\n["+record.title+" · "+record.source+" · "+record.time+"]\n")
+	report_hint.visible = view.notes.is_empty()
 	for slot in attachments:
 		var option = attachments[slot]
 		var selected = option.get_item_metadata(option.selected) if option.selected >= 0 and option.item_count else null
@@ -672,14 +692,60 @@ func recall_command(direction: int):
 	command_input.caret_column = command_input.text.length()
 
 func clear_terminal():
-	terminal_buffers[game.context] = ""
-	terminal.text = ""
+	terminal_buffers[game.context] = []
+	render_terminal()
 
-func print_output(command: String, text: String):
-	var output = terminal_buffers.get(game.context,"")+"\nsec.ops > "+command+"\n"+text+"\n"
-	terminal_buffers[game.context] = output.right(24000)
-	terminal.text = terminal_buffers[game.context]
+# kind is "output" or "error"; errors are shown in the warning colour.
+func print_output(command: String, text: String, kind = "output"):
+	var log = terminal_buffers.get(game.context,[])
+	log.append({"kind":"command","text":command})
+	log.append({"kind":kind,"text":text})
+	var size = 0
+	for entry in log: size += entry.text.length()
+	while size > 24000 and log.size() > 2: size -= log.pop_front().text.length()
+	terminal_buffers[game.context] = log
+	render_terminal()
+
+func render_terminal():
+	terminal.text = terminal_markup(terminal_buffers.get(game.context,[]))
 	terminal.scroll_to_line(maxi(0,terminal.get_line_count()-1))
+
+static func color_tag(color: Color) -> String:
+	return "[color=#%s]" % color.to_html(false)
+
+static func terminal_markup(log: Array) -> String:
+	var blocks = []
+	for entry in log:
+		if entry.kind == "command" and blocks.size() > 1: blocks.append("")
+		var lines = String(entry.text).split("\n")
+		var markup = []
+		match entry.kind:
+			"command": markup = [color_tag(InvestigationTheme.ACCENT)+"[b]sec.ops >[/b][/color] [b]"+String(entry.text).replace("[","[lb]")+"[/b]"]
+			"banner":
+				for i in lines.size():
+					var line = lines[i].replace("[","[lb]")
+					markup.append(color_tag(InvestigationTheme.ACCENT)+"[b]"+line+"[/b][/color]" if i == 0 else color_tag(InvestigationTheme.TEXT_DIM)+line+"[/color]" if not line.is_empty() else "")
+			"error":
+				for line in lines: markup.append(color_tag(InvestigationTheme.WARNING)+line.replace("[","[lb]")+"[/color]")
+			_:
+				for i in lines.size(): markup.append(style_line(lines[i],i == 0 and lines.size() > 1))
+		blocks.append("\n".join(markup))
+	return "\n".join(blocks)
+
+# "name — description" listings and "label: value" rows get their own colours.
+static func style_line(line: String, heading: bool) -> String:
+	var safe = line.replace("[","[lb]")
+	if safe.strip_edges().is_empty(): return ""
+	var dash = safe.find(" — ")
+	if dash > 0 and dash < 40: return color_tag(Color(.72,1,.9))+safe.left(dash)+"[/color] "+color_tag(InvestigationTheme.TEXT_FAINT)+"—[/color] "+safe.substr(dash+3)
+	var colon = safe.find(": ")
+	if colon > 0 and colon < 24 and not safe.left(colon).contains(" / "):
+		var value = safe.substr(colon+2)
+		var tone = InvestigationTheme.TEXT
+		if GOOD_WORDS.any(func(word): return value.contains(word)): tone = InvestigationTheme.TERMINAL_TEXT
+		if WARNING_WORDS.any(func(word): return value.contains(word)): tone = InvestigationTheme.WARNING
+		return color_tag(InvestigationTheme.TEXT_DIM)+safe.left(colon)+":[/color] "+color_tag(tone)+value+"[/color]"
+	return "[b]"+safe+"[/b]" if heading and safe.length() < 40 else safe
 
 func _show(next_mode: String, window: Control):
 	if is_instance_valid(settings_screen): settings_screen.close_editor()
@@ -715,8 +781,8 @@ func open_terminal():
 	refresh()
 	if not terminal_buffers.has(game.context):
 		var device = game.content.case.devices[game.context]
-		terminal_buffers[game.context] = "SECURITY OPERATIONS / "+device.label+"\n접속 사용자: sec.ops · "+device.zone+"\n\n"+device.description+"\n\n명령을 입력하세요. help를 입력하면 이 장비의 도움말이 표시됩니다."
-	terminal.text = terminal_buffers[game.context]
+		terminal_buffers[game.context] = [{"kind":"banner","text":"SECURITY OPERATIONS / "+device.label+"\n접속 사용자: sec.ops · "+device.zone+"\n\n"+device.description+"\n\n명령을 입력하세요. help를 입력하면 이 장비의 도움말이 표시됩니다."}]
+	render_terminal()
 	history_index = command_history.get(game.context,[]).size()
 	if not game.controls.mobile: command_input.grab_focus()
 
@@ -755,6 +821,26 @@ func toggle():
 	if modal_open: close()
 	else: open_tablet()
 
+# Built-in dialogs would say "Please Confirm…" and "OK"; keep them in the game's language and size.
+func localize_dialog(dialog: AcceptDialog, title: String, ok = "확인", cancel = "취소"):
+	dialog.title = title
+	dialog.ok_button_text = ok
+	dialog.dialog_autowrap = true
+	if dialog is ConfirmationDialog: dialog.cancel_button_text = cancel
+
+func popup_width(wanted: int) -> int:
+	return mini(wanted,int(get_viewport().get_visible_rect().size.x)-40)
+
+# Wrapped text is measured at the final width first, so the dialog fits its content.
+func open_dialog(dialog: Window, wanted: int):
+	var width = popup_width(wanted)
+	dialog.min_size = Vector2i(width,0)
+	dialog.popup_centered(Vector2i(width,0))
+	await get_tree().process_frame
+	if is_instance_valid(dialog):
+		dialog.reset_size()
+		dialog.move_to_center()
+
 func notice(text: String):
 	message.text = text.left(180)
 	toast.visible = not modal_open
@@ -766,21 +852,21 @@ func notice(text: String):
 			toast.hide())
 	if modal_open or text.length() > 220:
 		var popup = AcceptDialog.new()
-		popup.title = "조사 기록" if investigation_assigned() else "업무 알림"
+		localize_dialog(popup,"조사 기록" if investigation_assigned() else "업무 알림")
 		popup.dialog_text = text
-		popup.min_size = Vector2i(mini(650,int(get_viewport().get_visible_rect().size.x)-40),mini(400,int(get_viewport().get_visible_rect().size.y)-40))
 		root.add_child(popup)
 		popup.confirmed.connect(popup.queue_free)
 		popup.canceled.connect(popup.queue_free)
-		popup.popup_centered()
+		open_dialog(popup,560)
 
 func confirm(text: String, callback: Callable):
 	var dialog = ConfirmationDialog.new()
+	localize_dialog(dialog,"확인")
 	dialog.dialog_text = text
 	root.add_child(dialog)
 	dialog.confirmed.connect(func(): callback.call(); dialog.queue_free())
 	dialog.canceled.connect(dialog.queue_free)
-	dialog.popup_centered(Vector2i(mini(680,int(get_viewport().get_visible_rect().size.x)-40),mini(260,int(get_viewport().get_visible_rect().size.y)-40)))
+	open_dialog(dialog,520)
 
 func submit_report():
 	var selected = {}
@@ -798,8 +884,11 @@ func end_day():
 
 func file_dialog(exporting: bool):
 	var dialog = FileDialog.new()
+	localize_dialog(dialog,"진행 내보내기" if exporting else "진행 가져오기","저장" if exporting else "열기")
 	dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE if exporting else FileDialog.FILE_MODE_OPEN_FILE
 	dialog.access = FileDialog.ACCESS_FILESYSTEM
+	# The system picker speaks the player's language; other platforms keep the in-game one.
+	dialog.use_native_dialog = true
 	dialog.filters = PackedStringArray(["*.json ; 잔여 권한 진행"])
 	if exporting: dialog.current_file = "residual-permissions-save.json"
 	root.add_child(dialog)

@@ -95,14 +95,14 @@ func run(game: InvestigationPrototype):
 	game.ui.command_input.text = "logs tasks"
 	game.ui.execute_command()
 	if not game.ui.guide_info().title.begins_with("4 / 8"): failures.append("Server baseline advances the tutorial")
-	var server_output = game.ui.terminal.text
+	var server_output = game.ui.terminal.get_parsed_text()
 	if not server_output.contains("sec.ops > status"): failures.append("Terminal shows the session transcript")
 	await capture(game,"03-terminal")
 	game._use("project_pc","device",true)
 	var bad = game.dispatch(game.engine.parse("logs access --task T-17",game.context,game.state))
 	if bad.code != "WRONG_DEVICE": failures.append("Device command guard remains enforced")
 	game._use("server_console","device",true)
-	if game.ui.terminal.text != server_output: failures.append("Returning to a device preserves its output")
+	if game.ui.terminal.get_parsed_text() != server_output: failures.append("Returning to a device preserves its output")
 	game.dispatch({"type":"dialogue","payload":{"id":"han_intro"}})
 	game._use("project_pc","device",true)
 	game.ui.command_input.text = "inspect files"

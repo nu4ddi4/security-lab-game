@@ -37,9 +37,8 @@ static func summary() -> String:
 # The confirm button unlocks after a short countdown so it cannot be hit by accident.
 static func confirm(game: InvestigationPrototype):
 	var dialog = ConfirmationDialog.new()
-	dialog.title = "데이터 전체 초기화"
+	game.ui.localize_dialog(dialog,"데이터 전체 초기화","모두 삭제")
 	dialog.dialog_text = summary()
-	dialog.cancel_button_text = "취소"
 	game.ui.root.add_child(dialog)
 	var ok = dialog.get_ok_button()
 	ok.theme_type_variation = "DangerButton"
@@ -48,7 +47,7 @@ static func confirm(game: InvestigationPrototype):
 		game.ui.notice("%d개 파일을 지우고 처음 상태로 돌아갔습니다." % game.reset_all_data())
 		dialog.queue_free())
 	dialog.canceled.connect(dialog.queue_free)
-	dialog.popup_centered(Vector2i(mini(680,int(game.ui.get_viewport().get_visible_rect().size.x)-40),mini(420,int(game.ui.get_viewport().get_visible_rect().size.y)-40)))
+	game.ui.open_dialog(dialog,600)
 	for remaining in range(COUNTDOWN,0,-1):
 		if not is_instance_valid(dialog): return
 		ok.text = "모두 삭제 (%d)" % remaining

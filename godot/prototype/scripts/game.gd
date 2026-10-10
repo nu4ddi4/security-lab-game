@@ -309,16 +309,19 @@ func command(text: String):
 	var normalized = " ".join(text.strip_edges().split(" ",false)).to_lower()
 	for row in content.commands:
 		if row.text.to_lower() == normalized and context in row.devices and not engine.command_visible(state,row):
-			ui.print_output(text,"현재 맡은 업무에서 사용할 수 없는 명령입니다.")
+			ui.print_output(text,"현재 맡은 업무에서 사용할 수 없는 명령입니다.","error")
 			return
 	var action = engine.parse(text,context,state)
 	if action.type == "pause":
 		var preview = engine.step(state,action)
-		if preview.code != "CONFIRM_PAUSE": ui.print_output(text,preview.text); return
+		if preview.code != "CONFIRM_PAUSE": ui.print_output(text,preview.text,"error" if preview.code in InvestigationUI.ERROR_CODES else "output"); return
 		ui.confirm(engine._t("CONFIRM_PAUSE"),func():
 			action.payload["confirmed"] = true
-			ui.print_output(text,dispatch(action).text))
-	else: ui.print_output(text,dispatch(action).text)
+			var confirmed = dispatch(action)
+			ui.print_output(text,confirmed.text,"error" if confirmed.code in InvestigationUI.ERROR_CODES else "output"))
+	else:
+		var result = dispatch(action)
+		ui.print_output(text,result.text,"error" if result.code in InvestigationUI.ERROR_CODES else "output")
 
 func save_now() -> bool:
 	if blocked_save: return false
