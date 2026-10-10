@@ -1,0 +1,30 @@
+{
+  "rules": [
+    "godot/prototype/tests/unit.gd",
+    "godot/prototype/tests/scenarios.json",
+    "godot/prototype/tests/save.schema.json"
+  ],
+  "services": [
+    "godot/prototype/tests/services.gd",
+    "godot/prototype/tests/services_runner.gd",
+    "godot/tests/diagnostics_test.gd",
+    "godot/tests/native_update_test.gd"
+  ],
+  "scene": [
+    "godot/tests/input_bindings_test.gd",
+    "godot/tests/input_review.gd",
+    "godot/prototype/tests/smoke.gd"
+  ],
+  "assets": [
+    "godot/tests/fixtures/office-geometry.json"
+  ],
+  "platform": [
+    "tests/native/network_fixture.gd",
+    "tests/native/security_windows_updater.ps1"
+  ],
+  "ci": [
+    "tests/ci/test_policy.py",
+    "tests/ci/test_prototype_release.py",
+    "tests/ci/test_suites.py"
+  ]
+}

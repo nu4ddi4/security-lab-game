@@ -51,6 +51,11 @@ var update_setting: CheckButton
 var preview_setting: CheckButton
 var input_status: Label
 var update_status: Label
+var update_bar: ProgressBar
+var update_hud: PanelContainer
+var update_hud_label: Label
+var update_hud_bar: ProgressBar
+var update_value = -1.0
 var update_check: Button
 var update_download: Button
 var binding_summary: Label
@@ -88,6 +93,18 @@ func setup(controller: InvestigationPrototype):
 	dot.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	dot.autowrap_mode = TextServer.AUTOWRAP_OFF
 	dot.add_theme_font_size_override("font_size",28)
+	update_hud = PanelContainer.new()
+	update_hud.theme_type_variation = "HudPanel"
+	update_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	update_hud.hide()
+	root.add_child(update_hud)
+	var update_box = VBoxContainer.new()
+	update_hud.add_child(update_box)
+	update_hud_label = label(update_box,"","CaptionLabel")
+	update_hud_bar = ProgressBar.new()
+	update_hud_bar.show_percentage = false
+	update_hud_bar.custom_minimum_size = Vector2(240,8)
+	update_box.add_child(update_hud_bar)
 	toast = PanelContainer.new()
 	toast.theme_type_variation = "HudPanel"
 	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -408,8 +425,18 @@ func refresh_settings():
 	if game.controls.keyboard_seen: input_status.text += " · 키보드 입력 감지됨"
 	if is_instance_valid(binding_summary): binding_summary.text = LabInputBindings.summary(true)
 	update_status.text = game.updates.status
+	update_bar.visible = update_value >= 0.0
+	update_bar.value = maxf(update_value,0.0)*100.0
 	update_check.disabled = game.updater.state in ["checking","downloading","preparing"] if game.updater!=null else game.updates.busy
 	update_download.visible = game.updater.state in ["available","ready"] if game.updater!=null else not game.updates.download_url.is_empty()
+
+# value in 0..1 while a download runs, negative otherwise
+func update_progress(value: float):
+	update_value = value
+	update_hud_label.text = "업데이트 다운로드 · %d%%" % roundi(maxf(value,0.0)*100.0)
+	update_hud_bar.value = maxf(value,0.0)*100.0
+	update_hud.visible = value >= 0.0 and not modal_open
+	refresh_settings()
 
 func objective_info() -> Dictionary:
 	var objective = guide_info()
@@ -605,6 +632,7 @@ func _show(next_mode: String, window: Control):
 	window.show()
 	field_objective.visible = next_mode == "dialogue"
 	toast.hide()
+	update_hud.hide()
 	game.player.set_enabled(false)
 	game.controls.release_touches()
 	for key in ["forward","back","left","right","sprint","crouch","jump"]: Input.action_release(key)
@@ -654,6 +682,7 @@ func close():
 	modal_open = false
 	game.player.set_enabled(true)
 	field_objective.show()
+	update_hud.visible = update_value >= 0.0
 	toast.visible = not message.text.is_empty()
 	dot.show()
 	prompt.text = ""
@@ -773,6 +802,7 @@ func fit_screen():
 	field_objective.set_deferred("size",Vector2(objective_width,0))
 	toast.position = Vector2(safe.position.x+16,safe.position.y+175)
 	message.custom_minimum_size.x = minf(380,safe.size.x-64)
+	update_hud.position = Vector2(safe.position.x+16,safe.end.y-72-(130 if game.controls.touch_enabled else 0))
 	toast.reset_size.call_deferred()
 	messenger_contacts.visible = not compact
 	contact_picker.visible = compact
@@ -801,7 +831,7 @@ func open_rebinding():
 	var editor = InvestigationSettingsScreen.new()
 	editor.game = game
 	editor.original_controls = {}
-	for key in ["touch_setting","update_setting","preview_setting","input_status","update_status","update_check","update_download"]: editor.original_controls[key] = get(key)
+	for key in ["touch_setting","update_setting","preview_setting","input_status","update_status","update_bar","update_check","update_download"]: editor.original_controls[key] = get(key)
 	editor.configure(game.bindings,game.player)
 	editor.theme = root.theme
 	settings_screen = editor

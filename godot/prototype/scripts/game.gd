@@ -106,6 +106,7 @@ func _ready():
 			updates.status = text
 			ui.refresh_settings()
 			if not ui.modal_open: ui.notice(text))
+		updater.progress_changed.connect(ui.update_progress)
 		updater.setup(self)
 	updates.changed.connect(ui.refresh_settings)
 	controls.changed.connect(ui.refresh_settings)
@@ -335,6 +336,26 @@ func new_game():
 	ui.sync_memo()
 	ui.refresh()
 	save_now()
+
+# Returns how many files were removed.
+func reset_all_data() -> int:
+	var removed = InvestigationDataReset.wipe(InvestigationDataReset.targets(self))
+	state = engine.create_state()
+	blocked_save = false
+	context = ""
+	controls.reset()
+	bindings.bindings = LabInputBindings.defaults()
+	bindings.apply()
+	settings.values = LabSettings.DEFAULT_VALUES.duplicate()
+	settings.values.quality = 2
+	settings.apply()
+	if investigation_environment != null: investigation_environment.sync(state)
+	ui.reset_session()
+	ui.sync_memo()
+	ui.refresh()
+	ui.refresh_input_hints()
+	save_now()
+	return removed
 
 func transfer_file(path: String, exporting: bool):
 	if exporting:

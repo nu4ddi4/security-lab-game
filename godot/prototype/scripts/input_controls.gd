@@ -3,6 +3,8 @@ extends CanvasLayer
 
 signal changed
 
+const CONFIG_PATH = "user://controls.cfg"
+
 class Stick extends Control:
 	var axes = Vector2.ZERO
 	func _draw():
@@ -30,7 +32,7 @@ var config = ConfigFile.new()
 var testing = "--prototype-smoke" in OS.get_cmdline_user_args()
 
 func _init():
-	if not testing: config.load("user://controls.cfg")
+	if not testing: config.load(CONFIG_PATH)
 	touch_enabled = bool(config.get_value("input","touch",mobile))
 	automatic_updates = bool(config.get_value("updates","automatic",true))
 	if config.has_section_key("updates","beta_preview"): beta_preview_choice = bool(config.get_value("updates","beta_preview"))
@@ -88,6 +90,15 @@ func set_automatic_updates(value: bool):
 	_save()
 	changed.emit()
 
+# Back to first-run defaults; the caller removes the stored file.
+func reset():
+	config.clear()
+	touch_enabled = mobile
+	automatic_updates = true
+	beta_preview_choice = null
+	apply()
+	changed.emit()
+
 # Beta builds follow beta by default; stable builds opt in from settings.
 func beta_preview_enabled(beta_build: bool) -> bool:
 	return beta_build if beta_preview_choice == null else bool(beta_preview_choice)
@@ -99,7 +110,7 @@ func set_beta_preview(value: bool):
 	changed.emit()
 
 func _save():
-	if not testing and config.save("user://controls.cfg") != OK:
+	if not testing and config.save(CONFIG_PATH) != OK:
 		game.ui.notice("설정을 저장하지 못했습니다. 현재 실행에는 적용됩니다.")
 
 func apply():

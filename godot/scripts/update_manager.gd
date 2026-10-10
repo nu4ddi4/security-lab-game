@@ -4,6 +4,7 @@ extends Node
 const Policy = preload("res://scripts/update_policy.gd")
 signal status_changed(message: String)
 signal update_ready(version: String)
+signal progress_changed(value: float)
 var game: Node
 var info: Dictionary = {}
 var manifest: Dictionary = {}
@@ -16,6 +17,7 @@ var source_index = 0
 var candidates: Array = []
 var verified_sources = 0
 var check_error = ""
+var progress = -1.0
 var state = "disabled"
 var stage = ""
 var token = ""
@@ -259,6 +261,19 @@ func install():
 		if not OS.is_process_running(helper_pid): break
 	if OS.is_process_running(helper_pid): OS.kill(helper_pid)
 	fail("설치 준비에 실패했습니다. 게임을 계속 사용할 수 있습니다.")
+
+func set_progress(value: float):
+	if is_equal_approx(value,progress): return
+	progress = value
+	progress_changed.emit(value)
+
+# Download progress is shown while the installer or data pack is being fetched.
+func _process(_delta):
+	if state=="downloading" and is_instance_valid(http):
+		var total = float(manifest.get("size",0))
+		set_progress(clampf(http.get_downloaded_bytes()/total,0.0,1.0) if total>0 else -1.0)
+	elif progress>=0.0:
+		set_progress(-1.0)
 
 func fail(message: String):
 	state = "failed"; consent_granted = false

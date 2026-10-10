@@ -246,10 +246,19 @@ func build_general(page: VBoxContainer):
 		game.check_updates())
 	text(updates,"정식 릴리스가 아니어도 beta 커밋마다 나오는 빌드를 받습니다. 불안정할 수 있으며 저장은 유지됩니다.",13,InvestigationTheme.TEXT_DIM)
 	game.ui.update_status = text(updates,"")
+	game.ui.update_bar = ProgressBar.new()
+	game.ui.update_bar.show_percentage = false
+	game.ui.update_bar.custom_minimum_size.y = 8
+	game.ui.update_bar.hide()
+	updates.add_child(game.ui.update_bar)
 	game.ui.update_check = action_button(updates,"업데이트 확인",game.check_updates)
 	game.ui.update_download = action_button(updates,"업데이트 확인하고 설치…",func():
 		if game.updater != null: game.updater.request_install()
 		else: game.ui.confirm("업데이트를 다운로드할까요? 저장은 유지됩니다.",game.updates.open_download))
+	var reset = card(page)
+	text(reset,"데이터 전체 초기화",20)
+	text(reset,"이 기기에 저장된 조사 진행·메모·설정을 모두 지우고 처음 상태로 시작합니다. 삭제 전에 지워지는 항목을 확인합니다.",14,InvestigationTheme.TEXT_DIM)
+	action_button(reset,"데이터 전체 초기화…",func(): InvestigationDataReset.confirm(game)).theme_type_variation = "DangerButton"
 	var diagnostics = card(page)
 	text(diagnostics,"진단 / 지원",20)
 	text(diagnostics,"이 기기에서만 수집합니다. 저장 원문·계정·네트워크 주소는 포함하지 않습니다.",14,InvestigationTheme.TEXT_DIM)
