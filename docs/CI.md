@@ -30,4 +30,4 @@ CI 설정 변경은 `python -m unittest discover -s tests/ci`와 actionlint로 �
 
 main과 beta는 같은 패키지 ID와 핀으로 고정한 AOSP 공용 테스트 키를 사용한다. APK와 QA APK의 인증서를 확인하고, 같은 키로 서명된 파일의 덮어 설치·저장 유지·재실행을 검사한다. 비디버그 APK의 저장 검사는 테스트용 AOSP 에뮬레이터에서 root로 확인한다. 서명 비밀값 등록은 필요하지 않으며 전용 서명 전환은 정식 출시 준비 때 진행한다.
 
-아티팩트는 14일 보관한다. 버전 릴리스 파일은 검사된 EXE·ZIP·설치 파일·APK·체크섬·빌드 기록이며, 게시 완료 후 업데이트 채널을 반영한다.
+검증용 묶음 아티팩트(`SecurityLab-<버전>-Windows-x64`·`-Android`)는 릴리스 작업이 쓰고, 사람이 받는 `SecurityLab-<버전>.exe`·`SecurityLabSetup.exe`·`SecurityLab-<버전>.apk`는 zip 없이 별도 아티팩트(`archive: false`)로 올린다. 아티팩트는 14일 보관한다. 버전 릴리스 파일은 검사된 EXE·ZIP·설치 파일·APK·체크섬·빌드 기록이며, 게시 완료 후 업데이트 채널을 반영한다.

@@ -6,7 +6,6 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-import zipfile
 
 from github_release import github
 from release_version import PRODUCT, REPOSITORY, channel, parts, tag
@@ -205,10 +204,6 @@ def main():
             destination = directory/name
             shutil.copyfile(windows/name, destination)
             files.append(destination)
-        archive = files[0].with_suffix('.zip')
-        with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as bundle:
-            bundle.write(files[0], files[0].name)
-        files.append(archive)
         sums = directory / 'SHA256SUMS.txt'
         sums.write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.name+'\n' for path in files))
         files.append(sums)
