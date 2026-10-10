@@ -10,6 +10,12 @@ var manifest: Dictionary = {}
 var enabled = false
 var local_test = false
 var source = ""
+var other_source = ""
+var sources: Array = []
+var source_index = 0
+var candidates: Array = []
+var verified_sources = 0
+var check_error = ""
 var state = "disabled"
 var stage = ""
 var token = ""
@@ -35,6 +41,7 @@ func save_progress() -> bool: return false
 func data_directory() -> String: return "user://"
 func valid_saved_progress() -> bool: return false
 func pause_for_install(): pass
+func beta_preview() -> bool: return info.get("channel") == "beta"
 
 func setup(host: Node):
 	game = host
@@ -48,6 +55,7 @@ func setup(host: Node):
 	source = info.manifest_url
 	for argument in arguments:
 		if argument.begins_with("--update-url="): source = argument.trim_prefix("--update-url=")
+		elif argument.begins_with("--update-url-other="): other_source = argument.trim_prefix("--update-url-other=")
 	var preference = JSON.parse_string(FileAccess.get_file_as_string(settings_path)) if FileAccess.file_exists(settings_path) else null
 	enabled = Policy.enabled_for(info,arguments,preference,supported_platform())
 	if not enabled: return
@@ -83,13 +91,50 @@ func set_enabled(value: bool):
 		if http!=null: http.cancel_request()
 		state = "disabled"
 
+func build_sources() -> Array:
+	var rows = []
+	for channel in Policy.channels_to_check(info.channel,beta_preview()):
+		var url = Policy.manifest_url(channel,info.app_id)
+		if channel==info.channel: url = source
+		elif local_test:
+			if other_source.is_empty(): continue
+			url = other_source
+		rows.append({"channel":channel,"url":url})
+	return rows
+
 func check():
-	if not enabled or state!="idle": return
+	# A failed or postponed check must stay repeatable without restarting the game.
+	if not enabled or state not in ["idle","failed","available"] or consent_dialog!=null: return
+	sources = build_sources()
+	if sources.is_empty(): return
 	consent_granted = false
+	manifest = {}; candidates = []; verified_sources = 0; check_error = ""; source_index = 0
 	state = "checking"; redirects = 0
 	http.download_file = ""; http.body_size_limit = 16384
-	status_changed.emit("%s 업데이트 확인 중"%info.channel)
-	request(source)
+	status_changed.emit("업데이트 확인 중")
+	request(sources[0].url)
+
+func current_url() -> String:
+	return sources[source_index].url if state=="checking" and source_index<sources.size() else source
+
+# One unreachable or invalid channel never hides a valid update from another one.
+func reject(message: String):
+	if state!="checking": fail(message); return
+	check_error = message
+	next_source()
+
+func next_source():
+	source_index += 1; redirects = 0
+	if source_index<sources.size(): request(sources[source_index].url); return
+	if candidates.is_empty():
+		if verified_sources==0: fail(check_error); return
+		state = "idle"; status_changed.emit("현재 채널의 최신 버전입니다."); return
+	manifest = candidates[0]
+	for candidate in candidates:
+		if Policy.newer(candidate.version,manifest.version): manifest = candidate
+	state = "available"
+	status_changed.emit("업데이트가 있습니다 · %s · 동의 후 다운로드하고 설치합니다."%manifest.version)
+	request_install()
 
 func request(url: String):
 	if http.request(url,["Cache-Control: no-cache","Accept-Encoding: identity"])!=OK: fail("업데이트 연결을 시작하지 못했습니다.")
@@ -100,17 +145,16 @@ func response(result: int, code: int, headers: PackedStringArray, body: PackedBy
 		var location = ""
 		for header in headers:
 			if header.to_lower().begins_with("location:"): location = header.substr(9).strip_edges()
-		if redirects>=3 or not Policy.trusted_redirect(location,source,local_test): fail("허용되지 않은 업데이트 리다이렉트입니다."); return
+		if redirects>=3 or not Policy.trusted_redirect(location,current_url(),local_test): reject("허용되지 않은 업데이트 리다이렉트입니다."); return
 		redirects += 1; request.call_deferred(location); return
-	if result!=HTTPRequest.RESULT_SUCCESS or code!=200: fail("업데이트 서버에 연결하지 못했습니다. 게임은 계속 사용할 수 있습니다."); return
+	if result!=HTTPRequest.RESULT_SUCCESS or code!=200: reject("업데이트 서버에 연결하지 못했습니다. 게임은 계속 사용할 수 있습니다."); return
 	if state=="checking":
+		var entry = sources[source_index]
 		var parsed = JSON.parse_string(body.get_string_from_utf8())
-		if not parsed is Dictionary or not Policy.manifest_valid(parsed,info.channel,source,local_test,info.app_id): fail("업데이트 정보의 형식 또는 채널 검증에 실패했습니다."); return
-		if not Policy.newer(parsed.version,info.version): state = "idle"; status_changed.emit("현재 채널의 최신 버전입니다."); return
-		manifest = parsed
-		state = "available"
-		status_changed.emit("업데이트가 있습니다 · %s · 동의 후 다운로드하고 설치합니다."%manifest.version)
-		request_install()
+		if not parsed is Dictionary or not Policy.manifest_valid(parsed,entry.channel,entry.url,local_test,info.app_id): reject("업데이트 정보의 형식 또는 채널 검증에 실패했습니다."); return
+		verified_sources += 1
+		if Policy.newer(parsed.version,info.version): candidates.append(parsed)
+		next_source()
 	elif state=="downloading":
 		if not installer_verified(): fail("업데이트 파일의 크기 또는 SHA-256 검증에 실패했습니다."); return
 		state = "ready"
@@ -124,7 +168,7 @@ func request_install():
 	if ui==null: return
 	consent_dialog = ConfirmationDialog.new()
 	consent_dialog.title = "업데이트가 있습니다"
-	consent_dialog.dialog_text = "현재 %s → 새 버전 %s (%s 채널)\n업데이트하시겠습니까? 다운로드가 끝나면 진행을 저장하고 게임을 종료한 뒤 설치·재실행합니다."%[info.version,manifest.version,info.channel]
+	consent_dialog.dialog_text = "현재 %s → 새 버전 %s (%s 채널)\n업데이트하시겠습니까? 다운로드가 끝나면 진행을 저장하고 게임을 종료한 뒤 설치·재실행합니다."%[info.version,manifest.version,manifest.channel]
 	consent_dialog.ok_button_text = "다운로드 후 설치" if state=="available" else "저장 후 설치"
 	consent_dialog.cancel_button_text = "나중에"
 	consent_dialog.exclusive = true
@@ -206,7 +250,8 @@ func install():
 	helper_pid = OS.create_process(powershell,["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",stage.path_join("SecurityLabUpdater.ps1"),"-RequestPath",stage.path_join("transaction.json")])
 	if helper_pid<=0: fail("업데이트 실행 도우미를 시작하지 못했습니다."); return
 	status_changed.emit("진행 저장 완료 · 업데이트 설치를 준비합니다.")
-	for i in range(100):
+	# The helper hashes the install tree and installer before it reports ready.
+	for i in range(300):
 		await get_tree().create_timer(.1).timeout
 		var ready = JSON.parse_string(FileAccess.get_file_as_string(stage.path_join("ready.json"))) if FileAccess.file_exists(stage.path_join("ready.json")) else null
 		if ready is Dictionary and ready.get("token")==token and ready.get("pid")==helper_pid:

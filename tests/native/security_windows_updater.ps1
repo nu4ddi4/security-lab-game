@@ -7,6 +7,15 @@ if (-not (Test-Path -LiteralPath $Iscc)) { throw 'Inno Setup compiler required f
 $checks=[Collections.Generic.List[string]]::new()
 function Expect([bool]$Condition,[string]$Label) { if (-not $Condition) { throw $Label }; $checks.Add($Label) }
 function Expect-Reject([scriptblock]$Code,[string]$Label) { $rejected=$false; try { & $Code | Out-Null } catch { $rejected=$true }; Expect $rejected $Label }
+# Channel switching (opt-in beta preview and the way back) is limited to the beta product.
+foreach ($pair in @(@('stable','beta'),@('beta','stable'),@('beta','beta'))) { Expect (Test-UpdateChannelTransition $true $pair[0] $pair[1]) ('beta product may move '+$pair[0]+' to '+$pair[1]) }
+foreach ($pair in @(@('dev','beta'),@('beta','dev'),@('stable','dev'),@('dev','stable'))) { Expect (-not (Test-UpdateChannelTransition $true $pair[0] $pair[1])) ('dev never switches: '+$pair[0]+' to '+$pair[1]) }
+Expect (-not (Test-UpdateChannelTransition $false 'stable' 'beta')) 'Native product never switches channel'
+$switchProduct='SecurityLabQaSwitch'
+$switchKey=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall\'+$switchProduct+'-stable_is1'); $switchKey.SetValue('DisplayName','old channel'); $switchKey.Dispose()
+Expect (Get-UpdateRegistry 'stable' $switchProduct).exists 'old channel entry exists before the switch'
+Remove-UpdateRegistry 'stable' $switchProduct
+Expect (-not (Get-UpdateRegistry 'stable' $switchProduct).exists) 'old channel entry is removed after a healthy switch'
 $fixtureRoot=Join-Path $repoRoot ('godot/builds/update-tests/'+[Guid]::NewGuid().ToString('N'))
 $null=New-Item -ItemType Directory -Path $fixtureRoot -Force
 $csc=Join-Path $env:SystemRoot 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'

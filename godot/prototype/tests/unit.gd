@@ -15,8 +15,10 @@ func at(state: Dictionary, path: String):
 func _initialize():
 	var installed = {"version":"0.2.0","prerelease":true,"tag_prefix":"SecurityLab-proto-"}
 	var candidates = [release_fixture("0.3.0",false),release_fixture("0.2.1",true),release_fixture("0.10.0",true)]
-	check(InvestigationUpdates.select_release(candidates,installed,"Android").version == "0.10.0","Prerelease updates use numeric versions and skip stable releases")
+	check(InvestigationUpdates.select_release(candidates,installed,"Android",true).version == "0.10.0","Beta preview uses numeric versions and the newest release of either kind")
+	check(InvestigationUpdates.select_release(candidates,installed,"Android").version == "0.3.0","Without the preview a beta install only follows stable releases")
 	installed.prerelease = false
+	check(InvestigationUpdates.select_release(candidates,installed,"Windows",true).version == "0.10.0","A stable install receives beta builds only after opting in")
 	check(InvestigationUpdates.select_release(candidates,installed,"Windows").version == "0.3.0","Stable installs never offer prereleases")
 	check(InvestigationUpdates.select_release(candidates,installed,"Android").url.ends_with(".apk"),"Android receives an APK")
 	check(InvestigationUpdates.select_release(candidates,installed,"Windows").url.ends_with(".exe"),"Windows receives an EXE")

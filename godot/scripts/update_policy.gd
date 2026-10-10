@@ -10,6 +10,13 @@ const MAX_INSTALLER_BYTES = 536870912
 static func manifest_url(channel: String, app_id: String = APP_ID) -> String:
 	return REPOSITORY+("beta-channel-" if app_id=="security-lab-beta" else "native-channel-")+channel+"/update.json" if channel in CHANNELS and app_id in [APP_ID,"security-lab-beta"] else ""
 
+# Dev builds only follow dev. Stable and beta builds always watch stable, so a
+# promoted release reaches beta testers, and add beta when the preview is on.
+static func channels_to_check(own: String, preview: bool) -> Array:
+	if own not in CHANNELS: return []
+	if own == "dev": return ["dev"]
+	return ["stable","beta"] if preview else ["stable"]
+
 static func preference_path(channel: String, app_id: String = APP_ID) -> String:
 	return "user://"+("beta-update-settings-" if app_id=="security-lab-beta" else "update-settings-")+channel+".json" if channel in CHANNELS else ""
 

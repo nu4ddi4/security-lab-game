@@ -48,6 +48,7 @@ var memo: TextEdit
 var ready_memo = false
 var touch_setting: CheckButton
 var update_setting: CheckButton
+var preview_setting: CheckButton
 var input_status: Label
 var update_status: Label
 var update_check: Button
@@ -402,6 +403,7 @@ func refresh_settings():
 	if update_status == null: return
 	touch_setting.set_pressed_no_signal(game.controls.touch_enabled)
 	update_setting.set_pressed_no_signal(game.controls.automatic_updates)
+	preview_setting.set_pressed_no_signal(game.beta_preview())
 	input_status.text = "터치와 키보드를 함께 사용할 수 있습니다." if game.controls.touch_enabled else "키보드·마우스 조작"
 	if game.controls.keyboard_seen: input_status.text += " · 키보드 입력 감지됨"
 	if is_instance_valid(binding_summary): binding_summary.text = LabInputBindings.summary(true)
@@ -799,7 +801,7 @@ func open_rebinding():
 	var editor = InvestigationSettingsScreen.new()
 	editor.game = game
 	editor.original_controls = {}
-	for key in ["touch_setting","update_setting","input_status","update_status","update_check","update_download"]: editor.original_controls[key] = get(key)
+	for key in ["touch_setting","update_setting","preview_setting","input_status","update_status","update_check","update_download"]: editor.original_controls[key] = get(key)
 	editor.configure(game.bindings,game.player)
 	editor.theme = root.theme
 	settings_screen = editor

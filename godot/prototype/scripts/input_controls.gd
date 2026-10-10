@@ -14,6 +14,7 @@ var mobile = OS.has_feature("mobile") or "--mobile-qa" in OS.get_cmdline_user_ar
 var touch_enabled = false
 var keyboard_seen = false
 var automatic_updates = true
+var beta_preview_choice = null
 var game: InvestigationPrototype
 var root: Control
 var stick: Stick
@@ -32,6 +33,7 @@ func _init():
 	if not testing: config.load("user://controls.cfg")
 	touch_enabled = bool(config.get_value("input","touch",mobile))
 	automatic_updates = bool(config.get_value("updates","automatic",true))
+	if config.has_section_key("updates","beta_preview"): beta_preview_choice = bool(config.get_value("updates","beta_preview"))
 
 func setup(controller: InvestigationPrototype):
 	game = controller
@@ -83,6 +85,16 @@ func set_touch(value: bool):
 func set_automatic_updates(value: bool):
 	automatic_updates = value
 	config.set_value("updates","automatic",value)
+	_save()
+	changed.emit()
+
+# Beta builds follow beta by default; stable builds opt in from settings.
+func beta_preview_enabled(beta_build: bool) -> bool:
+	return beta_build if beta_preview_choice == null else bool(beta_preview_choice)
+
+func set_beta_preview(value: bool):
+	beta_preview_choice = value
+	config.set_value("updates","beta_preview",value)
 	_save()
 	changed.emit()
 

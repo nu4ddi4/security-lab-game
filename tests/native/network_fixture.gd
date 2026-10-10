@@ -30,6 +30,8 @@ class Host extends Node:
 	var ui: FixtureUI
 	var player: FixturePlayer
 	var settings = null
+	var preview = true
+	func beta_preview() -> bool: return preview
 var manager: FixtureUpdater
 var host: Host
 var mode = ""
@@ -42,6 +44,7 @@ func run():
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--fixture-mode="): mode = argument.trim_prefix("--fixture-mode=")
 	host = Host.new(); root.add_child(host)
+	host.preview = mode != "preview-off"
 	var nonce = Crypto.new().generate_random_bytes(16).hex_encode()
 	original_directory = "user://qa/updater-network/"+nonce
 	host.store.directory = original_directory
@@ -85,8 +88,18 @@ func run():
 			if manager.state in ["ready","failed","disabled"]: break
 			await create_timer(.1).timeout
 		await create_timer(.1).timeout
-	if mode in ["ready","redirect-ready","helper-launch","save-failure","health-validation","bad-save-health","dialog-confirm"]:
+	if mode=="retry-after-failure":
+		# The first answer is a server error; a later manual check must still work.
+		success = manager.state=="failed"
+		manager.check()
+		for i in range(200):
+			if manager.state in ["available","failed","disabled"]: break
+			await create_timer(.1).timeout
+		success = success and manager.state=="available"
+	elif mode in ["ready","redirect-ready","helper-launch","save-failure","health-validation","bad-save-health","dialog-confirm","preview-newer-stable","preview-other-down","preview-off"]:
 		success = manager.state=="ready" and manager.installer_verified() and manager.consent_granted and manager.install_requested
+		if mode in ["preview-newer-stable","preview-off"]: success = success and manager.manifest.channel=="stable"
+		if mode=="preview-other-down": success = success and manager.manifest.channel=="beta"
 		if mode=="dialog-confirm": success = success and manager.consent_dialog==null and host.player.enabled
 		if success and mode=="helper-launch":
 			manager.execute_install = true
@@ -106,7 +119,7 @@ func run():
 			if mode=="bad-save-health": write(original_directory.path_join("save.json"),"incompatible save")
 			manager.acknowledge_health(manager.token)
 			success = FileAccess.file_exists(manager.stage.path_join("health.json"))==(mode=="health-validation")
-	elif mode not in ["no-consent","declined","dialog-dismiss","dialog-close"]: success = manager.state==("disabled" if mode=="disabled" else "failed") and not manager.consent_granted
+	elif mode not in ["no-consent","declined","dialog-dismiss","dialog-close","retry-after-failure"]: success = manager.state==("disabled" if mode=="disabled" else "failed") and not manager.consent_granted
 	print("NATIVE_UPDATE_NETWORK ",JSON.stringify({"passed":success,"mode":mode,"state":manager.state,"message":failure,"installer_verified":manager.installer_verified() if manager.state=="ready" else false,"save_directory":ProjectSettings.globalize_path(original_directory)}))
 	quit(0 if success else 1)
 

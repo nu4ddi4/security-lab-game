@@ -102,7 +102,10 @@ func _ready():
 	if OS.get_name()=="Windows" and not testing and FileAccess.file_exists(OS.get_executable_path().get_base_dir().path_join("securitylab.install.json")):
 		updater = InvestigationInstallerUpdates.new()
 		add_child(updater)
-		updater.status_changed.connect(func(text): updates.status = text; ui.notice(text); ui.refresh_settings())
+		updater.status_changed.connect(func(text):
+			updates.status = text
+			ui.refresh_settings()
+			if not ui.modal_open: ui.notice(text))
 		updater.setup(self)
 	updates.changed.connect(ui.refresh_settings)
 	controls.changed.connect(ui.refresh_settings)
@@ -129,7 +132,7 @@ func _ready():
 		var smoke = load("res://tests/input_review.gd" if "--prototype-input-review" in OS.get_cmdline_user_args() else "res://prototype/tests/smoke.gd").new()
 		add_child(smoke)
 		smoke.run.call_deferred(self)
-	elif controls.automatic_updates and updater==null: updates.check.call_deferred()
+	elif controls.automatic_updates and updater==null: check_updates.call_deferred()
 
 func _show_loading():
 	loading = CanvasLayer.new()
@@ -256,6 +259,14 @@ func _use(id: String, kind: String, tool: bool):
 		context = id
 		ui.open_terminal()
 	else: ui.notice(content.case.devices[id].description)
+
+func beta_preview() -> bool:
+	var beta_build = updater.info.get("channel") == "beta" if updater != null else updates.installed.get("prerelease",true)
+	return controls.beta_preview_enabled(beta_build)
+
+func check_updates():
+	if updater != null: updater.check()
+	else: updates.check(beta_preview())
 
 func frame_speaker(id: String):
 	if not targets.has(id): return
