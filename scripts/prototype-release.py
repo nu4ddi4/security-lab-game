@@ -189,6 +189,7 @@ def main():
         if report.get('product') != PRODUCT or report.get('passed') is not True:
             raise ValueError('Windows installation and rollback checks must pass')
         installer = verified_file(windows, 'SecurityLabSetup.exe')
+        content = verified_file(windows, 'SecurityLabContent.pck')
         manifest = json.loads((windows/'update.json').read_text())
         identity = json.loads((windows/'build_info.json').read_text())
         if (manifest.get('app_id') != PRODUCT or manifest.get('commit') != sha
@@ -196,11 +197,15 @@ def main():
                 or manifest.get('sha256') != hashlib.sha256(installer.read_bytes()).hexdigest()
                 or manifest.get('size') != installer.stat().st_size
                 or manifest.get('exe_sha256') != hashlib.sha256(files[0].read_bytes()).hexdigest()
+                or manifest.get('content_sha256') != hashlib.sha256(content.read_bytes()).hexdigest()
+                or manifest.get('content_size') != content.stat().st_size
+                or manifest.get('compat') != identity.get('compat') or not manifest.get('compat')
+                or manifest.get('content_url') != 'https://github.com/'+repository+'/releases/download/'+release_tag+'/SecurityLabContent.pck'
                 or identity.get('commit') != sha or identity.get('version') != version
                 or identity.get('channel') != channel(version) or identity.get('app_id') != PRODUCT
                 or manifest.get('installer_url') != 'https://github.com/'+repository+'/releases/download/'+release_tag+'/SecurityLabSetup.exe'):
             raise ValueError('Installer and manifest differ from the verified Windows build')
-        for name in ['SecurityLabSetup.exe', 'update.json', 'build_info.json']:
+        for name in ['SecurityLabSetup.exe', 'SecurityLabContent.pck', 'update.json', 'build_info.json']:
             destination = directory/name
             shutil.copyfile(windows/name, destination)
             files.append(destination)

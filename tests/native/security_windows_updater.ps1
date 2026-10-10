@@ -78,7 +78,7 @@ Expect ((ConvertTo-ProcessArgument 'a & b% $c').StartsWith('"')) 'Opaque process
 $registryBefore=Get-UpdateRegistry 'dev' $product
 $owned=@();$stages=@()
 try {
- foreach ($case in @('success','installer-failure','startup-failure','wrong-hash','wrong-channel','junction','second-instance')) {
+ foreach ($case in @('success','data-pack','installer-failure','startup-failure','wrong-hash','wrong-channel','installed-mismatch','junction','second-instance')) {
     $nonce=[Guid]::NewGuid().ToString('N')
     $stage=Join-Path (Get-SecurityLabDataRoot) ($stageName+'/'+$nonce);$stages+=,$stage
     $saveRoot=Join-Path (Get-SecurityLabDataRoot) ('qa/updater/'+$nonce)
@@ -104,10 +104,14 @@ try {
         $null=New-Item -ItemType Junction -Path (Join-Path $installRoot 'link') -Target $junctionTarget
     }
     $transaction=@{schema=1;token=$nonce;parent_pid=$parent.Id;install_directory=$installRoot;data_directory=$saveRoot;current=$oldBuild;target=$target}
+    # A downloaded data pack makes the running game newer than its executable: `current` is the game,
+    # `installed` the executable on disk, and only the latter must match the install directory.
+    if ($case -eq 'data-pack') { $transaction.current=(Build-Info '0.7.0-dev.5' ('c'*40)); $transaction.installed=$oldBuild }
+    if ($case -eq 'installed-mismatch') { $transaction.installed=(Build-Info '0.6.9-dev.1' ('d'*40)) }
     $transactionPath=Join-Path $stage 'transaction.json'; Write-UpdateJson $transactionPath $transaction
     $helper=Start-UpdateProcess ($env:SystemRoot+'\System32\WindowsPowerShell\v1.0\powershell.exe') @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',(Join-Path $repoRoot 'godot/resources/native_update_helper.ps1'),'-RequestPath',$transactionPath);$owned+=,$helper
     for ($attempt=0;$attempt -lt 100;$attempt++){if((Test-Path -LiteralPath (Join-Path $stage 'ready.json')) -or $helper.HasExited){break};Start-Sleep -Milliseconds 100}
-    if ($case -in @('wrong-hash','wrong-channel','junction','second-instance')) {
+    if ($case -in @('wrong-hash','wrong-channel','installed-mismatch','junction','second-instance')) {
         Expect ($helper.WaitForExit(5000)) ($case+' rejected promptly')
         Expect (-not (Test-Path -LiteralPath (Join-Path $stage 'ready.json'))) ($case+' rejected before game exit')
         Expect (-not $parent.HasExited) ($case+' leaves game running')
@@ -119,7 +123,7 @@ try {
         $parent.Kill();$null=$parent.WaitForExit(5000)
         Expect ($helper.WaitForExit(45000)) ($case+' helper completed')
         $result=Get-Content -LiteralPath (Join-Path $stage 'result.json') -Raw | ConvertFrom-Json
-        if ($case -eq 'success') {
+        if ($case -in @('success','data-pack')) {
             Expect ($result.state -eq 'installed') 'real Inno install and startup health succeeded'
             Expect ((Get-FileHash -LiteralPath (Join-Path $installRoot 'SecurityLab.exe')).Hash -eq (Get-FileHash -LiteralPath $newStub).Hash) 'new EXE exact'
             Expect (-not (Test-Path -LiteralPath (Join-Path $stage 'backup'))) 'backup removed only after health'

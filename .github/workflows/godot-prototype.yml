@@ -84,6 +84,7 @@ jobs:
           name: SecurityLab-${{ needs.version.outputs.version }}-Windows-x64
           path: |
             prototype-dist/*.exe
+            prototype-dist/*.pck
             prototype-dist/*.json
             prototype-dist/*.sha256
             prototype-dist/ui/*

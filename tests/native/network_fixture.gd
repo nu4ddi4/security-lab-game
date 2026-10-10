@@ -2,7 +2,13 @@ extends SceneTree
 const Updater = preload("res://prototype/scripts/installer_updates.gd")
 class FixtureUpdater extends Updater:
 	var fixture_exe = ""
+	var fixture_content = ""
+	var restart_requested = false
 	func executable_path() -> String: return fixture_exe
+	func content_directory() -> String: return fixture_content
+	func restart() -> bool:
+		restart_requested = true
+		return true
 	func supported_platform() -> bool: return true
 	func data_directory() -> String: return game.store.directory
 	func pause_for_install(): pass
@@ -54,7 +60,9 @@ func run():
 	write(install.path_join("SecurityLab.exe"),"fixture executable; never executed")
 	write(install.path_join("build_info.json"),FileAccess.get_file_as_string("res://prototype/build_info.json"))
 	write(install.path_join("securitylab.install.json"),JSON.stringify({"app_id":"security-lab-beta","channel":"beta","install_layout":1}))
-	manager = FixtureUpdater.new(); manager.fixture_exe = ProjectSettings.globalize_path(install.path_join("SecurityLab.exe")); root.add_child(manager)
+	manager = FixtureUpdater.new(); manager.fixture_exe = ProjectSettings.globalize_path(install.path_join("SecurityLab.exe")); manager.fixture_content = original_directory.path_join("content"); root.add_child(manager)
+	DirAccess.make_dir_recursive_absolute(manager.fixture_content)
+	if mode=="content-rejected": ContentBootstrap.reject(manager.fixture_content,"a".repeat(40))
 	manager.status_changed.connect(func(message): failure = message)
 	if mode in ["dialog-dismiss","dialog-close","dialog-confirm"]:
 		host.ui = FixtureUI.new(); host.add_child(host.ui)
@@ -96,8 +104,15 @@ func run():
 			if manager.state in ["available","failed","disabled"]: break
 			await create_timer(.1).timeout
 		success = success and manager.state=="available"
-	elif mode in ["ready","redirect-ready","helper-launch","save-failure","health-validation","bad-save-health","dialog-confirm","preview-newer-stable","preview-other-down","preview-off"]:
+	elif mode in ["ready","redirect-ready","helper-launch","save-failure","health-validation","bad-save-health","dialog-confirm","preview-newer-stable","preview-other-down","preview-off","content-update","content-mismatch","content-rejected"]:
 		success = manager.state=="ready" and manager.installer_verified() and manager.consent_granted and manager.install_requested
+		success = success and manager.kind==("content" if mode=="content-update" else "installer")
+		if mode=="content-update":
+			# The verified pack is handed to the launcher: pending metadata, saved progress, then a restart.
+			manager.execute_install = true
+			await manager.install()
+			var pending = ContentBootstrap.read_json(manager.fixture_content.path_join("pending.json"))
+			success = success and manager.restart_requested and pending.get("commit")==manager.manifest.commit and pending.get("sha256")==manager.manifest.content_sha256 and pending.get("compat")==manager.manifest.compat and FileAccess.file_exists(manager.fixture_content.path_join("pending.pck")) and host.store.load_state(host.content).has("state")
 		if mode in ["preview-newer-stable","preview-off"]: success = success and manager.manifest.channel=="stable"
 		if mode=="preview-other-down": success = success and manager.manifest.channel=="beta"
 		if mode=="dialog-confirm": success = success and manager.consent_dialog==null and host.player.enabled

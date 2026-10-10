@@ -7,7 +7,10 @@ signal update_ready(version: String)
 signal progress_changed(value: float)
 var game: Node
 var info: Dictionary = {}
+var bundled: Dictionary = {}
 var manifest: Dictionary = {}
+var kind = "installer"
+var candidate_sources: Array = []
 var enabled = false
 var local_test = false
 var source = ""
@@ -43,6 +46,7 @@ func save_progress() -> bool: return false
 func data_directory() -> String: return "user://"
 func valid_saved_progress() -> bool: return false
 func pause_for_install(): pass
+func content_directory() -> String: return "user://content"
 func beta_preview() -> bool: return info.get("channel") == "beta"
 
 func setup(host: Node):
@@ -50,6 +54,8 @@ func setup(host: Node):
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(build_info_path()))
 	if not parsed is Dictionary or not Policy.build_valid(parsed): return
 	info = parsed
+	# A downloaded game-data pack replaces res://; the executable keeps its own identity.
+	bundled = Engine.get_meta("bundled_build_info",info)
 	settings_path = Policy.preference_path(info.channel,info.app_id)
 	health_acknowledgement()
 	var arguments = OS.get_cmdline_user_args()
@@ -73,14 +79,19 @@ func setup(host: Node):
 	state = "idle"
 	if automatic_check_enabled(): check.call_deferred()
 
+# The executable's own build; a downloaded data pack can make `info` newer than it.
+func installed_identity() -> Dictionary:
+	return bundled if not bundled.is_empty() else info
+
 func installed_identity_valid() -> bool:
+	var bundled = installed_identity()
 	var executable = executable_path()
 	if executable.get_file()!="SecurityLab.exe": return false
 	var directory = executable.get_base_dir()
 	if not FileAccess.file_exists(directory.path_join("build_info.json")) or not FileAccess.file_exists(directory.path_join("securitylab.install.json")): return false
 	var sidecar = JSON.parse_string(FileAccess.get_file_as_string(directory.path_join("build_info.json")))
 	var marker = JSON.parse_string(FileAccess.get_file_as_string(directory.path_join("securitylab.install.json")))
-	return sidecar is Dictionary and sidecar==info and marker is Dictionary and marker.get("app_id")==info.app_id and marker.get("channel")==info.channel and marker.get("install_layout")==1
+	return sidecar is Dictionary and sidecar==bundled and marker is Dictionary and marker.get("app_id")==bundled.app_id and marker.get("channel")==bundled.channel and marker.get("install_layout")==1
 
 func set_enabled(value: bool):
 	var file = FileAccess.open(settings_path,FileAccess.WRITE)
@@ -110,7 +121,7 @@ func check():
 	sources = build_sources()
 	if sources.is_empty(): return
 	consent_granted = false
-	manifest = {}; candidates = []; verified_sources = 0; check_error = ""; source_index = 0
+	manifest = {}; candidates = []; candidate_sources = []; verified_sources = 0; check_error = ""; source_index = 0; kind = "installer"
 	state = "checking"; redirects = 0
 	http.download_file = ""; http.body_size_limit = 16384
 	status_changed.emit("업데이트 확인 중")
@@ -131,12 +142,21 @@ func next_source():
 	if candidates.is_empty():
 		if verified_sources==0: fail(check_error); return
 		state = "idle"; status_changed.emit("현재 채널의 최신 버전입니다."); return
-	manifest = candidates[0]
-	for candidate in candidates:
-		if Policy.newer(candidate.version,manifest.version): manifest = candidate
+	var best = 0
+	for i in candidates.size():
+		if Policy.newer(candidates[i].version,candidates[best].version): best = i
+	manifest = candidates[best]
+	# A small game-data pack is enough when this executable can run it; otherwise the full installer.
+	kind = "content" if content_applicable(manifest,candidate_sources[best]) else "installer"
 	state = "available"
-	status_changed.emit("업데이트가 있습니다 · %s · 동의 후 다운로드하고 설치합니다."%manifest.version)
+	status_changed.emit("업데이트가 있습니다 · %s · %s"%[manifest.version,"동의 후 게임 데이터만 내려받아 적용합니다." if kind=="content" else "동의 후 다운로드하고 설치합니다."])
 	request_install()
+
+func content_applicable(candidate: Dictionary, endpoint: String) -> bool:
+	if not Policy.content_valid(candidate,candidate.channel,endpoint,local_test,info.app_id): return false
+	var installed = installed_identity()
+	if not Policy.hex(installed.get("compat"),64) or candidate.compat!=installed.compat: return false
+	return candidate.commit not in ContentBootstrap.rejected(content_directory())
 
 func request(url: String):
 	if http.request(url,["Cache-Control: no-cache","Accept-Encoding: identity"])!=OK: fail("업데이트 연결을 시작하지 못했습니다.")
@@ -155,7 +175,9 @@ func response(result: int, code: int, headers: PackedStringArray, body: PackedBy
 		var parsed = JSON.parse_string(body.get_string_from_utf8())
 		if not parsed is Dictionary or not Policy.manifest_valid(parsed,entry.channel,entry.url,local_test,info.app_id): reject("업데이트 정보의 형식 또는 채널 검증에 실패했습니다."); return
 		verified_sources += 1
-		if Policy.newer(parsed.version,info.version): candidates.append(parsed)
+		if Policy.newer(parsed.version,info.version):
+			candidates.append(parsed)
+			candidate_sources.append(entry.url)
 		next_source()
 	elif state=="downloading":
 		if not installer_verified(): fail("업데이트 파일의 크기 또는 SHA-256 검증에 실패했습니다."); return
@@ -170,8 +192,8 @@ func request_install():
 	if ui==null: return
 	consent_dialog = ConfirmationDialog.new()
 	consent_dialog.title = "업데이트가 있습니다"
-	consent_dialog.dialog_text = "현재 %s → 새 버전 %s (%s 채널)\n업데이트하시겠습니까? 다운로드가 끝나면 진행을 저장하고 게임을 종료한 뒤 설치·재실행합니다."%[info.version,manifest.version,manifest.channel]
-	consent_dialog.ok_button_text = "다운로드 후 설치" if state=="available" else "저장 후 설치"
+	consent_dialog.dialog_text = ("현재 %s → 새 버전 %s (%s 채널)\n업데이트하시겠습니까? 게임 데이터만 내려받아(%.1fMB) 진행을 저장하고 게임을 다시 시작합니다." if kind=="content" else "현재 %s → 새 버전 %s (%s 채널)\n업데이트하시겠습니까? 다운로드가 끝나면 진행을 저장하고 게임을 종료한 뒤 설치·재실행합니다.")%([info.version,manifest.version,manifest.channel,float(manifest.content_size)/1048576.0] if kind=="content" else [info.version,manifest.version,manifest.channel])
+	consent_dialog.ok_button_text = ("다운로드 후 적용" if kind=="content" else "다운로드 후 설치") if state=="available" else ("저장 후 적용" if kind=="content" else "저장 후 설치")
 	consent_dialog.cancel_button_text = "나중에"
 	consent_dialog.exclusive = true
 	consent_dialog.theme = ui.root.theme
@@ -209,6 +231,15 @@ func confirm_update():
 	close_consent()
 	if state=="ready": install.call_deferred(); return
 	token = Crypto.new().generate_random_bytes(16).hex_encode()
+	if kind=="content":
+		stage = ProjectSettings.globalize_path(content_directory())
+		if DirAccess.make_dir_recursive_absolute(stage)!=OK: fail("업데이트 준비 폴더를 만들지 못했습니다."); return
+		ContentBootstrap.remove(content_directory().path_join("pending.json"))
+		http.download_file = stage.path_join("pending.pck")
+		http.body_size_limit = int(manifest.content_size); http.timeout = 180; redirects = 0
+		state = "downloading"; status_changed.emit("동의한 게임 데이터 다운로드 중")
+		request.call_deferred(manifest.content_url)
+		return
 	stage = ProjectSettings.globalize_path(stage_root().path_join(token))
 	if DirAccess.make_dir_recursive_absolute(stage)!=OK: fail("업데이트 준비 폴더를 만들지 못했습니다."); return
 	http.download_file = stage.path_join("SecurityLabSetup.exe")
@@ -216,15 +247,42 @@ func confirm_update():
 	state = "downloading"; status_changed.emit("동의한 업데이트 설치 파일 다운로드 중")
 	request.call_deferred(manifest.installer_url)
 
+func download_path() -> String:
+	return stage.path_join("pending.pck" if kind=="content" else "SecurityLabSetup.exe")
+
 func installer_verified() -> bool:
-	var path = stage.path_join("SecurityLabSetup.exe")
+	var path = download_path()
 	var file = FileAccess.open(path,FileAccess.READ)
 	if file==null: return false
 	var size = file.get_length(); file.close()
-	return size==int(manifest.size) and FileAccess.get_sha256(path)==manifest.sha256
+	return size==int(manifest.content_size if kind=="content" else manifest.size) and FileAccess.get_sha256(path)==(manifest.content_sha256 if kind=="content" else manifest.sha256)
+
+# Hand-over of the verified pack: the launcher mounts it on the next start.
+func install_content():
+	state = "preparing"
+	if not installer_verified(): fail("설치 직전 검증에 실패했습니다. 현재 앱을 유지합니다."); return
+	if not save_progress(): fail("진행 저장에 실패하여 업데이트를 중단했습니다."); return
+	var pending = {"version":manifest.version,"commit":manifest.commit,"sha256":manifest.content_sha256,"size":int(manifest.content_size),"compat":manifest.compat,"channel":manifest.channel}
+	if not ContentBootstrap.write_json(content_directory().path_join("pending.json"),pending): fail("업데이트 정보를 저장하지 못했습니다."); return
+	status_changed.emit("진행 저장 완료 · 게임 데이터를 적용하기 위해 다시 시작합니다.")
+	if not restart(): fail("게임을 다시 시작하지 못했습니다. 다음 실행 때 적용됩니다.")
+
+func restart() -> bool:
+	var arguments = []
+	for argument in OS.get_cmdline_args():
+		if argument=="--": break
+		arguments.append(argument)
+	var user_arguments = OS.get_cmdline_user_args()
+	if not user_arguments.is_empty():
+		arguments.append("--")
+		arguments.append_array(user_arguments)
+	if OS.create_process(executable_path(),PackedStringArray(arguments))<=0: return false
+	get_tree().quit()
+	return true
 
 func install():
 	if state!="ready" or not enabled or not consent_granted: return
+	if kind=="content": install_content(); return
 	state = "preparing"
 	if not installed_identity_valid() or not installer_verified(): fail("설치 직전 검증에 실패했습니다. 현재 앱을 유지합니다."); return
 	if not save_progress(): fail("진행 저장에 실패하여 업데이트를 중단했습니다."); return
@@ -243,7 +301,7 @@ func install():
 		preparing_dialog.get_ok_button().disabled = true
 		ui.root.add_child(preparing_dialog)
 		preparing_dialog.popup_centered(Vector2i(580,160))
-	var request_data = {"schema":1,"token":token,"parent_pid":OS.get_process_id(),"install_directory":executable_path().get_base_dir(),"data_directory":ProjectSettings.globalize_path(data_directory()),"current":info,"target":manifest}
+	var request_data = {"schema":1,"token":token,"parent_pid":OS.get_process_id(),"install_directory":executable_path().get_base_dir(),"data_directory":ProjectSettings.globalize_path(data_directory()),"current":info,"installed":installed_identity(),"target":manifest}
 	for entry in [["transaction.json",JSON.stringify(request_data)], ["SecurityLabUpdater.ps1",FileAccess.get_file_as_string("res://resources/native_update_helper.ps1")]]:
 		var file = FileAccess.open(stage.path_join(entry[0]),FileAccess.WRITE)
 		if file==null: fail("업데이트 실행 준비를 저장하지 못했습니다."); return
@@ -270,7 +328,7 @@ func set_progress(value: float):
 # Download progress is shown while the installer or data pack is being fetched.
 func _process(_delta):
 	if state=="downloading" and is_instance_valid(http):
-		var total = float(manifest.get("size",0))
+		var total = float(manifest.get("content_size" if kind=="content" else "size",0))
 		set_progress(clampf(http.get_downloaded_bytes()/total,0.0,1.0) if total>0 else -1.0)
 	elif progress>=0.0:
 		set_progress(-1.0)

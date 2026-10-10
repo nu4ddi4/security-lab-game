@@ -6,6 +6,7 @@ const PLATFORM = "windows-x86_64"
 const REPOSITORY = "https://github.com/nu4ddi4/security-lab-game/releases/download/"
 const CHANNELS = ["stable", "beta", "dev"]
 const MAX_INSTALLER_BYTES = 536870912
+const MAX_CONTENT_BYTES = 268435456
 
 static func manifest_url(channel: String, app_id: String = APP_ID) -> String:
 	return REPOSITORY+("beta-channel-" if app_id=="security-lab-beta" else "native-channel-")+channel+"/update.json" if channel in CHANNELS and app_id in [APP_ID,"security-lab-beta"] else ""
@@ -83,6 +84,22 @@ static func trusted_installer(url: String, version: String, channel: String, sou
 	if app_id=="security-lab-beta" and channel=="beta" and version.ends_with("-beta.1") and url==REPOSITORY+"SecurityLab-beta-"+version.split("-")[0]+"/SecurityLabSetup.exe": return true
 	var origin = local_origin(source) if local_test else ""
 	return origin!="" and url==origin+"/"+channel+"/SecurityLabSetup.exe"
+
+# The game-data pack of a release. It replaces files inside the installed executable,
+# so it is only valid for executables carrying the same compat key.
+static func trusted_content(url: String, version: String, channel: String, source: String, local_test: bool, app_id: String = APP_ID) -> bool:
+	if not clean_url(url): return false
+	var tag = "SecurityLab-"+version if app_id=="security-lab-beta" else "native-"+channel+"-v"+version
+	if url==REPOSITORY+tag+"/SecurityLabContent.pck": return true
+	var origin = local_origin(source) if local_test else ""
+	return origin!="" and url==origin+"/"+channel+"/SecurityLabContent.pck"
+
+static func content_valid(info: Dictionary, channel: String, source: String, local_test: bool, app_id: String = APP_ID) -> bool:
+	if not manifest_valid(info,channel,source,local_test,app_id): return false
+	if not hex(info.get("compat"),64) or not hex(info.get("content_sha256"),64): return false
+	var size = info.get("content_size")
+	if not (size is int or size is float) or not is_finite(float(size)) or size!=int(size) or size<1024 or size>MAX_CONTENT_BYTES: return false
+	return info.get("content_url") is String and trusted_content(info.content_url,info.version,channel,source,local_test,app_id)
 
 static func trusted_redirect(url: String, source: String, local_test: bool) -> bool:
 	if not clean_url(url): return false

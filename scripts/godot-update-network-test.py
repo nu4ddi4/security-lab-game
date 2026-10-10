@@ -17,7 +17,8 @@ def main():
     parser.add_argument('--results', default='godot/tests/results/updater-network.json')
     args = parser.parse_args()
     payload = b'MZ' + b'fixture payload; never executed'.ljust(4094, b'\0')
-    server_modes = ['no-consent', 'declined', 'dialog-dismiss', 'dialog-close', 'dialog-confirm', 'ready', 'redirect-ready', 'hash-failure', 'size-failure', 'channel-failure', 'redirect-failure', 'oversized-manifest', 'no-local-option', 'disabled', 'helper-launch', 'save-failure', 'health-validation', 'bad-save-health', 'retry-after-failure', 'preview-newer-stable', 'preview-other-down', 'preview-off']
+    server_modes = ['no-consent', 'declined', 'dialog-dismiss', 'dialog-close', 'dialog-confirm', 'ready', 'redirect-ready', 'hash-failure', 'size-failure', 'channel-failure', 'redirect-failure', 'oversized-manifest', 'no-local-option', 'disabled', 'helper-launch', 'save-failure', 'health-validation', 'bad-save-health', 'retry-after-failure', 'preview-newer-stable', 'preview-other-down', 'preview-off', 'content-update', 'content-mismatch', 'content-rejected']
+    content_payload = b'PCK' + b'fixture game-data pack'.ljust(2045, b'\0')
     skipped = []
     if platform.system() != 'Windows':
         server_modes.remove('helper-launch')
@@ -31,7 +32,7 @@ def main():
         shutil.copyfile('godot/assets/fonts/NotoSansKR.ttf', project / 'assets/fonts/NotoSansKR.ttf')
         identity = {'schema': 1, 'app_id': 'security-lab-beta', 'platform': 'windows-x86_64',
                     'install_layout': 1, 'channel': 'beta', 'version': '0.8.0-beta.1',
-                    'commit': 'a' * 40, 'updates_default': True,
+                    'commit': 'a' * 40, 'compat': 'd' * 64, 'updates_default': True,
                     'manifest_url': 'https://github.com/nu4ddi4/security-lab-game/releases/download/beta-channel-beta/update.json'}
         (project / 'prototype/build_info.json').write_text(json.dumps(identity), encoding='utf-8')
         shutil.copyfile('tests/native/network_fixture.gd', project / 'fixture.gd')
@@ -57,8 +58,11 @@ def main():
                         self.send_response(302); self.send_header('Location', f'http://127.0.0.1:{self.server.server_port}/redirect-manifest'); self.end_headers(); return
                     if self.path in ['/beta/update.json', '/redirect-manifest']:
                         manifest = {'schema': 1, 'app_id': 'security-lab-beta', 'platform': 'windows-x86_64', 'install_layout': 1, 'channel': 'dev' if mode == 'channel-failure' else 'beta', 'version': '0.8.1-beta.1', 'commit': 'a' * 40, 'sha256': 'b' * 64 if mode == 'hash-failure' else hashlib.sha256(payload).hexdigest(), 'exe_sha256': 'a' * 64, 'size': len(payload) + (1 if mode == 'size-failure' else 0), 'installer_url': f'http://127.0.0.1:{self.server.server_port}/beta/SecurityLabSetup.exe'}
+                        if mode.startswith('content-'):
+                            manifest.update({'compat': 'e' * 64 if mode == 'content-mismatch' else 'd' * 64, 'content_url': f'http://127.0.0.1:{self.server.server_port}/beta/SecurityLabContent.pck', 'content_sha256': hashlib.sha256(content_payload).hexdigest(), 'content_size': len(content_payload)})
                         body = b'x' * 20000 if mode == 'oversized-manifest' else json.dumps(manifest).encode()
                     elif self.path in ['/beta/SecurityLabSetup.exe', '/stable/SecurityLabSetup.exe']: body = payload
+                    elif self.path == '/beta/SecurityLabContent.pck': body = content_payload
                     else: self.send_error(404); return
                     self.send_response(200); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
 
@@ -80,6 +84,10 @@ def main():
                 raise SystemExit('Disabled/disallowed updater sent a request')
             if mode in ['channel-failure', 'no-consent', 'declined', 'dialog-dismiss', 'dialog-close'] and '/beta/SecurityLabSetup.exe' in requests:
                 raise SystemExit('Unapproved or cross-channel manifest triggered download')
+            if mode == 'content-update' and (requests.count('/beta/SecurityLabContent.pck') != 1 or '/beta/SecurityLabSetup.exe' in requests):
+                raise SystemExit('A compatible executable did not take only the game-data pack')
+            if mode in ['content-mismatch', 'content-rejected'] and (requests.count('/beta/SecurityLabSetup.exe') != 1 or '/beta/SecurityLabContent.pck' in requests):
+                raise SystemExit('An incompatible or rejected pack was not replaced by the full installer')
             if mode in ['ready', 'redirect-ready', 'dialog-confirm', 'preview-other-down'] and requests.count('/beta/SecurityLabSetup.exe') != 1:
                 raise SystemExit('Approved update did not download exactly once')
             if mode in ['preview-newer-stable', 'preview-off']:

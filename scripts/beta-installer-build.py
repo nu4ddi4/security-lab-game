@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 
@@ -25,6 +26,12 @@ def main():
     if (metadata.get('app_id') != 'security-lab-beta' or metadata.get('channel') != channel(version)
             or metadata.get('version') != version or metadata.get('commit') != sha):
         raise ValueError('Verified EXE identity differs from this beta source')
+    if not re.fullmatch(r'[0-9a-f]{64}', metadata.get('compat', '')):
+        raise ValueError('The verified EXE carries no game-data compat key')
+    pack = exe.with_name('SecurityLabContent.pck')
+    pack_digest = hashlib.sha256(pack.read_bytes()).hexdigest()
+    if pack.with_suffix('.sha256').read_text().strip() != pack_digest + '  ' + pack.name:
+        raise ValueError('The game-data pack differs from its verified checksum')
     payload = exe.parent / 'payload'
     payload.mkdir(exist_ok=True)
     shutil.copyfile(exe,payload/'SecurityLab.exe')
@@ -38,6 +45,10 @@ def main():
     manifest={key:metadata[key] for key in ['schema','app_id','platform','install_layout','channel','version','commit']}
     manifest.update({'installer_url':'https://github.com/nu4ddi4/security-lab-game/releases/download/'+tag(version)+'/SecurityLabSetup.exe',
                      'size':installer.stat().st_size,'sha256':hashlib.sha256(installer.read_bytes()).hexdigest(),'exe_sha256':digest})
+    # Installed executables with the same compat key can take just the data pack.
+    manifest.update({'compat':metadata['compat'],
+                     'content_url':'https://github.com/nu4ddi4/security-lab-game/releases/download/'+tag(version)+'/SecurityLabContent.pck',
+                     'content_size':pack.stat().st_size,'content_sha256':pack_digest})
     (exe.parent/'update.json').write_text(json.dumps(manifest,indent=2))
     installer.with_suffix('.sha256').write_text(manifest['sha256']+'  '+installer.name+'\n')
     # The beta product uses a separate manifest and installer; Native publication is untouched.

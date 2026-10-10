@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 
+import content_pack
 from release_version import build_version, identity, parts, tag
 
 
@@ -38,7 +39,7 @@ def prototype_version(source):
     return version
 
 
-def stage(source, target):
+def stage(source, target, godot_version):
     version = build_version(source)
     shutil.copytree(source / 'prototype', target / 'prototype')
     shutil.copytree(source / 'scripts', target / 'scripts')
@@ -48,7 +49,6 @@ def stage(source, target):
         shutil.copyfile(source / 'tests' / name, target / 'tests' / name)
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source.parent, text=True).strip()
     metadata = identity(version, commit)
-    (target / 'prototype/build_info.json').write_text(json.dumps(metadata), encoding='utf-8')
     (target / 'prototype/version.json').write_text(json.dumps({'version': version, 'prerelease': metadata['channel'] == 'beta', 'tag_prefix': 'SecurityLab-'}), encoding='utf-8')
     for name in ['assets/models/Interior_07_Godot.glb', 'assets/models/Investigation_Environment.glb', 'assets/textures/city-sunset.png', 'scripts/player.gd', 'assets/fonts/NotoSansKR.ttf', 'assets/fonts/OFL.txt', 'assets/fonts/Gaegu-Regular.ttf', 'assets/fonts/Gaegu-OFL.txt', 'LICENSES.txt']:
         destination = target / name
@@ -63,8 +63,10 @@ def stage(source, target):
     project = project.replace('window/stretch/mode="canvas_items"',
                               'window/stretch/mode="canvas_items"\nwindow/stretch/aspect="expand"')
     project = re.sub(r'^config/version="[^"]*"$', 'config/version="' + version + '"', project, flags=re.MULTILINE)
+    # Exported builds start in the launcher, which mounts an approved data pack before the game.
+    project = project.replace('run/main_scene="res://prototype/main.tscn"', 'run/main_scene="res://prototype/bootstrap.tscn"')
     (target / 'project.godot').write_text(project, encoding='utf-8')
-    (target / 'export_presets.cfg').write_text('''[preset.0]
+    executable_preset = '''[preset.0]
 name="Windows Prototype"
 platform="Windows Desktop"
 runnable=true
@@ -85,7 +87,11 @@ application/file_version="0.1.0.0"
 application/product_version="0.1.0.0"
 application/product_name="Security Lab"
 application/file_description="Offline security investigation"
-'''.replace('0.1.0.0', '.'.join(map(str, parts(version)))), encoding='utf-8')
+'''.replace('0.1.0.0', '.'.join(map(str, parts(version))))
+    (target / 'export_presets.cfg').write_text(executable_preset + '\n' + content_pack.pack_preset(executable_preset), encoding='utf-8')
+    # Compat key: which installed executables may run this build's data pack.
+    metadata['compat'] = content_pack.compat_key(target, godot_version)
+    (target / 'prototype/build_info.json').write_text(json.dumps(metadata), encoding='utf-8')
 
 
 def configure_texture_compression(target):
@@ -112,6 +118,47 @@ def check(godot, target):
             target, 'NATIVE_DIAGNOSTICS')
 
 
+def export_pack(godot, target, destination):
+    run([godot, '--headless', '--path', str(target), '--export-pack', content_pack.PACK_PRESET, str(destination)], target, timeout=180)
+    if not destination.is_file() or destination.stat().st_size < 10_000:
+        raise SystemExit('Game-data pack is missing or incomplete.')
+
+
+def check_content_pack(executable, probe, bundled, probe_version, directory):
+    """The executable must mount an approved newer pack once, and roll it back when it never confirmed a stable start."""
+    content = Path(directory) / 'content'
+    content.mkdir()
+    shutil.copyfile(probe, content / 'pending.pck')
+    commit = 'f' * 40
+    (content / 'pending.json').write_text(json.dumps({
+        'version': probe_version, 'commit': commit, 'sha256': hashlib.sha256(probe.read_bytes()).hexdigest(),
+        'size': probe.stat().st_size, 'compat': bundled['compat'], 'channel': bundled['channel']}), encoding='utf-8')
+    command = [str(executable), '--headless', '--', '--prototype-smoke', '--content-dir=' + str(content)]
+
+    def mounted():
+        return [json.loads(line[len('CONTENT_PACK '):]) for line in run(command, directory, 'INVESTIGATION_SMOKE').splitlines()
+                if line.startswith('CONTENT_PACK ')]
+
+    first = mounted()
+    if not first or first[-1].get('version') != probe_version or first[-1].get('commit') != commit:
+        raise SystemExit('The executable did not mount the approved game-data pack.')
+    active = content / 'active.json'
+    record = json.loads(active.read_text(encoding='utf-8'))
+    # A pack that proved stable keeps being used on the next start ...
+    record['pending_boot'] = False
+    active.write_text(json.dumps(record), encoding='utf-8')
+    if not mounted():
+        raise SystemExit('A confirmed game-data pack was not used on the next start.')
+    # ... while one that never finished starting is dropped and remembered as bad.
+    record['pending_boot'] = True
+    active.write_text(json.dumps(record), encoding='utf-8')
+    if mounted():
+        raise SystemExit('An unconfirmed game-data pack was not rolled back.')
+    if commit not in (content / 'rejected.json').read_text(encoding='utf-8'):
+        raise SystemExit('A rolled-back game-data pack was not remembered as rejected.')
+    print('Game-data pack mounts and rolls back inside the exported EXE.')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--godot', default=os.environ.get('SECURITY_LAB_GODOT_CONSOLE', 'godot'))
@@ -127,7 +174,8 @@ def main():
     output = Path(args.output or ('prototype-dist/' + tag(version) + '.exe')).resolve()
     with tempfile.TemporaryDirectory(prefix='security-lab-prototype-') as directory:
         target = Path(directory)
-        stage(root / 'godot', target)
+        godot_version = '.'.join(subprocess.check_output([godot, '--version'], text=True).split('.')[:3])
+        stage(root / 'godot', target, godot_version)
         check(godot, target)
         baked_metadata = (target / "prototype/build_info.json").read_text(encoding="utf-8")
         if args.check_only:
@@ -141,6 +189,19 @@ def main():
             target, timeout=180)
         if not output.is_file() or output.stat().st_size < 1_000_000:
             raise SystemExit('Windows executable is missing or incomplete.')
+        # The same sources without the heavy assets, plus a copy that claims a newer version
+        # so the exported executable can be shown to mount and roll back a pack.
+        pack = output.with_name('SecurityLabContent.pck')
+        export_pack(godot, target, pack)
+        info_file = target / 'prototype/build_info.json'
+        original_info = info_file.read_text(encoding='utf-8')
+        major, minor, patch, _ = parts(version)
+        probe_version = '%d.%d.%d' % (major, minor, patch + 1)
+        info_file.write_text(json.dumps(dict(json.loads(original_info), version=probe_version, commit='f' * 40)), encoding='utf-8')
+        probe_directory = Path(tempfile.mkdtemp(prefix='security-lab-probe-'))
+        probe = probe_directory / 'probe.pck'
+        export_pack(godot, target, probe)
+        info_file.write_text(original_info, encoding='utf-8')
     # Run only the EXE in a separate directory after the staged sources are deleted.
     with tempfile.TemporaryDirectory(prefix='security-lab-exe-only-') as directory:
         executable = Path(directory) / output.name
@@ -152,6 +213,7 @@ def main():
         run([str(executable), '--headless', '--', '--prototype-services'],
             directory, 'INVESTIGATION_SERVICES')
         print('Exported beta diagnostics, save and update identity passed.')
+        check_content_pack(executable, probe, json.loads(baked_metadata), probe_version, directory)
         if args.rendered_check:
             captures = output.parent / 'ui'
             # CI uses a software GPU: cold shader setup and all landscape /
@@ -163,8 +225,12 @@ def main():
                 raise SystemExit('Exported Windows UI captures are incomplete.')
             print('Rendered Windows EXE UI and interaction passed.')
     (output.parent / 'build_info.json').write_text(baked_metadata, encoding='utf-8')
+    shutil.rmtree(probe_directory, ignore_errors=True)
+    for artifact in [output, pack]:
+        artifact_digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        artifact.with_suffix('.sha256').write_text(artifact_digest + '  ' + artifact.name + '\n', encoding='utf-8')
     digest = hashlib.sha256(output.read_bytes()).hexdigest()
-    output.with_suffix('.sha256').write_text(digest + '  ' + output.name + '\n', encoding='utf-8')
+    print('PROTOTYPE_PACK', json.dumps({'file': pack.name, 'bytes': pack.stat().st_size}))
     print('PROTOTYPE_EXE', json.dumps({'file':output.name, 'bytes':output.stat().st_size, 'sha256':digest}))
 
 

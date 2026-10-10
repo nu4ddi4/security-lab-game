@@ -141,7 +141,12 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         $request = Get-Content -LiteralPath $transactionPath -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($request.schema -ne 1 -or $request.token -cne $nonce) { throw 'Invalid transaction identity' }
         Assert-UpdateBuild $request.current; Assert-UpdateBuild $request.target
-        $channel = $request.current.channel
+        # `current` is what the running game reports (a downloaded data pack can be newer than
+        # the executable); `installed` is the executable's own identity on disk.
+        $installed = if ($request.PSObject.Properties['installed']) { $request.installed } else { $request.current }
+        Assert-UpdateBuild $installed
+        if ($installed.app_id -cne $request.current.app_id) { throw 'Product mismatch' }
+        $channel = $installed.channel
         if ($request.target.app_id -cne $request.current.app_id) { throw 'Product mismatch' }
         $beta = $request.current.app_id -eq 'security-lab-beta'
         if ($stageRoot -ne $(if ($beta) {$betaStage} else {$expectedStage})) { throw 'Product stage mismatch' }
@@ -158,7 +163,7 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         $appExe = Join-Path $installRoot 'SecurityLab.exe'
         $sidecar = Get-Content -LiteralPath (Join-Path $installRoot 'build_info.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         $marker = Get-Content -LiteralPath (Join-Path $installRoot 'securitylab.install.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($marker.app_id -cne $request.current.app_id -or $marker.channel -cne $channel -or $marker.install_layout -ne 1 -or $sidecar.version -cne $request.current.version -or $sidecar.commit -cne $request.current.commit -or $sidecar.channel -cne $channel) { throw 'Installed identity mismatch' }
+        if ($marker.app_id -cne $request.current.app_id -or $marker.channel -cne $channel -or $marker.install_layout -ne 1 -or $sidecar.version -cne $installed.version -or $sidecar.commit -cne $installed.commit -or $sidecar.channel -cne $channel) { throw 'Installed identity mismatch' }
         $null = Get-UpdateTree $installRoot
         $parentProcess = [Diagnostics.Process]::GetProcessById([int]$request.parent_pid)
         if ($parentProcess.MainModule.FileName -ne $appExe) { throw 'Parent process is not this installation' }

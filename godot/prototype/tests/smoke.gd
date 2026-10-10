@@ -175,11 +175,6 @@ func run(game: InvestigationPrototype):
 	if game.controls.look_finger != -1 or not game.player.touch_axes.is_zero_approx(): failures.append("Opening UI releases all touch state")
 	game.ui.close()
 	game.updates._completed(HTTPRequest.RESULT_CANT_CONNECT,0,PackedStringArray(),PackedByteArray())
-	game.dispatch({"type":"memo","payload":{"text":"temporary note"}})
-	game.reset_all_data()
-	if game.state.memo != "" or game.state.day != 1 or game.blocked_save or game.ui.memo.text != "": failures.append("Full data reset returns to a fresh investigation")
-	if game.ui.mode != "briefing": failures.append("A fresh investigation starts with the assignment briefing")
-	game.ui.close()
 	game.ui.update_progress(.42)
 	if not game.ui.update_hud.visible or roundi(game.ui.update_hud_bar.value) != 42: failures.append("Update download progress is shown in the field")
 	game.ui.update_progress(-1.0)
@@ -285,6 +280,11 @@ func run(game: InvestigationPrototype):
 			game.ui.close()
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png(argument.trim_prefix("--prototype-capture="))
+	game.dispatch({"type":"memo","payload":{"text":"temporary note"}})
+	game.reset_all_data()
+	if game.state.memo != "" or game.state.day != 1 or game.blocked_save or game.ui.memo.text != "": failures.append("Full data reset returns to a fresh investigation")
+	if game.ui.mode != "briefing": failures.append("A fresh investigation starts with the assignment briefing")
+	game.ui.close()
 	var summary = {"passed":failures.is_empty(),"failures":failures,"platform":OS.get_name(),"mobile":game.controls.mobile,"touchDefault":original_touch,"keyboardDetected":game.controls.keyboard_seen}
 	var report = FileAccess.open("user://prototype-smoke-result.json",FileAccess.WRITE)
 	if report != null: report.store_string(JSON.stringify(summary))
