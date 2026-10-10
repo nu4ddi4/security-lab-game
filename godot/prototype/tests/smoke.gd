@@ -136,6 +136,14 @@ func run(game: InvestigationPrototype):
 		game.ui.settings_screen.select_category(category)
 		await capture(game,"07-settings-"+category)
 	game.ui.settings_screen.select_category("controls")
+	# Moving to another tablet page keeps the tablet open and never hands the pointer back to the game.
+	var pointer = Input.mouse_mode
+	game.ui.settings_screen.leave_for(1)
+	if game.ui.mode != "tablet" or not game.ui.modal.visible or game.ui.tabs.current_tab != 1 or game.player.enabled or Input.mouse_mode != pointer or is_instance_valid(game.ui.settings_screen): failures.append("Leaving settings for a tablet page keeps the tablet open and the pointer free")
+	game.ui.open_tablet(4)
+	game.ui.settings_screen.close_editor()
+	if game.ui.mode != "field" or not game.player.enabled or game.ui.modal.visible: failures.append("Closing settings returns to the game")
+	game.ui.open_tablet(4)
 	game.ui.close()
 	await get_tree().process_frame
 	var dimensions = get_viewport().get_visible_rect().size

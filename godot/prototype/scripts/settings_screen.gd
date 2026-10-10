@@ -82,7 +82,12 @@ func _ready():
 	body.add_theme_constant_override("separation",14)
 	margin.add_child(body)
 	var assigned = game.ui.investigation_assigned()
-	var header = InvestigationTheme.shell_header(body,[["노트",0],["메신저",1],["발생 보고",2,assigned],["업무",3],["설정",4]],4,func(id): if id != 4: leave_for(id),running_version(),game.controls.mobile)
+	var close_button = Button.new()
+	close_button.text = "닫기"
+	close_button.custom_minimum_size.y = 48 if game.controls.mobile else 34
+	close_button.add_theme_font_size_override("font_size",16 if game.controls.mobile else 14)
+	close_button.pressed.connect(func(): close_editor())
+	var header = InvestigationTheme.shell_header(body,[["노트",0],["메신저",1],["발생 보고",2,assigned],["업무",3],["설정",4]],4,func(id): if id != 4: leave_for(id),running_version(),game.controls.mobile,[close_button])
 	header.buttons[4].mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel = PanelContainer.new()
 	panel.theme_type_variation = "ShellPanel"
@@ -380,17 +385,19 @@ func save_changes():
 	if result.ok: close_editor()
 	else: select_category("controls")
 
-func close_editor():
+# Going back to the game closes the tablet too; moving to another tablet page keeps it open so the
+# pointer is never recaptured and re-centred in between.
+func close_editor(keep_tablet := false):
 	capture_action = ""
 	hide()
 	release_player()
 	game.ui.settings_screen = null
 	for key in original_controls: game.ui.set(key,original_controls[key])
 	game.ui.refresh_settings()
-	game.ui.close()
+	if not keep_tablet: game.ui.close()
 	queue_free()
 
 func leave_for(index: int):
-	close_editor()
+	close_editor(true)
 	game.ui.open_tablet(index)
 
