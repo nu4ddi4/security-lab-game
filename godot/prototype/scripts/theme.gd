@@ -105,6 +105,12 @@ static func build(mobile: bool) -> Theme:
 	_button(theme,"OptionButton",RAISED,BORDER,ACCENT_HOVER,TEXT)
 	_button(theme,"CheckButton",Color(0,0,0,0),Color(0,0,0,0),Color(1,1,1,.04),TEXT)
 	theme.set_color("font_color","CheckButton",TEXT)
+	# The switch shows the state; a checked row keeps the same quiet look as an unchecked one.
+	theme.set_stylebox("pressed","CheckButton",theme.get_stylebox("normal","CheckButton"))
+	theme.set_stylebox("hover_pressed","CheckButton",theme.get_stylebox("hover","CheckButton"))
+	theme.set_type_variation("ChoiceButton","Button")
+	_button(theme,"ChoiceButton",INSET,ACCENT.darkened(.55),ACCENT_HOVER,TEXT)
+	theme.set_constant("h_separation","ChoiceButton",10)
 
 	theme.set_stylebox("panel","PanelContainer",box(RAISED))
 	_variation(theme,"ModalPanel","PanelContainer",box(SURFACE,BORDER_STRONG,14,22))

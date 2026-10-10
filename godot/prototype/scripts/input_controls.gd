@@ -60,8 +60,9 @@ func _add_button(id: String, text: String, callback: Callable, action = ""):
 	shape.size = Vector2(140,58)
 	node.shape = shape
 	root.add_child(node)
+	var outline = rounded_rectangle(Vector2(140,58),12)
 	var background = Polygon2D.new()
-	background.polygon = PackedVector2Array([Vector2(-70,-29),Vector2(70,-29),Vector2(70,29),Vector2(-70,29)])
+	background.polygon = outline
 	background.color = Color(InvestigationTheme.ACCENT_FILL,.8)
 	node.add_child(background)
 	var text_label = Label.new()
@@ -74,8 +75,24 @@ func _add_button(id: String, text: String, callback: Callable, action = ""):
 	text_label.add_theme_font_override("font",InvestigationTheme.font(InvestigationTheme.BOLD_WEIGHT))
 	text_label.add_theme_font_size_override("font_size",18)
 	node.add_child(text_label)
+	var border = Line2D.new()
+	border.points = outline
+	border.closed = true
+	border.width = 2.0
+	border.default_color = Color(InvestigationTheme.ACCENT,.6)
+	node.add_child(border)
 	if callback.is_valid(): node.pressed.connect(callback)
 	buttons[id] = node
+
+# Button silhouette around the origin with rounded corners.
+static func rounded_rectangle(size: Vector2, radius: float, steps = 6) -> PackedVector2Array:
+	var points = PackedVector2Array()
+	var half = size/2
+	for corner in [[Vector2(half.x-radius,half.y-radius),0.0],[Vector2(-half.x+radius,half.y-radius),90.0],[Vector2(-half.x+radius,-half.y+radius),180.0],[Vector2(half.x-radius,-half.y+radius),270.0]]:
+		for step in steps+1:
+			var angle = deg_to_rad(corner[1]+90.0*step/steps)
+			points.append(corner[0]+Vector2(cos(angle),sin(angle))*radius)
+	return points
 
 func set_touch(value: bool):
 	touch_enabled = value

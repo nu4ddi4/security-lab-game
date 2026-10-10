@@ -13,7 +13,9 @@ var tabs: TabContainer
 var hud: Label
 var guide: Label
 var prompt: Label
-var dot: Label
+var prompt_panel: PanelContainer
+var dot: Crosshair
+var checklist: VBoxContainer
 var toast: PanelContainer
 var message: Label
 var source: Label
@@ -62,6 +64,16 @@ var binding_summary: Label
 var settings_screen: InvestigationSettingsScreen
 var settings_backdrop: Texture2D
 
+# Aim point: a ring that closes and lights up when something can be used.
+class Crosshair extends Control:
+	var active = false
+	func _draw():
+		var color = InvestigationTheme.ACCENT if active else Color(.9,.95,1,.75)
+		var center = size/2
+		draw_arc(center,9.0 if active else 7.0,0,TAU,32,Color(0,0,0,.55),4.0,true)
+		draw_arc(center,9.0 if active else 7.0,0,TAU,32,color,2.0,true)
+		draw_circle(center,2.0,color)
+
 func setup(controller: InvestigationPrototype):
 	game = controller
 	root = Control.new()
@@ -80,19 +92,20 @@ func setup(controller: InvestigationPrototype):
 	hud = label(info,"","SectionLabel")
 	guide = label(info,"")
 	guide.add_theme_font_size_override("font_size",16)
-	prompt = label(root,"")
-	prompt.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	prompt.offset_top = -78
-	prompt.offset_bottom = -16
+	prompt_panel = PanelContainer.new()
+	prompt_panel.theme_type_variation = "KeyCapPanel"
+	prompt_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	prompt_panel.hide()
+	root.add_child(prompt_panel)
+	prompt = label(prompt_panel,"")
+	prompt.autowrap_mode = TextServer.AUTOWRAP_OFF
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	prompt.add_theme_color_override("font_color",InvestigationTheme.ACCENT)
 	prompt.add_theme_font_override("font",InvestigationTheme.font(InvestigationTheme.BOLD_WEIGHT))
-	prompt.add_theme_color_override("font_outline_color",Color(0,0,0,.8))
-	prompt.add_theme_constant_override("outline_size",6)
-	dot = label(root,"·")
-	dot.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	dot.autowrap_mode = TextServer.AUTOWRAP_OFF
-	dot.add_theme_font_size_override("font_size",28)
+	dot = Crosshair.new()
+	dot.size = Vector2(28,28)
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(dot)
 	update_hud = PanelContainer.new()
 	update_hud.theme_type_variation = "HudPanel"
 	update_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -167,12 +180,21 @@ func _build_tablet():
 		var scroll = ScrollContainer.new()
 		scroll.name = name
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		tabs.add_child(scroll)
 		var box = VBoxContainer.new()
 		box.name = "Body"
 		box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		box.add_theme_constant_override("separation",12)
 		scroll.add_child(box)
+		if name == "업무":
+			# The day's actions stay below the scrolling summary instead of at its far end.
+			var page = VBoxContainer.new()
+			page.name = name
+			page.add_theme_constant_override("separation",10)
+			scroll.name = "Scroll"
+			scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			page.add_child(scroll)
+			tabs.add_child(page)
+		else: tabs.add_child(scroll)
 	tabs.tab_changed.connect(func(index):
 		if index == 4 and modal_open and game.settings != null and settings_screen == null: open_rebinding())
 	label(tab(0),"확보한 원본 · 장비에서 조회한 기록과 받은 첨부만 표시됩니다.","CaptionLabel")
@@ -202,7 +224,7 @@ func _build_tablet():
 	layout.add_child(messenger_contacts)
 	for id in game.content.case.npcs:
 		var npc = game.content.case.npcs[id]
-		button(messenger_contacts,npc.name+"\n"+npc.role,func(): contact = id; refresh_messenger())
+		button(messenger_contacts,npc.name+"\n"+npc.role,func(): contact = id; refresh_messenger()).alignment = HORIZONTAL_ALIGNMENT_LEFT
 	var thread = VBoxContainer.new()
 	thread.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	layout.add_child(thread)
@@ -228,11 +250,22 @@ func _build_tablet():
 	summary.theme_type_variation = "CardPanel"
 	tab(3).add_child(summary)
 	work = label(summary,"")
-	button(tab(3),"오늘 업무 종료",end_day,"PrimaryButton")
-	button(tab(3),"업무 배경과 점검 방법",open_briefing)
-	button(tab(3),"진행 내보내기",func(): file_dialog(true))
-	button(tab(3),"진행 가져오기",func(): file_dialog(false))
-	new_session_button = button(tab(3),"새 업무 시작",func(): confirm("현재 진행을 보관하고 새 업무를 시작할까요?",game.new_game),"DangerButton")
+	var checks = PanelContainer.new()
+	checks.theme_type_variation = "CardPanel"
+	tab(3).add_child(checks)
+	checklist = VBoxContainer.new()
+	checklist.add_theme_constant_override("separation",6)
+	checks.add_child(checklist)
+	var actions = tabs.get_child(3)
+	button(actions,"오늘 업무 종료",end_day,"PrimaryButton")
+	var more = HFlowContainer.new()
+	more.add_theme_constant_override("h_separation",8)
+	more.add_theme_constant_override("v_separation",8)
+	actions.add_child(more)
+	button(more,"업무 배경과 점검 방법",open_briefing)
+	button(more,"진행 내보내기",func(): file_dialog(true))
+	button(more,"진행 가져오기",func(): file_dialog(false))
+	new_session_button = button(more,"새 업무 시작",func(): confirm("현재 진행을 보관하고 새 업무를 시작할까요?",game.new_game),"DangerButton")
 	button(tab(4),"설정 열기",open_rebinding,"PrimaryButton")
 
 func _build_terminal():
@@ -302,7 +335,7 @@ func _build_terminal():
 	scroll.add_child(command_list)
 
 func _build_dialogue():
-	dialogue_panel = panel(.16,.62,.84,.96)
+	dialogue_panel = panel(.16,.56,.84,.96)
 	dialogue_panel.name = "Dialogue"
 	if game.controls.mobile:
 		dialogue_panel.anchor_left = .03
@@ -312,12 +345,13 @@ func _build_dialogue():
 	dialogue_panel.add_child(body)
 	dialogue_title = heading(body,"")
 	conversation = RichTextLabel.new()
-	conversation.custom_minimum_size.y = 64 if game.controls.mobile else 84
+	conversation.custom_minimum_size.y = 64 if game.controls.mobile else 150
 	conversation.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	conversation.bbcode_enabled = true
 	conversation.selection_enabled = not game.controls.mobile
 	body.add_child(conversation)
 	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size.y = 72 if game.controls.mobile else 90
+	scroll.custom_minimum_size.y = 72 if game.controls.mobile else 64
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	body.add_child(scroll)
 	dialogue_questions = VBoxContainer.new()
@@ -355,7 +389,7 @@ func _build_briefing():
 	button(body,"휴대 단말에서 업무 확인",func(): open_tablet(3))
 
 func tab(index: int) -> VBoxContainer:
-	return tabs.get_child(index).get_node("Body")
+	return tabs.get_child(index).find_child("Body",true,false)
 
 func label(parent: Node, text: String, variation = "") -> Label:
 	var node = Label.new()
@@ -438,6 +472,16 @@ func update_progress(value: float):
 	update_hud.visible = value >= 0.0 and not modal_open
 	refresh_settings()
 
+# Bottom centre of the safe area; the chip is sized to its text first.
+func place_prompt():
+	prompt_panel.reset_size()
+	var area = game.safe_rect()
+	prompt_panel.position = Vector2(area.position.x+(area.size.x-prompt_panel.size.x)/2,area.end.y-prompt_panel.size.y-28)
+
+func set_prompt_visible(value: bool):
+	prompt.visible = value
+	prompt_panel.visible = value
+
 func objective_info() -> Dictionary:
 	var objective = guide_info()
 	if game.detailed_world and game.targets.has(objective.get("target","")):
@@ -479,7 +523,11 @@ func refresh():
 	var assigned = investigation_assigned()
 	tabs.set_tab_hidden(2,not assigned)
 	new_session_button.text = "새 조사" if assigned else "새 업무 시작"
-	work.text = objective.title+"\n"+objective.text+"\n\n오늘의 필수 운영 확인\n"+("확인 완료" if view.work.is_empty() else "\n".join(view.work))
+	work.text = objective.title+"\n"+objective.text
+	clear(checklist)
+	label(checklist,"오늘의 필수 운영 확인","SectionLabel")
+	if view.work.is_empty(): label(checklist,"✓  오늘의 필수 확인을 모두 마쳤습니다.")
+	for line in view.work: label(checklist,"○  "+line)
 	if assigned: work.text += "\n\n발생 보고: "+("승인됨 · 감사 권한 유지" if view.approved else "미승인")
 	if assigned: work.text += "\n확인한 내부 수집 문서: "+("미확인" if view.documentCount < 0 else "%d개 · 반출과 별도" % view.documentCount)
 	if view.ended: work.text += "\n\n"+game.engine._t("PROTOTYPE_ENDED")
@@ -490,13 +538,23 @@ func refresh_dialogue():
 	var questions = game.engine.project(game.state).questions
 	for question in questions:
 		if question.npc == speaker and question.channel == "dialogue" and question_visible(question.id):
-			button(dialogue_questions,question.label,ask.bind(question.id),"TileButton")
+			var choice = button(dialogue_questions,question.label,ask.bind(question.id),"ChoiceButton")
+			choice.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	if dialogue_questions.get_child_count() == 0: label(dialogue_questions,"지금 더 물어볼 내용이 없습니다.")
 
-func ask(id: String):
-	conversation.text = game.dispatch({"type":"dialogue","payload":{"id":id}}).text
+# The reply starts with the speaker's name; show it as a label, never as markup.
+func speech(text: String) -> String:
+	var safe = text.replace("[","[lb]")
+	var lines = safe.split("\n",true,1)
+	var name = game.content.case.npcs.get(speaker,{}).get("name","")
+	if lines.size() == 2 and not name.is_empty() and lines[0].strip_edges() == name:
+		return "[color=#%s][b]%s[/b][/color]\n%s" % [InvestigationTheme.ACCENT.to_html(false),lines[0],lines[1]]
+	return safe
 
-func bubble(text: String, outgoing = false):
+func ask(id: String):
+	conversation.text = speech(game.dispatch({"type":"dialogue","payload":{"id":id}}).text)
+
+func bubble(sender: String, text: String, outgoing = false):
 	var row = HBoxContainer.new()
 	messenger.add_child(row)
 	if outgoing:
@@ -507,7 +565,12 @@ func bubble(text: String, outgoing = false):
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.theme_type_variation = "OutgoingBubblePanel" if outgoing else "BubblePanel"
 	row.add_child(card)
-	label(card,text)
+	var content = VBoxContainer.new()
+	card.add_child(content)
+	if not sender.is_empty():
+		var from = label(content,sender,"CaptionLabel")
+		if outgoing: from.add_theme_color_override("font_color",InvestigationTheme.ACCENT)
+	label(content,text)
 
 func refresh_messenger():
 	clear(messenger)
@@ -519,17 +582,17 @@ func refresh_messenger():
 	var count = 0
 	for msg in game.state.messages:
 		if msg.npc == contact:
-			bubble("%d일차 · %s\n%s" % [msg.day,npc.name,msg.text])
+			bubble("%d일차 · %s" % [msg.day,npc.name],msg.text)
 			count += 1
 	for question in game.content.dialogue:
 		if question.npc == contact and question.get("channel","dialogue") == "messenger" and question.id in game.state.statements:
-			bubble("나\n"+question.label,true)
-			bubble(npc.name+"\n"+question.response)
+			bubble("나",question.label,true)
+			bubble(npc.name,question.response)
 			if question.record != "" and question.record in game.state.known:
 				var record = game.state.records[question.record]
 				button(messenger,"첨부 · "+record.title,func(): notice(record.title+"\n"+record.source+"\n"+record.body),"TileButton")
 			count += 1
-	if count == 0: bubble("아직 받은 메시지가 없습니다. 담당자와 직접 대화하려면 현장에서 만나세요.")
+	if count == 0: bubble("","아직 받은 메시지가 없습니다. 담당자와 직접 대화하려면 현장에서 만나세요.")
 	for question in game.engine.project(game.state).questions:
 		if question.npc == contact and question.channel == "messenger" and question.id not in game.state.statements and question_visible(question.id):
 			button(messenger,question.label,func(): game.dispatch({"type":"dialogue","payload":{"id":question.id}}),"PrimaryButton")
@@ -636,7 +699,7 @@ func _show(next_mode: String, window: Control):
 	game.player.set_enabled(false)
 	game.controls.release_touches()
 	for key in ["forward","back","left","right","sprint","crouch","jump"]: Input.action_release(key)
-	prompt.hide()
+	set_prompt_visible(false)
 	dot.hide()
 
 func open_tablet(index = 3):
@@ -686,7 +749,7 @@ func close():
 	toast.visible = not message.text.is_empty()
 	dot.show()
 	prompt.text = ""
-	prompt.hide()
+	set_prompt_visible(false)
 
 func toggle():
 	if modal_open: close()
@@ -753,7 +816,7 @@ func _process(_delta):
 		terminal_tools.visible = keyboard == 0
 		terminal_panel.anchor_bottom = clampf(.98-keyboard/height,.2,.98)
 	if modal_open:
-		prompt.hide()
+		set_prompt_visible(false)
 		return
 	if game.detailed_world:
 		var text = LabInputBindings.hint(objective_info().text)
@@ -761,12 +824,17 @@ func _process(_delta):
 			guide.text = text
 			field_objective.reset_size.call_deferred()
 	var target = game.player.target
-	prompt.text = target.get_interaction_prompt().replace("E · ","F — ") if target != null else ""
-	if game.controls.touch_enabled: prompt.text = prompt.text.replace("F — ","")
-	prompt.text = LabInputBindings.hint(prompt.text)
-	dot.position = game.player.aim_screen_point-Vector2(8,16) if game.player.aim_screen_point.x >= 0 else get_viewport().get_visible_rect().size*.5-Vector2(8,16)
-	prompt.visible = target != null
-	dot.add_theme_color_override("font_color",InvestigationTheme.ACCENT if target != null else Color(.9,.95,1,.7))
+	var hint = target.get_interaction_prompt().replace("E · ","F — ") if target != null else ""
+	if game.controls.touch_enabled: hint = hint.replace("F — ","")
+	hint = LabInputBindings.hint(hint)
+	if prompt.text != hint:
+		prompt.text = hint
+		place_prompt.call_deferred()
+	dot.position = (game.player.aim_screen_point if game.player.aim_screen_point.x >= 0 else get_viewport().get_visible_rect().size*.5)-dot.size/2
+	set_prompt_visible(target != null)
+	if dot.active != (target != null):
+		dot.active = target != null
+		dot.queue_redraw()
 
 func _input(event: InputEvent):
 	if game == null or not game.controls.touch_enabled or not modal_open: return
