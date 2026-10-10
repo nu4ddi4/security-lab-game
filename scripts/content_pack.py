@@ -11,6 +11,8 @@ import hashlib
 from pathlib import Path
 import re
 
+# The launcher and the update policy are loaded before a pack is mounted, so a pack cannot replace them.
+STARTUP_FILES = ['prototype/bootstrap.tscn', 'prototype/scripts/content_bootstrap.gd', 'scripts/update_policy.gd']
 HEAVY_EXCLUDE = 'assets/models/*,assets/textures/*,assets/fonts/*.ttf'
 PACK_PRESET = 'Windows Content'
 
@@ -51,6 +53,7 @@ def compat_key(staged, godot_version):
         'presets=' + normalized_presets((staged / 'export_presets.cfg').read_text(encoding='utf-8')),
         'classes=' + '\n'.join(class_registry(staged)),
         'assets=' + '\n'.join(assets),
+        'startup=' + '\n'.join(name + ':' + _digest(staged / name) for name in STARTUP_FILES if (staged / name).is_file()),
     ]
     return hashlib.sha256('\n--\n'.join(parts).encode('utf-8')).hexdigest()
 

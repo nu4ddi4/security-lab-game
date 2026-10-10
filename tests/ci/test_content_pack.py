@@ -14,6 +14,10 @@ PRESET = '[preset.0]\nname="Windows Prototype"\nexclude_filter="prototype/tests/
 def stage(root):
     root = Path(root)
     (root / 'scripts').mkdir()
+    (root / 'prototype/scripts').mkdir(parents=True)
+    (root / 'prototype/bootstrap.tscn').write_text('[gd_scene]\n', encoding='utf-8')
+    (root / 'prototype/scripts/content_bootstrap.gd').write_text('func start(): pass\n', encoding='utf-8')
+    (root / 'scripts/update_policy.gd').write_text('func newer(): return true\n', encoding='utf-8')
     (root / 'assets/models').mkdir(parents=True)
     (root / 'project.godot').write_text(PROJECT, encoding='utf-8')
     (root / 'export_presets.cfg').write_text(PRESET, encoding='utf-8')
@@ -42,6 +46,8 @@ class CompatKeyTests(unittest.TestCase):
         changes = {
             'new global class': lambda: (self.root / 'scripts/more.gd').write_text('class_name More\n', encoding='utf-8'),
             'renamed global class': lambda: (self.root / 'scripts/player.gd').write_text('class_name Hero\n', encoding='utf-8'),
+            'launcher script': lambda: (self.root / 'prototype/scripts/content_bootstrap.gd').write_text('func start(): print(1)\n', encoding='utf-8'),
+            'update policy': lambda: (self.root / 'scripts/update_policy.gd').write_text('func newer(): return false\n', encoding='utf-8'),
             'heavy asset': lambda: (self.root / 'assets/models/office.glb').write_bytes(b'glb-2'),
             'project setting': lambda: (self.root / 'project.godot').write_text(PROJECT + 'renderer/x=1\n', encoding='utf-8'),
             'export option': lambda: (self.root / 'export_presets.cfg').write_text(PRESET + 'texture_format/s3tc_bptc=false\n', encoding='utf-8'),

@@ -50,7 +50,8 @@ varying vec3 city_local;
 varying vec3 city_world;
 varying vec3 city_normal;
 varying vec4 variation;
-float city_hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+// A sine hash loses precision for large cell ids and turns into blocky noise; this one stays stable.
+float city_hash(vec2 p){vec3 q=fract(vec3(p.xyx)*0.1031);q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
 void vertex(){
  vec3 size=vec3(length(MODEL_MATRIX[0].xyz),length(MODEL_MATRIX[1].xyz),length(MODEL_MATRIX[2].xyz));
  city_local=(VERTEX+0.5)*size;
@@ -67,7 +68,10 @@ void fragment(){
  vec2 grid=vec2(along/pitch,city_local.y/3.0),cell=fract(grid),id=floor(grid);
  vec2 aa=max(fwidth(grid),vec2(0.001));
  vec2 mask=smoothstep(vec2(0.16,0.19)-aa,vec2(0.16,0.19)+aa,cell)*(1.0-smoothstep(vec2(0.79,0.77)-aa,vec2(0.79,0.77)+aa,cell));
- float pane=mask.x*mask.y*wall*(family<6?1.0:0.0);
+ // Far away a window is smaller than a pixel: fade to its average look instead of shimmering.
+ float detail=1.0-smoothstep(0.28,0.75,max(aa.x,aa.y));
+ float window_wall=wall*(family<6?1.0:0.0);
+ float pane=mix(0.365*window_wall,mask.x*mask.y*window_wall,detail);
  float floor_seed=city_hash(vec2(id.y,stable_seed));
  float occupancy=(variation.y+(0.5-floor_seed)*0.3)*step(0.12,floor_seed);
  float suite=city_hash(vec2(floor(id.x/3.0)+stable_seed,id.y));
@@ -75,6 +79,9 @@ void fragment(){
  float brightness=mix(0.14,0.58,city_hash(id.yx+stable_seed*2.0));
  vec3 lamp=mix(vec3(1.0,0.58,0.25),vec3(0.80,0.84,0.86),step(0.80,city_hash(id+52.0+stable_seed)));
  lamp=mix(lamp,vec3(0.46,0.66,0.86),step(0.97,city_hash(id+73.0+stable_seed)));
+ light=mix(clamp(occupancy,0.0,1.0)*0.62,light,detail);
+ brightness=mix(0.36,brightness,detail);
+ lamp=mix(vec3(0.93,0.62,0.36),lamp,detail);
  float sun=max(0.0,dot(n,vec3(-0.973,0.10,-0.208)));
  vec3 illumination=vec3(0.28,0.38,0.54)+sun*vec3(0.91,0.53,0.27);
  float floor_band=1.0-smoothstep(0.035,0.075,min(cell.y,1.0-cell.y));

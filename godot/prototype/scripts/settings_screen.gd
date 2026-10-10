@@ -34,6 +34,11 @@ func text(parent: Node, value: String, font_size = 16, color = InvestigationThem
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
 
+# project.godot is fixed inside the executable; the mounted data pack carries the running version.
+func running_version() -> String:
+	var info = JSON.parse_string(FileAccess.get_file_as_string("res://prototype/build_info.json"))
+	return String(info.get("version")) if info is Dictionary and info.get("version") is String else String(ProjectSettings.get_setting("application/config/version","개발"))
+
 func action_button(parent: Node, value: String, callback: Callable, primary = false) -> Button:
 	var node = add_button(parent,value,callback)
 	node.custom_minimum_size.y = 32
@@ -94,7 +99,7 @@ func _ready():
 		action_button(header,entry[0],func(): leave_for(entry[1]))
 	var active = action_button(header,"설정",Callable(),true)
 	active.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var version = text(header,ContentBootstrap.build_version(),12,InvestigationTheme.TEXT_FAINT)
+	var version = text(header,running_version(),12,InvestigationTheme.TEXT_FAINT)
 	version.autowrap_mode = TextServer.AUTOWRAP_OFF
 	version.custom_minimum_size.x = 104
 	version.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -233,7 +238,7 @@ func build_controls(page: VBoxContainer):
 func build_general(page: VBoxContainer):
 	var updates = card(page)
 	text(updates,"업데이트",20)
-	text(updates,"현재 빌드 · "+ContentBootstrap.build_version(),14)
+	text(updates,"현재 빌드 · "+running_version(),14)
 	game.ui.update_setting = CheckButton.new()
 	game.ui.update_setting.text = "시작할 때 내 채널의 업데이트 확인"
 	updates.add_child(game.ui.update_setting)

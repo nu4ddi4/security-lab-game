@@ -55,6 +55,11 @@ func setup(office: LabWorld, content: Dictionary):
 		if marker.has_meta("base_root"):
 			var base = world.model.find_child(str(marker.get_meta("base_root")),true,false)
 			if base is Node3D: base.global_position += marker.position
+		# Only the depth shift: the sideways shift of these desks is already part of their collider.
+		if marker.has_meta("shift_collider"):
+			var shifted = world.protected_nodes.get(str(marker.get_meta("shift_collider")))
+			if shifted != null and shifted.get_node_or_null("NativeCollision") != null:
+				shifted.get_node("NativeCollision").global_position.z += marker.position.z
 		if marker.has_meta("replace_base_collision"):
 			var collider = world.protected_nodes.get(str(marker.get_meta("replace_base_collision")))
 			if collider != null:
@@ -66,6 +71,7 @@ func setup(office: LabWorld, content: Dictionary):
 			var node = world.model.find_child(source_name.replace(".","_"),true,false)
 			if node is GeometryInstance3D: node.hide()
 	for marker in anchors.values():
+		if marker.has_meta("cull_node"): _cull(marker)
 		if marker.has_meta("base_collider"):
 			_refine_surface(marker)
 		if marker.has_meta("collision_size"):
@@ -104,6 +110,36 @@ func _collect(node: Node):
 func _size(node: Node3D, key: String) -> Vector3:
 	var values = node.get_meta(key)
 	return Vector3(values[0],values[1],values[2])
+
+# Decoration that cannot be moved separately (a conduit drop in front of a display) is cut out of
+# its base mesh, inside the box the overlay marker describes.
+func _cull(marker: Node3D):
+	var target = world.model.find_child(str(marker.get_meta("cull_node")),true,false)
+	if not target is MeshInstance3D: return
+	var size = _size(marker,"cull_size")
+	target.mesh = InvestigationEnvironment.without_region(target.mesh,target.global_transform,AABB(marker.global_position-size*.5,size))
+
+static func without_region(source: Mesh, transform: Transform3D, region: AABB) -> ArrayMesh:
+	var result = ArrayMesh.new()
+	for surface in source.get_surface_count():
+		var arrays = source.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		if indices.is_empty(): indices = PackedInt32Array(range(vertices.size()))
+		var kept = PackedInt32Array()
+		for i in range(0,indices.size()-2,3):
+			var outside = false
+			for corner in 3:
+				if not region.has_point(transform*vertices[indices[i+corner]]): outside = true
+			if outside:
+				kept.push_back(indices[i])
+				kept.push_back(indices[i+1])
+				kept.push_back(indices[i+2])
+		if kept.is_empty(): continue
+		arrays[Mesh.ARRAY_INDEX] = kept
+		result.add_surface_from_arrays(source.surface_get_primitive_type(surface),arrays)
+		result.surface_set_material(result.get_surface_count()-1,source.surface_get_material(surface))
+	return result
 
 func _refine_surface(marker: Node3D):
 	var collider = world.protected_nodes.get(str(marker.get_meta("base_collider")))

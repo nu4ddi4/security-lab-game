@@ -54,6 +54,15 @@ func run():
 	check(log.events[0].event=="investigation_ready" and log.errors[0].source=="res://prototype/scripts/ui.gd","Beta log summary keeps only allowlisted event and source")
 	check(not JSON.stringify(log).contains("private-"),"Beta log summary never contains free text or save paths")
 	zip.close()
+	var cull_mesh = ArrayMesh.new()
+	var cull_arrays = []
+	cull_arrays.resize(Mesh.ARRAY_MAX)
+	cull_arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array([Vector3(0,0,0),Vector3(1,0,0),Vector3(0,1,0),Vector3(5,0,0),Vector3(6,0,0),Vector3(5,1,0)])
+	cull_arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0,1,2,3,4,5])
+	cull_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,cull_arrays)
+	var culled = InvestigationEnvironment.without_region(cull_mesh,Transform3D(),AABB(Vector3(4,-1,-1),Vector3(3,3,2)))
+	check(culled.surface_get_arrays(0)[Mesh.ARRAY_INDEX].size() == 3,"Culling removes only the triangles inside the box")
+	check(InvestigationEnvironment.without_region(cull_mesh,Transform3D(),AABB(Vector3(-1,-1,-1),Vector3(20,3,2))).get_surface_count() == 0,"Culling can empty a surface")
 	var reset_root = "user://qa/reset-test"
 	write(reset_root.path_join("investigation/save.json"),"progress")
 	write(reset_root.path_join("investigation/nested/save.backup.json"),"backup")

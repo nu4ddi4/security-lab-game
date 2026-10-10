@@ -175,9 +175,12 @@ static func build(mobile: bool) -> Theme:
 		theme.set_stylebox("grabber",type,grabber)
 		theme.set_stylebox("grabber_highlight",type,grabber_hover)
 		theme.set_stylebox("grabber_pressed",type,grabber_hover)
-	theme.set_stylebox("slider","HSlider",box(Color(1,1,1,.1),Color(0,0,0,0),3,0,0))
-	theme.set_stylebox("grabber_area","HSlider",box(ACCENT.darkened(.3),Color(0,0,0,0),3,0,0))
-	theme.set_stylebox("grabber_area_highlight","HSlider",box(ACCENT,Color(0,0,0,0),3,0,0))
+	# A flat stylebox has no height of its own, so the track needs content margins to be visible.
+	for entry in [["slider",Color(1,1,1,.14)],["grabber_area",ACCENT.darkened(.3)],["grabber_area_highlight",ACCENT]]:
+		var rail = box(entry[1],Color(0,0,0,0),4,0,0)
+		rail.content_margin_top = 4
+		rail.content_margin_bottom = 4
+		theme.set_stylebox(entry[0],"HSlider",rail)
 	theme.set_stylebox("background","ProgressBar",box(Color(1,1,1,.08),Color(0,0,0,0),6,0,0))
 	theme.set_stylebox("fill","ProgressBar",box(ACCENT,Color(0,0,0,0),6,0,0))
 	theme.set_stylebox("separator","HSeparator",box(BORDER,Color(0,0,0,0),0,0,0))

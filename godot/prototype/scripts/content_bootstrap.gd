@@ -21,11 +21,6 @@ static func directory(args: PackedStringArray) -> String:
 static func wanted(args: PackedStringArray, os_name: String) -> bool:
 	return os_name == "Windows" and "--disable-content-updates" not in args and "--server" not in args
 
-# project.godot is fixed inside the executable; the mounted data pack carries the running version.
-static func build_version() -> String:
-	var info = read_json(BUILD_INFO)
-	return String(info.get("version",ProjectSettings.get_setting("application/config/version","개발")))
-
 static func read_json(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path): return {}
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
