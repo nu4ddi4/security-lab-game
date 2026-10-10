@@ -34,10 +34,8 @@ func text(parent: Node, value: String, font_size = 16, color = InvestigationThem
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
 
-# project.godot is fixed inside the executable; the mounted data pack carries the running version.
 func running_version() -> String:
-	var info = JSON.parse_string(FileAccess.get_file_as_string("res://prototype/build_info.json"))
-	return String(info.get("version")) if info is Dictionary and info.get("version") is String else String(ProjectSettings.get_setting("application/config/version","개발"))
+	return ContentVersion.running()
 
 func action_button(parent: Node, value: String, callback: Callable, primary = false) -> Button:
 	var node = add_button(parent,value,callback)
@@ -70,11 +68,7 @@ func _ready():
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	surface.add_child(background)
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var shader = Shader.new()
-	shader.code = "shader_type canvas_item; void fragment(){ vec4 c=vec4(0.0); for(int x=-2;x<=2;x++){for(int y=-2;y<=2;y++){c+=texture(TEXTURE,UV+vec2(float(x),float(y))*TEXTURE_PIXEL_SIZE*4.0);}} COLOR=vec4(c.rgb/25.0*0.43,1.0); }"
-	var material = ShaderMaterial.new()
-	material.shader = shader
-	background.material = material
+	background.material = InvestigationTheme.backdrop_material()
 	var shade = ColorRect.new()
 	shade.color = Color(InvestigationTheme.BACKDROP,.4)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -87,24 +81,11 @@ func _ready():
 	var body = VBoxContainer.new()
 	body.add_theme_constant_override("separation",14)
 	margin.add_child(body)
-	var header = HBoxContainer.new()
-	body.add_child(header)
-	header.add_child(InvestigationTheme.brand_mark())
-	var brand = VBoxContainer.new()
-	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(brand)
-	text(brand,"SECURITY LAB  ·  BETA",24)
-	text(brand,"보이는 것이 전부가 아니다.",13,InvestigationTheme.TEXT_DIM)
-	for entry in [["노트",0],["메신저",1],["업무",3]]:
-		action_button(header,entry[0],func(): leave_for(entry[1]))
-	var active = action_button(header,"설정",Callable(),true)
-	active.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var version = text(header,running_version(),12,InvestigationTheme.TEXT_FAINT)
-	version.autowrap_mode = TextServer.AUTOWRAP_OFF
-	version.custom_minimum_size.x = 104
-	version.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var assigned = game.ui.investigation_assigned()
+	var header = InvestigationTheme.shell_header(body,[["노트",0],["메신저",1],["발생 보고",2,assigned],["업무",3],["설정",4]],4,func(id): if id != 4: leave_for(id),running_version(),game.controls.mobile)
+	header.buttons[4].mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel = PanelContainer.new()
-	panel.add_theme_stylebox_override("panel",InvestigationTheme.box(Color(.06,.1,.125,.8),InvestigationTheme.BORDER_STRONG,14,20))
+	panel.theme_type_variation = "ShellPanel"
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(panel)
 	layout = HBoxContainer.new()

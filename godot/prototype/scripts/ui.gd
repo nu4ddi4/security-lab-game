@@ -4,6 +4,10 @@ extends CanvasLayer
 var game: InvestigationPrototype
 var root: Control
 var modal: PanelContainer
+var tablet_backdrop: TextureRect
+var tablet_nav = {}
+var tablet_version: Label
+var dialogue_scroll: ScrollContainer
 var terminal_panel: PanelContainer
 var dialogue_panel: PanelContainer
 var briefing_panel: PanelContainer
@@ -166,20 +170,40 @@ func heading(parent: Node, text: String) -> Label:
 	return title
 
 func _build_tablet():
-	modal = panel(.14,.09,.86,.91)
+	# The tablet is a full page like the settings: same frosted backdrop, header and panel.
+	tablet_backdrop = TextureRect.new()
+	tablet_backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tablet_backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	tablet_backdrop.material = InvestigationTheme.backdrop_material()
+	tablet_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	tablet_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	tablet_backdrop.hide()
+	root.add_child(tablet_backdrop)
+	modal = panel(0,0,1,1)
 	modal.name = "Tablet"
-	if game.controls.mobile:
-		modal.anchor_left = .02
-		modal.anchor_right = .98
-		modal.anchor_top = .03
-		modal.anchor_bottom = .97
+	modal.theme_type_variation = "ShellRoot"
+	modal.add_theme_constant_override("margin_left",14 if game.controls.mobile else 24)
+	modal.visibility_changed.connect(func(): tablet_backdrop.visible = modal.visible and tablet_backdrop.texture != null)
 	var body = VBoxContainer.new()
+	body.add_theme_constant_override("separation",14)
 	modal.add_child(body)
-	heading(body,"휴대 단말 · 보안 운영")
-	label(body,"업무 기록 · 사내 연락 · 오늘 업무","CaptionLabel")
+	var close_button = Button.new()
+	close_button.text = "닫기" if game.controls.touch_enabled else "닫기 · Esc"
+	close_button.set_meta("binding_text",close_button.text)
+	close_button.custom_minimum_size.y = 48 if game.controls.mobile else 34
+	close_button.add_theme_font_size_override("font_size",16 if game.controls.mobile else 14)
+	close_button.pressed.connect(close)
+	var header = InvestigationTheme.shell_header(body,[["노트",0],["메신저",1],["발생 보고",2],["업무",3],["설정",4]],3,func(id): tabs.current_tab = id,ContentVersion.running(),game.controls.mobile,[close_button])
+	tablet_nav = header.buttons
+	tablet_version = header.version
+	var shell = PanelContainer.new()
+	shell.theme_type_variation = "ShellPanel"
+	shell.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_child(shell)
 	tabs = TabContainer.new()
+	tabs.tabs_visible = false
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_child(tabs)
+	shell.add_child(tabs)
 	for name in ["노트","메신저","발생 보고","업무","설정"]:
 		var scroll = ScrollContainer.new()
 		scroll.name = name
@@ -189,6 +213,7 @@ func _build_tablet():
 		box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		box.add_theme_constant_override("separation",12)
 		scroll.add_child(box)
+		label(box,name,"TitleLabel")
 		if name == "업무":
 			# The day's actions stay below the scrolling summary instead of at its far end.
 			var page = VBoxContainer.new()
@@ -200,6 +225,7 @@ func _build_tablet():
 			tabs.add_child(page)
 		else: tabs.add_child(scroll)
 	tabs.tab_changed.connect(func(index):
+		InvestigationTheme.mark_active(tablet_nav,index)
 		if index == 4 and modal_open and game.settings != null and settings_screen == null: open_rebinding())
 	label(tab(0),"확보한 원본 · 장비에서 조회한 기록과 받은 첨부만 표시됩니다.","CaptionLabel")
 	notes = VBoxContainer.new()
@@ -221,7 +247,7 @@ func _build_tablet():
 		contact_picker.add_item(game.content.case.npcs[id].name+" · "+game.content.case.npcs[id].role)
 		contact_picker.set_item_metadata(contact_picker.item_count-1,id)
 	tab(1).add_child(contact_picker)
-	tab(1).move_child(contact_picker,1)
+	tab(1).move_child(contact_picker,2)
 	contact_picker.item_selected.connect(func(index): contact = contact_picker.get_item_metadata(index); refresh_messenger())
 	messenger_contacts = VBoxContainer.new()
 	messenger_contacts.custom_minimum_size.x = 210
@@ -345,7 +371,7 @@ func _build_terminal():
 	scroll.add_child(command_list)
 
 func _build_dialogue():
-	dialogue_panel = panel(.16,.56,.84,.96)
+	dialogue_panel = panel(.16,.48,.84,.96)
 	dialogue_panel.name = "Dialogue"
 	if game.controls.mobile:
 		dialogue_panel.anchor_left = .03
@@ -355,18 +381,19 @@ func _build_dialogue():
 	dialogue_panel.add_child(body)
 	dialogue_title = heading(body,"")
 	conversation = RichTextLabel.new()
-	conversation.custom_minimum_size.y = 64 if game.controls.mobile else 150
+	conversation.custom_minimum_size.y = 64 if game.controls.mobile else 110
 	conversation.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	conversation.bbcode_enabled = true
 	conversation.selection_enabled = not game.controls.mobile
 	body.add_child(conversation)
-	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size.y = 72 if game.controls.mobile else 64
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	body.add_child(scroll)
+	dialogue_scroll = ScrollContainer.new()
+	dialogue_scroll.custom_minimum_size.y = 72 if game.controls.mobile else 64
+	dialogue_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body.add_child(dialogue_scroll)
 	dialogue_questions = VBoxContainer.new()
 	dialogue_questions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(dialogue_questions)
+	dialogue_questions.add_theme_constant_override("separation",6)
+	dialogue_scroll.add_child(dialogue_questions)
 
 func _build_briefing():
 	briefing_panel = panel(.2,.1,.8,.9)
@@ -512,7 +539,7 @@ func objective_info() -> Dictionary:
 func refresh():
 	var view = game.engine.project(game.state,game.context)
 	var objective = objective_info()
-	hud.text = "%d일차 · %s" % [view.day,objective.title]
+	hud.text = objective.title if objective.title.begins_with("%d일차" % view.day) else "%d일차 · %s" % [view.day,objective.title]
 	guide.text = LabInputBindings.hint(objective.text)
 	field_objective.reset_size.call_deferred()
 	source.text = view.device.get("label","현장 단말")+" · 운영 점검 세션"
@@ -542,6 +569,7 @@ func refresh():
 	refresh_commands()
 	var assigned = investigation_assigned()
 	tabs.set_tab_hidden(2,not assigned)
+	tablet_nav[2].visible = assigned
 	new_session_button.text = "새 조사" if assigned else "새 업무 시작"
 	work.text = objective.title+"\n"+objective.text
 	clear(checklist)
@@ -561,6 +589,13 @@ func refresh_dialogue():
 			var choice = button(dialogue_questions,question.label,ask.bind(question.id),"ChoiceButton")
 			choice.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	if dialogue_questions.get_child_count() == 0: label(dialogue_questions,"지금 더 물어볼 내용이 없습니다.")
+	fit_choices.call_deferred()
+
+# All choices stay visible without scrolling unless they would crowd out the conversation.
+func fit_choices():
+	if not is_instance_valid(dialogue_scroll): return
+	var wanted = dialogue_questions.get_combined_minimum_size().y
+	dialogue_scroll.custom_minimum_size.y = clampf(wanted,48,get_viewport().get_visible_rect().size.y*.32)
 
 # The reply starts with the speaker's name; show it as a label, never as markup.
 func speech(text: String) -> String:
@@ -771,6 +806,9 @@ func _show(next_mode: String, window: Control):
 func open_tablet(index = 3):
 	_show("tablet",modal)
 	tabs.current_tab = 3 if index == 2 and not investigation_assigned() else index
+	InvestigationTheme.mark_active(tablet_nav,tabs.current_tab)
+	tablet_backdrop.texture = settings_backdrop
+	tablet_backdrop.visible = modal.visible and settings_backdrop != null
 	if index == 4 and settings_screen == null: open_rebinding()
 	refresh()
 
@@ -970,11 +1008,12 @@ func fit_screen():
 	if is_instance_valid(settings_screen):
 		settings_screen.size = Vector2i(safe.size)
 		settings_screen.position = Vector2i(safe.position)
+	modal.add_theme_constant_override("margin_left",14 if game.controls.mobile else 24)
 	for item in [modal,terminal_panel,briefing_panel,dialogue_panel]:
-		if compact:
+		if compact and item != modal:
 			item.anchor_left = .02
 			item.anchor_right = .98
-			item.anchor_top = .52 if item == dialogue_panel else .02
+			item.anchor_top = .46 if item == dialogue_panel else .02
 			item.anchor_bottom = .98
 		item.offset_left = safe.position.x
 		item.offset_right = safe.end.x-size.x

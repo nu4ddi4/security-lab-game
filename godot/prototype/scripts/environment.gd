@@ -55,11 +55,6 @@ func setup(office: LabWorld, content: Dictionary):
 		if marker.has_meta("base_root"):
 			var base = world.model.find_child(str(marker.get_meta("base_root")),true,false)
 			if base is Node3D: base.global_position += marker.position
-		# Only the depth shift: the sideways shift of these desks is already part of their collider.
-		if marker.has_meta("shift_collider"):
-			var shifted = world.protected_nodes.get(str(marker.get_meta("shift_collider")))
-			if shifted != null and shifted.get_node_or_null("NativeCollision") != null:
-				shifted.get_node("NativeCollision").global_position.z += marker.position.z
 		if marker.has_meta("replace_base_collision"):
 			var collider = world.protected_nodes.get(str(marker.get_meta("replace_base_collision")))
 			if collider != null:

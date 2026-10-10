@@ -48,6 +48,68 @@ static func box(fill: Color, border = BORDER, radius = 10, margin = 14, border_w
 	style.set_content_margin_all(margin)
 	return style
 
+# Frosted look of everything behind a full-screen page (tablet and settings).
+static func backdrop_material() -> ShaderMaterial:
+	var shader = Shader.new()
+	shader.code = "shader_type canvas_item; void fragment(){ vec4 c=vec4(0.0); for(int x=-2;x<=2;x++){for(int y=-2;y<=2;y++){c+=texture(TEXTURE,UV+vec2(float(x),float(y))*TEXTURE_PIXEL_SIZE*4.0);}} COLOR=vec4(c.rgb/25.0*0.43,1.0); }"
+	var material = ShaderMaterial.new()
+	material.shader = shader
+	return material
+
+# One header for the tablet pages and the settings page: brand, page links, version.
+# entries are [label, id, visible]; returns {"row","buttons","version"}.
+static func shell_header(parent: Node, entries: Array, active, on_select: Callable, version := "", mobile := false, trailing: Array = []) -> Dictionary:
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation",16)
+	parent.add_child(row)
+	row.add_child(brand_mark())
+	var brand = VBoxContainer.new()
+	brand.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(brand)
+	var title = Label.new()
+	title.text = "SECURITY LAB  ·  BETA"
+	title.theme_type_variation = "TitleLabel"
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	brand.add_child(title)
+	var tagline = Label.new()
+	tagline.text = "보이는 것이 전부가 아니다."
+	tagline.theme_type_variation = "CaptionLabel"
+	tagline.autowrap_mode = TextServer.AUTOWRAP_OFF
+	brand.add_child(tagline)
+	var flow = HFlowContainer.new()
+	flow.alignment = FlowContainer.ALIGNMENT_END
+	flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	flow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	flow.add_theme_constant_override("h_separation",8)
+	flow.add_theme_constant_override("v_separation",8)
+	row.add_child(flow)
+	var buttons = {}
+	for entry in entries:
+		var node = Button.new()
+		node.text = entry[0]
+		node.visible = entry.size() < 3 or entry[2]
+		node.custom_minimum_size.y = 48 if mobile else 34
+		node.add_theme_font_size_override("font_size",16 if mobile else 14)
+		node.pressed.connect(func(): on_select.call(entry[1]))
+		flow.add_child(node)
+		buttons[entry[1]] = node
+	var result = {"row":row,"buttons":buttons,"version":null}
+	for node in trailing: flow.add_child(node)
+	if not version.is_empty():
+		var tag = Label.new()
+		tag.text = version
+		tag.theme_type_variation = "EyebrowLabel"
+		tag.autowrap_mode = TextServer.AUTOWRAP_OFF
+		tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		flow.add_child(tag)
+		result.version = tag
+	mark_active(buttons,active)
+	return result
+
+static func mark_active(buttons: Dictionary, active):
+	for id in buttons:
+		buttons[id].theme_type_variation = "PrimaryButton" if id == active else ""
+
 static func brand_mark() -> Control:
 	var mark = Mark.new()
 	mark.custom_minimum_size = Vector2(48,48)
@@ -114,6 +176,8 @@ static func build(mobile: bool) -> Theme:
 
 	theme.set_stylebox("panel","PanelContainer",box(RAISED))
 	_variation(theme,"ModalPanel","PanelContainer",box(SURFACE,BORDER_STRONG,14,22))
+	_variation(theme,"ShellRoot","PanelContainer",box(Color(0,0,0,0),Color(0,0,0,0),0,24,0))
+	_variation(theme,"ShellPanel","PanelContainer",box(Color(.06,.1,.125,.8),BORDER_STRONG,14,20))
 	_variation(theme,"CardPanel","PanelContainer",box(Color(.035,.065,.085,.74),BORDER,10,14))
 	_variation(theme,"InsetPanel","PanelContainer",box(INSET,BORDER,8,10))
 	_variation(theme,"HudPanel","PanelContainer",box(Color(.02,.04,.055,.82),BORDER,10,14))
@@ -159,6 +223,8 @@ static func build(mobile: bool) -> Theme:
 	theme.set_color("font_color","PopupMenu",TEXT)
 	theme.set_color("font_hover_color","PopupMenu",ACCENT)
 	var dialog = box(Color(.035,.065,.085,.99),BORDER_STRONG,12,18,1)
+	# The title strip sits above the window rectangle; without this it is left unpainted.
+	dialog.expand_margin_top = 36
 	for type in ["Window","AcceptDialog","ConfirmationDialog","FileDialog"]:
 		theme.set_stylebox("embedded_border",type,dialog)
 		theme.set_stylebox("embedded_unfocused_border",type,dialog)
