@@ -371,7 +371,8 @@ func _build_terminal():
 	scroll.add_child(command_list)
 
 func _build_dialogue():
-	dialogue_panel = panel(.16,.48,.84,.96)
+	dialogue_panel = panel(.16,.505,.84,.96)
+	dialogue_panel.add_theme_stylebox_override("panel",InvestigationTheme.box(InvestigationTheme.SURFACE,InvestigationTheme.BORDER_STRONG,14,16))
 	dialogue_panel.name = "Dialogue"
 	if game.controls.mobile:
 		dialogue_panel.anchor_left = .03
@@ -381,7 +382,7 @@ func _build_dialogue():
 	dialogue_panel.add_child(body)
 	dialogue_title = heading(body,"")
 	conversation = RichTextLabel.new()
-	conversation.custom_minimum_size.y = 64 if game.controls.mobile else 110
+	conversation.custom_minimum_size.y = 64 if game.controls.mobile else 80
 	conversation.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	conversation.bbcode_enabled = true
 	conversation.selection_enabled = not game.controls.mobile
@@ -595,7 +596,9 @@ func refresh_dialogue():
 func fit_choices():
 	if not is_instance_valid(dialogue_scroll): return
 	var wanted = dialogue_questions.get_combined_minimum_size().y
-	dialogue_scroll.custom_minimum_size.y = clampf(wanted,48,get_viewport().get_visible_rect().size.y*.32)
+	# The scene must stay visible behind the conversation, so the choices never take more than a fifth of the screen.
+	var cap = 76.0 if game.controls.mobile else get_viewport().get_visible_rect().size.y*.2
+	dialogue_scroll.custom_minimum_size.y = clampf(wanted,48,cap)
 
 # The reply starts with the speaker's name; show it as a label, never as markup.
 func speech(text: String) -> String:
@@ -1013,7 +1016,7 @@ func fit_screen():
 		if compact and item != modal:
 			item.anchor_left = .02
 			item.anchor_right = .98
-			item.anchor_top = .46 if item == dialogue_panel else .02
+			item.anchor_top = .52 if item == dialogue_panel else .02
 			item.anchor_bottom = .98
 		item.offset_left = safe.position.x
 		item.offset_right = safe.end.x-size.x

@@ -173,6 +173,11 @@ static func build(mobile: bool) -> Theme:
 	theme.set_type_variation("ChoiceButton","Button")
 	_button(theme,"ChoiceButton",INSET,ACCENT.darkened(.55),ACCENT_HOVER,TEXT)
 	theme.set_constant("h_separation","ChoiceButton",10)
+	for state in ["normal","hover","pressed","hover_pressed","disabled"]:
+		var slim = theme.get_stylebox(state,"ChoiceButton").duplicate()
+		slim.content_margin_top = 3
+		slim.content_margin_bottom = 3
+		theme.set_stylebox(state,"ChoiceButton",slim)
 
 	theme.set_stylebox("panel","PanelContainer",box(RAISED))
 	_variation(theme,"ModalPanel","PanelContainer",box(SURFACE,BORDER_STRONG,14,22))
