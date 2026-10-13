@@ -10,10 +10,13 @@ var displays: Dictionary = {}
 var last_visual_state = ""
 var world: LabWorld
 
+const GOOD = Color(.25,.72,.63)
+const WARNING = Color(.9,.6,.25)
+
 class EquipmentDisplay extends Control:
 	var heading = ""
 	var rows: Array = []
-	var tone = Color(.25,.72,.63)
+	var tone = GOOD
 	var font = preload("res://assets/fonts/NotoSansKR.ttf")
 	var paper_board = false
 
@@ -21,16 +24,16 @@ class EquipmentDisplay extends Control:
 		if paper_board:
 			_draw_whiteboard()
 			return
-		draw_rect(Rect2(0,0,640,360),Color(.018,.031,.043))
+		draw_rect(Rect2(0,0,640,360),InvestigationTheme.BACKDROP)
 		draw_rect(Rect2(0,0,640,7),tone)
-		draw_string(font,Vector2(27,40),"SECURITY OPERATIONS   /   LOCAL SYSTEM",HORIZONTAL_ALIGNMENT_LEFT,600,15,Color(.46,.62,.66))
-		draw_string(font,Vector2(27,83),heading,HORIZONTAL_ALIGNMENT_LEFT,585,28,Color(.83,.89,.90))
+		draw_string(font,Vector2(27,40),"SECURITY OPERATIONS   /   LOCAL SYSTEM",HORIZONTAL_ALIGNMENT_LEFT,600,15,InvestigationTheme.TEXT_FAINT)
+		draw_string(font,Vector2(27,83),heading,HORIZONTAL_ALIGNMENT_LEFT,585,28,InvestigationTheme.TEXT)
 		for i in rows.size():
 			var y = 128+i*43
 			draw_rect(Rect2(28,y-19,5,23),tone)
-			draw_string(font,Vector2(47,y),str(rows[i]),HORIZONTAL_ALIGNMENT_LEFT,560,21,Color(.68,.77,.81))
-		draw_line(Vector2(28,315),Vector2(610,315),Color(.12,.22,.28),1)
-		draw_string(font,Vector2(28,342),"원본 기록과 조작은 현장 단말에서 확인",HORIZONTAL_ALIGNMENT_LEFT,600,16,Color(.45,.61,.65))
+			draw_string(font,Vector2(47,y),str(rows[i]),HORIZONTAL_ALIGNMENT_LEFT,560,21,InvestigationTheme.TEXT_DIM)
+		draw_line(Vector2(28,315),Vector2(610,315),InvestigationTheme.BORDER,1)
+		draw_string(font,Vector2(28,342),"원본 기록과 조작은 현장 단말에서 확인",HORIZONTAL_ALIGNMENT_LEFT,600,16,InvestigationTheme.TEXT_FAINT)
 
 	func _draw_whiteboard():
 		var ink = Color(.055,.15,.23)
@@ -63,6 +66,7 @@ func setup(office: LabWorld, content: Dictionary):
 			var node = world.model.find_child(source_name.replace(".","_"),true,false)
 			if node is GeometryInstance3D: node.hide()
 	for marker in anchors.values():
+		if marker.has_meta("cull_node"): _cull(marker)
 		if marker.has_meta("base_collider"):
 			_refine_surface(marker)
 		if marker.has_meta("collision_size"):
@@ -101,6 +105,36 @@ func _collect(node: Node):
 func _size(node: Node3D, key: String) -> Vector3:
 	var values = node.get_meta(key)
 	return Vector3(values[0],values[1],values[2])
+
+# Decoration that cannot be moved separately (a conduit drop in front of a display) is cut out of
+# its base mesh, inside the box the overlay marker describes.
+func _cull(marker: Node3D):
+	var target = world.model.find_child(str(marker.get_meta("cull_node")),true,false)
+	if not target is MeshInstance3D: return
+	var size = _size(marker,"cull_size")
+	target.mesh = InvestigationEnvironment.without_region(target.mesh,target.global_transform,AABB(marker.global_position-size*.5,size))
+
+static func without_region(source: Mesh, transform: Transform3D, region: AABB) -> ArrayMesh:
+	var result = ArrayMesh.new()
+	for surface in source.get_surface_count():
+		var arrays = source.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		if indices.is_empty(): indices = PackedInt32Array(range(vertices.size()))
+		var kept = PackedInt32Array()
+		for i in range(0,indices.size()-2,3):
+			var outside = false
+			for corner in 3:
+				if not region.has_point(transform*vertices[indices[i+corner]]): outside = true
+			if outside:
+				kept.push_back(indices[i])
+				kept.push_back(indices[i+1])
+				kept.push_back(indices[i+2])
+		if kept.is_empty(): continue
+		arrays[Mesh.ARRAY_INDEX] = kept
+		result.add_surface_from_arrays(source.surface_get_primitive_type(surface),arrays)
+		result.surface_set_material(result.get_surface_count()-1,source.surface_get_material(surface))
+	return result
 
 func _refine_surface(marker: Node3D):
 	var collider = world.protected_nodes.get(str(marker.get_meta("base_collider")))
@@ -154,8 +188,6 @@ func sync(state: Dictionary):
 	var signature = JSON.stringify(visual)
 	if signature == last_visual_state: return
 	last_visual_state = signature
-	var good = Color(.25,.72,.63)
-	var warning = Color(.82,.55,.23)
 	var service = "자료 서비스 지연" if visual.delay else "자료 서비스 정상"
 	var search = "검색 색인 점검 필요" if not visual.index else "검색 색인 정상"
 	var data = {
@@ -170,7 +202,7 @@ func sync(state: Dictionary):
 		var display = displays[id]
 		display.canvas.heading = data[id][0]
 		display.canvas.rows = data[id][1]
-		display.canvas.tone = warning if (id in ["server_console","control_console","briefing_board"] and visual.delay or id in ["project_pc","control_console","briefing_board"] and not visual.index) else good
+		display.canvas.tone = WARNING if (id in ["server_console","control_console","briefing_board"] and visual.delay or id in ["project_pc","control_console","briefing_board"] and not visual.index) else GOOD
 		display.canvas.queue_redraw()
 		display.viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 

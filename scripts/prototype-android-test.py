@@ -124,7 +124,8 @@ def main():
     # the production APK to exercise certificate compatibility and save retention.
     adb('install', '-r', str(qa))
     launch()
-    result = wait_for('INVESTIGATION_SMOKE', timeout=180)
+    # The software-rendered emulator needs about three minutes for the full detailed-office smoke run.
+    result = wait_for('INVESTIGATION_SMOKE', timeout=300)
     captures = directory / 'ui'
     captures.mkdir(exist_ok=True)
     for name in ['01-briefing','02-dialogue','03-terminal','04-messenger','05-notes','06-field','07-settings']:

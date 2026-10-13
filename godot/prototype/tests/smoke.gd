@@ -46,6 +46,9 @@ func run(game: InvestigationPrototype):
 		tap.pressed = false
 		Input.parse_input_event(tap)
 		game.ui.close()
+		await game.dialogue_camera_tween.finished
+	var original_fov = game.player.camera.fov
+	game.player.camera.fov = 90.0
 	var camera_pose = game.player.camera.global_transform
 	game._use("oh","npc",true)
 	await game.dialogue_camera_tween.finished
@@ -60,6 +63,9 @@ func run(game: InvestigationPrototype):
 	var framed_pose = game.player.camera.global_transform
 	game.ui.close()
 	if not game.player.camera.global_transform.is_equal_approx(framed_pose): failures.append("Closing dialogue preserves the current camera angle")
+	await game.dialogue_camera_tween.finished
+	if not is_equal_approx(game.player.camera.fov,90.0): failures.append("Closing dialogue restores the player's custom field of view")
+	game.player.camera.fov = original_fov
 	game.player.look(Vector2(1,0))
 	if absf(game.player.camera.rotation.y) > .001: failures.append("Framed camera yaw is synchronized with movement")
 	game.dispatch({"type":"dialogue","payload":{"id":"park_intro"}})
@@ -95,14 +101,14 @@ func run(game: InvestigationPrototype):
 	game.ui.command_input.text = "logs tasks"
 	game.ui.execute_command()
 	if not game.ui.guide_info().title.begins_with("4 / 8"): failures.append("Server baseline advances the tutorial")
-	var server_output = game.ui.terminal.text
+	var server_output = game.ui.terminal.get_parsed_text()
 	if not server_output.contains("sec.ops > status"): failures.append("Terminal shows the session transcript")
 	await capture(game,"03-terminal")
 	game._use("project_pc","device",true)
 	var bad = game.dispatch(game.engine.parse("logs access --task T-17",game.context,game.state))
 	if bad.code != "WRONG_DEVICE": failures.append("Device command guard remains enforced")
 	game._use("server_console","device",true)
-	if game.ui.terminal.text != server_output: failures.append("Returning to a device preserves its output")
+	if game.ui.terminal.get_parsed_text() != server_output: failures.append("Returning to a device preserves its output")
 	game.dispatch({"type":"dialogue","payload":{"id":"han_intro"}})
 	game._use("project_pc","device",true)
 	game.ui.command_input.text = "inspect files"
@@ -136,6 +142,15 @@ func run(game: InvestigationPrototype):
 		game.ui.settings_screen.select_category(category)
 		await capture(game,"07-settings-"+category)
 	game.ui.settings_screen.select_category("controls")
+	# Moving to another tablet page keeps the tablet open and never hands the pointer back to the game.
+	var pointer = Input.mouse_mode
+	game.ui.settings_screen.leave_for(1)
+	if game.ui.mode != "tablet" or not game.ui.modal.visible or game.ui.tabs.current_tab != 1 or game.player.enabled or Input.mouse_mode != pointer or is_instance_valid(game.ui.settings_screen): failures.append("Leaving settings for a tablet page keeps the tablet open and the pointer free")
+	game.ui.open_tablet(4)
+	game.ui.settings_screen.close_editor()
+	if game.ui.mode != "field" or not game.player.enabled or game.ui.modal.visible: failures.append("Closing settings returns to the game")
+	settings_checks(game,failures)
+	game.ui.open_tablet(4)
 	game.ui.close()
 	await get_tree().process_frame
 	var dimensions = get_viewport().get_visible_rect().size
@@ -175,6 +190,10 @@ func run(game: InvestigationPrototype):
 	if game.controls.look_finger != -1 or not game.player.touch_axes.is_zero_approx(): failures.append("Opening UI releases all touch state")
 	game.ui.close()
 	game.updates._completed(HTTPRequest.RESULT_CANT_CONNECT,0,PackedStringArray(),PackedByteArray())
+	game.ui.update_progress(.42)
+	if not game.ui.update_hud.visible or roundi(game.ui.update_hud_bar.value) != 42: failures.append("Update download progress is shown in the field")
+	game.ui.update_progress(-1.0)
+	if game.ui.update_hud.visible: failures.append("Update progress disappears when no download runs")
 	if game.updates.busy or not game.player.enabled or (is_instance_valid(game.ui.update_download) and game.ui.update_download.visible): failures.append("Update failures leave gameplay available and hide stale downloads")
 	game.controls.set_touch(original_touch)
 	game.player.global_position = Vector3(0,.01,7)
@@ -276,11 +295,40 @@ func run(game: InvestigationPrototype):
 			game.ui.close()
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png(argument.trim_prefix("--prototype-capture="))
+	game.dispatch({"type":"memo","payload":{"text":"temporary note"}})
+	game.reset_all_data()
+	if game.state.memo != "" or game.state.day != 1 or game.blocked_save or game.ui.memo.text != "": failures.append("Full data reset returns to a fresh investigation")
+	if game.ui.mode != "briefing": failures.append("A fresh investigation starts with the assignment briefing")
+	game.ui.close()
 	var summary = {"passed":failures.is_empty(),"failures":failures,"platform":OS.get_name(),"mobile":game.controls.mobile,"touchDefault":original_touch,"keyboardDetected":game.controls.keyboard_seen}
 	var report = FileAccess.open("user://prototype-smoke-result.json",FileAccess.WRITE)
 	if report != null: report.store_string(JSON.stringify(summary))
 	print("INVESTIGATION_SMOKE ",JSON.stringify(summary))
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+func settings_checks(game, failures: Array):
+	var original = game.settings.values.duplicate(true)
+	var viewport = game.get_viewport()
+	var original_scale = viewport.scaling_3d_scale
+	var original_msaa = viewport.msaa_3d
+	for quality in range(4):
+		var candidate = original.duplicate(true)
+		candidate.quality = quality
+		candidate.master = .2
+		if not game.settings.save_values(candidate).ok: failures.append("Settings save succeeds for quality "+str(quality))
+		var expected_scale = .65 if game.controls.mobile else (.8 if quality == 0 else 1.0)
+		var expected_msaa = Viewport.MSAA_DISABLED if game.controls.mobile else [Viewport.MSAA_DISABLED,Viewport.MSAA_2X,Viewport.MSAA_4X,Viewport.MSAA_8X][quality]
+		if not is_equal_approx(viewport.scaling_3d_scale,expected_scale) or viewport.msaa_3d != expected_msaa:
+			failures.append("Settings save preserves the platform's rendering profile at quality "+str(quality))
+		var reloaded = LabSettings.new()
+		game.add_child(reloaded)
+		reloaded.setup(game)
+		if reloaded.values.quality != quality or not is_equal_approx(viewport.scaling_3d_scale,expected_scale) or viewport.msaa_3d != expected_msaa:
+			failures.append("Reloading settings preserves the platform's rendering profile at quality "+str(quality))
+		reloaded.queue_free()
+	if not game.settings.save_values(original).ok: failures.append("Original settings can be restored after the review")
+	viewport.scaling_3d_scale = original_scale
+	viewport.msaa_3d = original_msaa
 
 func _dummy_server_pose(game):
 	game.player.global_position = Vector3(0,.01,-2)

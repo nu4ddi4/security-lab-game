@@ -2,13 +2,14 @@ class_name InvestigationUpdates
 extends Node
 
 signal changed
-const API = "https://api.github.com/repos/nu4ddi4/security-lab-game/releases?per_page=100"
+const API = "https://api.github.com/repos/nu4ddi4/security-lab-game/releases?per_page=30"
 const DOWNLOAD = "https://github.com/nu4ddi4/security-lab-game/releases/download/"
 var installed = {}
 var platform = OS.get_name()
 var status = ""
 var download_url = ""
 var busy = false
+var preview = false
 var request: HTTPRequest
 
 static func version_parts(value: String) -> Array:
@@ -17,12 +18,13 @@ static func version_parts(value: String) -> Array:
 static func newer(a: String, b: String) -> bool:
 	return NativeUpdatePolicy.newer(a,b)
 
-static func select_release(releases: Array, metadata: Dictionary, target: String) -> Dictionary:
+# Stable releases are always candidates; prereleases only while the beta preview is on.
+static func select_release(releases: Array, metadata: Dictionary, target: String, preview = false) -> Dictionary:
 	var best = {}
-	var prefix = metadata.get("tag_prefix","SecurityLab-beta-")
+	var prefix = metadata.get("tag_prefix","SecurityLab-")
 	for release in releases:
 		if not release is Dictionary or release.get("draft",true) != false: continue
-		if release.get("prerelease") != metadata.get("prerelease"): continue
+		if release.get("prerelease") != false and not preview: continue
 		var tag = release.get("tag_name","")
 		if not tag is String or not tag.begins_with(prefix): continue
 		var version = tag.trim_prefix(prefix)
@@ -51,9 +53,10 @@ func _ready():
 	add_child(request)
 	request.request_completed.connect(_completed)
 
-func check():
+func check(beta_preview = false):
 	if busy: return
 	busy = true
+	preview = beta_preview
 	download_url = ""
 	status = "업데이트 확인 중…"
 	changed.emit()
@@ -70,7 +73,7 @@ func _completed(result: int, code: int, _headers: PackedStringArray, body: Packe
 	var releases = JSON.parse_string(body.get_string_from_utf8())
 	if not releases is Array: _failed(); return
 	busy = false
-	var candidate = select_release(releases,installed,platform)
+	var candidate = select_release(releases,installed,platform,preview)
 	if candidate.is_empty(): status = "현재 채널의 최신 버전입니다."
 	elif candidate.url == "": status = "새 버전 %s · 이 플랫폼의 배포 파일이 아직 없습니다." % candidate.version
 	else:

@@ -102,7 +102,11 @@ func _ready():
 	if OS.get_name()=="Windows" and not testing and FileAccess.file_exists(OS.get_executable_path().get_base_dir().path_join("securitylab.install.json")):
 		updater = InvestigationInstallerUpdates.new()
 		add_child(updater)
-		updater.status_changed.connect(func(text): updates.status = text; ui.notice(text); ui.refresh_settings())
+		updater.status_changed.connect(func(text):
+			updates.status = text
+			ui.refresh_settings()
+			if not ui.modal_open: ui.notice(text))
+		updater.progress_changed.connect(ui.update_progress)
 		updater.setup(self)
 	updates.changed.connect(ui.refresh_settings)
 	controls.changed.connect(ui.refresh_settings)
@@ -129,14 +133,15 @@ func _ready():
 		var smoke = load("res://tests/input_review.gd" if "--prototype-input-review" in OS.get_cmdline_user_args() else "res://prototype/tests/smoke.gd").new()
 		add_child(smoke)
 		smoke.run.call_deferred(self)
-	elif controls.automatic_updates and updater==null: updates.check.call_deferred()
+	elif controls.automatic_updates and updater==null: check_updates.call_deferred()
 
 func _show_loading():
 	loading = CanvasLayer.new()
 	loading.layer = 100
 	add_child(loading)
 	var background = ColorRect.new()
-	background.color = Color(.025,.045,.065)
+	background.color = InvestigationTheme.BACKDROP
+	background.theme = InvestigationTheme.build(false)
 	loading.add_child(background)
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var center = CenterContainer.new()
@@ -144,15 +149,25 @@ func _show_loading():
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var body = VBoxContainer.new()
 	body.custom_minimum_size.x = 360
-	body.add_theme_constant_override("separation",24)
+	body.add_theme_constant_override("separation",18)
 	center.add_child(body)
+	var brand = HBoxContainer.new()
+	brand.alignment = BoxContainer.ALIGNMENT_CENTER
+	brand.add_theme_constant_override("separation",14)
+	brand.add_child(InvestigationTheme.brand_mark())
+	var title = Label.new()
+	title.theme_type_variation = "TitleLabel"
+	title.text = "SECURITY LAB"
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	brand.add_child(title)
+	body.add_child(brand)
 	loading_text = Label.new()
-	loading_text.add_theme_font_override("font",load("res://assets/fonts/NotoSansKR.ttf"))
-	loading_text.add_theme_font_size_override("font_size",22)
+	loading_text.theme_type_variation = "CaptionLabel"
 	loading_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	loading_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(loading_text)
 	loading_bar = ProgressBar.new()
-	loading_bar.custom_minimum_size.y = 16
+	loading_bar.custom_minimum_size.y = 8
 	loading_bar.show_percentage = false
 	body.add_child(loading_bar)
 
@@ -246,10 +261,18 @@ func _use(id: String, kind: String, tool: bool):
 		ui.open_terminal()
 	else: ui.notice(content.case.devices[id].description)
 
+func beta_preview() -> bool:
+	var beta_build = updater.info.get("channel") == "beta" if updater != null else updates.installed.get("prerelease",true)
+	return controls.beta_preview_enabled(beta_build)
+
+func check_updates():
+	if updater != null: updater.check()
+	else: updates.check(beta_preview())
+
 func frame_speaker(id: String):
 	if not targets.has(id): return
 	if not dialogue_camera_active:
-		dialogue_camera_fov = 72.0
+		dialogue_camera_fov = player.camera.fov
 		dialogue_camera_active = true
 	if dialogue_camera_tween != null: dialogue_camera_tween.kill()
 	var head = investigation_environment.speaker_position(id) if detailed_world else targets[id].global_position + Vector3(0,.55,0)
@@ -286,16 +309,19 @@ func command(text: String):
 	var normalized = " ".join(text.strip_edges().split(" ",false)).to_lower()
 	for row in content.commands:
 		if row.text.to_lower() == normalized and context in row.devices and not engine.command_visible(state,row):
-			ui.print_output(text,"현재 맡은 업무에서 사용할 수 없는 명령입니다.")
+			ui.print_output(text,"현재 맡은 업무에서 사용할 수 없는 명령입니다.","error")
 			return
 	var action = engine.parse(text,context,state)
 	if action.type == "pause":
 		var preview = engine.step(state,action)
-		if preview.code != "CONFIRM_PAUSE": ui.print_output(text,preview.text); return
+		if preview.code != "CONFIRM_PAUSE": ui.print_output(text,preview.text,"error" if preview.code in InvestigationUI.ERROR_CODES else "output"); return
 		ui.confirm(engine._t("CONFIRM_PAUSE"),func():
 			action.payload["confirmed"] = true
-			ui.print_output(text,dispatch(action).text))
-	else: ui.print_output(text,dispatch(action).text)
+			var confirmed = dispatch(action)
+			ui.print_output(text,confirmed.text,"error" if confirmed.code in InvestigationUI.ERROR_CODES else "output"))
+	else:
+		var result = dispatch(action)
+		ui.print_output(text,result.text,"error" if result.code in InvestigationUI.ERROR_CODES else "output")
 
 func save_now() -> bool:
 	if blocked_save: return false
@@ -313,6 +339,26 @@ func new_game():
 	ui.sync_memo()
 	ui.refresh()
 	save_now()
+
+# Returns how many files were removed.
+func reset_all_data() -> int:
+	var removed = InvestigationDataReset.wipe(InvestigationDataReset.targets(self))
+	state = engine.create_state()
+	blocked_save = false
+	context = ""
+	controls.reset()
+	bindings.bindings = LabInputBindings.defaults()
+	bindings.apply()
+	settings.values = LabSettings.DEFAULT_VALUES.duplicate()
+	settings.values.quality = 2
+	settings.apply()
+	if investigation_environment != null: investigation_environment.sync(state)
+	ui.reset_session()
+	ui.sync_memo()
+	ui.refresh()
+	ui.refresh_input_hints()
+	save_now()
+	return removed
 
 func transfer_file(path: String, exporting: bool):
 	if exporting:

@@ -16,7 +16,6 @@ var release_keys: Array = []
 var crouched = false
 var sensitivity = 0.0018
 var body_height = 1.8
-var movement_seconds = 0.0
 var jump_peak = 0.0
 var jump_count = 0
 var standing_shape = CapsuleShape3D.new()
@@ -160,7 +159,6 @@ func _physics_process(delta):
 	var speed = 1.35 if crouched else 4.2 if Input.is_action_pressed("sprint") else 2.6
 	velocity.x = direction.x * speed
 	velocity.z = direction.z * speed
-	if axes.length() > 0: movement_seconds += delta
 	if is_on_floor() and Input.is_action_just_pressed("jump"):
 		velocity.y = 4.3
 		jump_count += 1

@@ -51,7 +51,11 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("needs.version.outputs.append_android == 'true'", workflow)
         self.assertIn('cancel-in-progress: false', workflow)
         self.assertIn('prototype-android-review-${{ github.run_id }}-${{ github.run_attempt }}', workflow)
-        self.assertEqual(workflow.count('overwrite: true'), 2)
+        self.assertEqual(workflow.count('overwrite: true'), 5)
+        self.assertNotIn('upload-artifact@v4', workflow)
+        self.assertEqual(workflow.count('archive: false'), 3)
+        for plain in ['SecurityLab-${{ needs.version.outputs.version }}.exe', 'SecurityLabSetup.exe', 'SecurityLab-${{ needs.version.outputs.version }}.apk']:
+            self.assertIn('path: ' + ('prototype-android-dist/' if plain.endswith('.apk') else 'prototype-dist/') + plain, workflow)
         self.assertNotIn('  pull_request:', workflow)
 
         # Evaluate the actual condition, including Android-only additions to a

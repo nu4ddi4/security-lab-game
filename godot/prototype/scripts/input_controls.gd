@@ -3,17 +3,20 @@ extends CanvasLayer
 
 signal changed
 
+const CONFIG_PATH = "user://controls.cfg"
+
 class Stick extends Control:
 	var axes = Vector2.ZERO
 	func _draw():
-		draw_circle(Vector2(60,60),56,Color(.08,.14,.18,.65))
-		draw_arc(Vector2(60,60),56,0,TAU,64,Color(.5,.85,.85,.7),3)
-		draw_circle(Vector2(60,60)+axes*40,22,Color(.5,.85,.85,.8))
+		draw_circle(Vector2(60,60),56,Color(InvestigationTheme.BACKDROP,.6))
+		draw_arc(Vector2(60,60),56,0,TAU,64,Color(InvestigationTheme.ACCENT,.55),3)
+		draw_circle(Vector2(60,60)+axes*40,22,Color(InvestigationTheme.ACCENT,.75))
 
 var mobile = OS.has_feature("mobile") or "--mobile-qa" in OS.get_cmdline_user_args()
 var touch_enabled = false
 var keyboard_seen = false
 var automatic_updates = true
+var beta_preview_choice = null
 var game: InvestigationPrototype
 var root: Control
 var stick: Stick
@@ -29,9 +32,10 @@ var config = ConfigFile.new()
 var testing = "--prototype-smoke" in OS.get_cmdline_user_args()
 
 func _init():
-	if not testing: config.load("user://controls.cfg")
+	if not testing: config.load(CONFIG_PATH)
 	touch_enabled = bool(config.get_value("input","touch",mobile))
 	automatic_updates = bool(config.get_value("updates","automatic",true))
+	if config.has_section_key("updates","beta_preview"): beta_preview_choice = bool(config.get_value("updates","beta_preview"))
 
 func setup(controller: InvestigationPrototype):
 	game = controller
@@ -56,9 +60,10 @@ func _add_button(id: String, text: String, callback: Callable, action = ""):
 	shape.size = Vector2(140,58)
 	node.shape = shape
 	root.add_child(node)
+	var outline = rounded_rectangle(Vector2(140,58),12)
 	var background = Polygon2D.new()
-	background.polygon = PackedVector2Array([Vector2(-70,-29),Vector2(70,-29),Vector2(70,29),Vector2(-70,29)])
-	background.color = Color(.08,.2,.24,.8)
+	background.polygon = outline
+	background.color = Color(InvestigationTheme.ACCENT_FILL,.8)
 	node.add_child(background)
 	var text_label = Label.new()
 	text_label.text = text
@@ -67,11 +72,27 @@ func _add_button(id: String, text: String, callback: Callable, action = ""):
 	text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	text_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	text_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text_label.add_theme_font_override("font",load("res://assets/fonts/NotoSansKR.ttf"))
+	text_label.add_theme_font_override("font",InvestigationTheme.font(InvestigationTheme.BOLD_WEIGHT))
 	text_label.add_theme_font_size_override("font_size",18)
 	node.add_child(text_label)
+	var border = Line2D.new()
+	border.points = outline
+	border.closed = true
+	border.width = 2.0
+	border.default_color = Color(InvestigationTheme.ACCENT,.6)
+	node.add_child(border)
 	if callback.is_valid(): node.pressed.connect(callback)
 	buttons[id] = node
+
+# Button silhouette around the origin with rounded corners.
+static func rounded_rectangle(size: Vector2, radius: float, steps = 6) -> PackedVector2Array:
+	var points = PackedVector2Array()
+	var half = size/2
+	for corner in [[Vector2(half.x-radius,half.y-radius),0.0],[Vector2(-half.x+radius,half.y-radius),90.0],[Vector2(-half.x+radius,-half.y+radius),180.0],[Vector2(half.x-radius,-half.y+radius),270.0]]:
+		for step in steps+1:
+			var angle = deg_to_rad(corner[1]+90.0*step/steps)
+			points.append(corner[0]+Vector2(cos(angle),sin(angle))*radius)
+	return points
 
 func set_touch(value: bool):
 	touch_enabled = value
@@ -86,8 +107,27 @@ func set_automatic_updates(value: bool):
 	_save()
 	changed.emit()
 
+# Back to first-run defaults; the caller removes the stored file.
+func reset():
+	config.clear()
+	touch_enabled = mobile
+	automatic_updates = true
+	beta_preview_choice = null
+	apply()
+	changed.emit()
+
+# Beta builds follow beta by default; stable builds opt in from settings.
+func beta_preview_enabled(beta_build: bool) -> bool:
+	return beta_build if beta_preview_choice == null else bool(beta_preview_choice)
+
+func set_beta_preview(value: bool):
+	beta_preview_choice = value
+	config.set_value("updates","beta_preview",value)
+	_save()
+	changed.emit()
+
 func _save():
-	if not testing and config.save("user://controls.cfg") != OK:
+	if not testing and config.save(CONFIG_PATH) != OK:
 		game.ui.notice("설정을 저장하지 못했습니다. 현재 실행에는 적용됩니다.")
 
 func apply():
@@ -182,5 +222,5 @@ func _process(_delta):
 		buttons[id].position = positions[id]
 		button_rects[id] = Rect2(positions[id]-Vector2(70,29),Vector2(140,58))
 	var target = game.player.target
-	buttons.tool.get_child(0).color = Color(.08,.32,.32,.95) if target != null else Color(.08,.12,.16,.55)
+	buttons.tool.get_child(0).color = Color(.08,.34,.34,.95) if target != null else Color(InvestigationTheme.RAISED,.55)
 	buttons.tool.get_child(1).text = "상호작용" if target != null else "대상을 가리키세요"

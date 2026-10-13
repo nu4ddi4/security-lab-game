@@ -120,9 +120,11 @@ def main():
         directory = Path(temporary)
         target = directory / 'project'
         target.mkdir()
-        build.stage(root / 'godot', target)
+        # Data packs are a Windows feature: Android keeps the game scene as its main scene.
+        build.stage(root / 'godot', target, '.'.join(subprocess.check_output([godot, '--version'], text=True).split('.')[:3]), launcher=False)
         identity_path = target / 'prototype/build_info.json'
         identity = json.loads(identity_path.read_text(encoding='utf-8'))
+        identity.pop('compat', None)
         identity['platform'] = 'android'
         identity['commit'] = source_sha
         identity_path.write_text(json.dumps(identity), encoding='utf-8')
@@ -132,7 +134,7 @@ def main():
         project = project.replace('[application]', '[application]\nconfig/icon="res://android/app-icon.svg"')
         project = project.replace('textures/vram_compression/import_etc2_astc=false', 'textures/vram_compression/import_etc2_astc=true')
         project += '\n[input_devices]\npointing/emulate_touch_from_mouse=false\npointing/emulate_mouse_from_touch=true\n'
-        project = project.replace('window/stretch/mode="canvas_items"', 'window/stretch/mode="canvas_items"\nwindow/handheld/orientation=6')
+        project = project.replace('window/stretch/mode="canvas_items"', 'window/stretch/mode="canvas_items"\nwindow/handheld/orientation=4')
         (target / 'project.godot').write_text(project, encoding='utf-8')
         build.check(godot, target)
         configure_editor(sdk, java)

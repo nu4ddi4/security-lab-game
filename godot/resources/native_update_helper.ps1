@@ -88,6 +88,15 @@ function Restore-UpdateRegistry([string]$Channel, $Snapshot, [string]$Product='S
         } } finally { $key.Dispose() }
     }
 }
+function Remove-UpdateRegistry([string]$Channel, [string]$Product='SecurityLabNative') {
+    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree('Software\Microsoft\Windows\CurrentVersion\Uninstall\'+$Product+'-'+$Channel+'_is1',$false)
+}
+# Only the beta product moves between stable and beta (the opt-in beta preview and
+# the way back). Dev installs stay on their own channel.
+function Test-UpdateChannelTransition([bool]$Beta, [string]$Current, [string]$Target) {
+    if ($Target -ceq $Current) { return $true }
+    $Beta -and $Current -in @('stable','beta') -and $Target -in @('stable','beta')
+}
 function ConvertTo-ProcessArgument([string]$Value) {
     '"'+[regex]::Replace([regex]::Replace($Value,'(\\*)"','$1$1\"'),'(\\+)$','$1$1')+'"'
 }
@@ -119,7 +128,7 @@ function Test-NewerUpdateVersion([string]$Remote,[string]$Current) {
     return $ap.Count -gt $bp.Count
 }
 function Invoke-SecurityLabUpdate([string]$TransactionPath) {
-    $stageRoot = ''; $installerLock = $null; $backupReady = $false; $newProcess = $null; $parentProcess = $null; $installStarted = $false
+    $stageRoot = ''; $installerLock = $null; $backupReady = $false; $targetRegistrySnapshot = $null; $newProcess = $null; $parentProcess = $null; $installStarted = $false
     try {
         $transactionPath = Assert-LocalPath $TransactionPath
         $stageRoot = [IO.Path]::GetDirectoryName($transactionPath)
@@ -132,12 +141,18 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         $request = Get-Content -LiteralPath $transactionPath -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($request.schema -ne 1 -or $request.token -cne $nonce) { throw 'Invalid transaction identity' }
         Assert-UpdateBuild $request.current; Assert-UpdateBuild $request.target
-        $channel = $request.current.channel
+        # `current` is what the running game reports (a downloaded data pack can be newer than
+        # the executable); `installed` is the executable's own identity on disk.
+        $installed = if ($request.PSObject.Properties['installed']) { $request.installed } else { $request.current }
+        Assert-UpdateBuild $installed
+        if ($installed.app_id -cne $request.current.app_id) { throw 'Product mismatch' }
+        $channel = $installed.channel
         if ($request.target.app_id -cne $request.current.app_id) { throw 'Product mismatch' }
         $beta = $request.current.app_id -eq 'security-lab-beta'
         if ($stageRoot -ne $(if ($beta) {$betaStage} else {$expectedStage})) { throw 'Product stage mismatch' }
         $product = if ($beta) {'SecurityLabBeta'} else {'SecurityLabNative'}
-        if ($request.target.channel -cne $channel) { throw 'Channel mismatch' }
+        $targetChannel = $request.target.channel
+        if (-not (Test-UpdateChannelTransition $beta $channel $targetChannel)) { throw 'Channel mismatch' }
         if (-not (Test-NewerUpdateVersion $request.target.version $request.current.version)) { throw 'Downgrade or duplicate version rejected' }
         if ($request.parent_pid -le 0 -or $request.parent_pid -gt 2147483647 -or $request.parent_pid -ne [Math]::Floor($request.parent_pid)) { throw 'Invalid parent PID' }
         if ($request.target.sha256 -cnotmatch '^[0-9a-f]{64}$' -or $request.target.exe_sha256 -cnotmatch '^[0-9a-f]{64}$' -or $request.target.size -lt 1024 -or $request.target.size -gt 512MB) { throw 'Invalid payload digest or size' }
@@ -148,7 +163,7 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         $appExe = Join-Path $installRoot 'SecurityLab.exe'
         $sidecar = Get-Content -LiteralPath (Join-Path $installRoot 'build_info.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         $marker = Get-Content -LiteralPath (Join-Path $installRoot 'securitylab.install.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($marker.app_id -cne $request.current.app_id -or $marker.channel -cne $channel -or $marker.install_layout -ne 1 -or $sidecar.version -cne $request.current.version -or $sidecar.commit -cne $request.current.commit -or $sidecar.channel -cne $channel) { throw 'Installed identity mismatch' }
+        if ($marker.app_id -cne $request.current.app_id -or $marker.channel -cne $channel -or $marker.install_layout -ne 1 -or $sidecar.version -cne $installed.version -or $sidecar.commit -cne $installed.commit -or $sidecar.channel -cne $channel) { throw 'Installed identity mismatch' }
         $null = Get-UpdateTree $installRoot
         $parentProcess = [Diagnostics.Process]::GetProcessById([int]$request.parent_pid)
         if ($parentProcess.MainModule.FileName -ne $appExe) { throw 'Parent process is not this installation' }
@@ -164,7 +179,7 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         $inventory = @(Get-UpdateTree $installRoot)
         Copy-UpdateTree $installRoot $backupRoot $inventory
         $saveSnapshot = @()
-        $saveNames = if ($beta) {@('investigation/save.json','investigation/save.backup.json','controls.cfg',('beta-update-settings-'+$channel+'.json'))} else {@('progress.json','progress.backup.json')}
+        $saveNames = if ($beta) {@('investigation/save.json','investigation/save.backup.json','controls.cfg','beta-settings.json','input_bindings.json',('beta-update-settings-'+$channel+'.json'),('beta-update-settings-'+$targetChannel+'.json')) | Select-Object -Unique} else {@('progress.json','progress.backup.json')}
         foreach ($saveName in $saveNames) {
             $savePath = Join-Path $progressRoot $saveName
             $exists = Test-Path -LiteralPath $savePath
@@ -178,7 +193,8 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
             $saveSnapshot += @{name=$saveName;exists=$exists;sha256=$saveHash}
         }
         $registrySnapshot = Get-UpdateRegistry $channel $product
-        Write-UpdateJson (Join-Path $stageRoot 'backup.json') @{files=$inventory;saves=$saveSnapshot;registry=$registrySnapshot;install=$installRoot;data=$progressRoot;channel=$channel}
+        if ($targetChannel -cne $channel) { $targetRegistrySnapshot = Get-UpdateRegistry $targetChannel $product }
+        Write-UpdateJson (Join-Path $stageRoot 'backup.json') @{files=$inventory;saves=$saveSnapshot;registry=$registrySnapshot;registry_target=$targetRegistrySnapshot;install=$installRoot;data=$progressRoot;channel=$channel;target_channel=$targetChannel}
         $backupReady = $true
         # Hold a read-only, non-delete-sharing handle through installer execution.
         if ((Get-UpdateHash $installer).ToLowerInvariant() -cne $request.target.sha256) { throw 'Installer changed immediately before install' }
@@ -195,7 +211,7 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         $newBuild = Get-Content -LiteralPath (Join-Path $installRoot 'build_info.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         Assert-UpdateBuild $newBuild
         $newMarker = Get-Content -LiteralPath (Join-Path $installRoot 'securitylab.install.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($newBuild.channel -cne $channel -or $newBuild.version -cne $request.target.version -or $newBuild.commit -cne $request.target.commit -or $newMarker.app_id -cne $request.current.app_id -or $newMarker.channel -cne $channel -or (Get-UpdateHash $appExe).ToLowerInvariant() -cne $request.target.exe_sha256) { throw 'Installed payload identity/digest mismatch' }
+        if ($newBuild.channel -cne $targetChannel -or $newBuild.version -cne $request.target.version -or $newBuild.commit -cne $request.target.commit -or $newMarker.app_id -cne $request.current.app_id -or $newMarker.channel -cne $targetChannel -or (Get-UpdateHash $appExe).ToLowerInvariant() -cne $request.target.exe_sha256) { throw 'Installed payload identity/digest mismatch' }
         Write-UpdateJson (Join-Path $stageRoot 'result.json') @{state='verifying_startup';token=$nonce}
         $newProcess = Start-UpdateProcess $appExe @('--','--disable-updates',('--update-relaunch='+$nonce))
         $healthy = $false
@@ -211,6 +227,8 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
         }
         if (-not $healthy -or $newProcess.WaitForExit(1000)) { throw 'New game did not complete startup health check' }
         Write-UpdateJson (Join-Path $stageRoot 'result.json') @{state='installed';token=$nonce;version=$newBuild.version;pid=$newProcess.Id}
+        # A channel switch installs under the target channel's product entry; drop the old one.
+        if ($targetChannel -cne $channel) { try { Remove-UpdateRegistry $channel $product } catch { } }
         $null = Assert-ChildPath $stageRoot $backupRoot
         Remove-Item -LiteralPath $backupRoot -Recurse -Force
         $installerLock.Dispose(); $installerLock=$null
@@ -236,6 +254,7 @@ function Invoke-SecurityLabUpdate([string]$TransactionPath) {
                     } elseif (Test-Path -LiteralPath $destination) { Remove-Item -LiteralPath $destination -Force }
                 }
                 Restore-UpdateRegistry $channel $registrySnapshot $product
+                if ($null -ne $targetRegistrySnapshot) { Restore-UpdateRegistry $targetChannel $targetRegistrySnapshot $product }
                 Write-UpdateJson (Join-Path $stageRoot 'result.json') @{state='rolled_back';token=$nonce;error=$failure;backup=$backupRoot}
                 $oldProcess = Start-UpdateProcess $appExe @('--','--disable-updates',('--update-rollback='+$nonce))
                 return 1
