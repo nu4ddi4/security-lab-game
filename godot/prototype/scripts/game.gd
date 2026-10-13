@@ -272,7 +272,7 @@ func check_updates():
 func frame_speaker(id: String):
 	if not targets.has(id): return
 	if not dialogue_camera_active:
-		dialogue_camera_fov = 72.0
+		dialogue_camera_fov = player.camera.fov
 		dialogue_camera_active = true
 	if dialogue_camera_tween != null: dialogue_camera_tween.kill()
 	var head = investigation_environment.speaker_position(id) if detailed_world else targets[id].global_position + Vector3(0,.55,0)

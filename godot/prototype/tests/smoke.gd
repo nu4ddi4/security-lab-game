@@ -46,6 +46,9 @@ func run(game: InvestigationPrototype):
 		tap.pressed = false
 		Input.parse_input_event(tap)
 		game.ui.close()
+		await game.dialogue_camera_tween.finished
+	var original_fov = game.player.camera.fov
+	game.player.camera.fov = 90.0
 	var camera_pose = game.player.camera.global_transform
 	game._use("oh","npc",true)
 	await game.dialogue_camera_tween.finished
@@ -60,6 +63,9 @@ func run(game: InvestigationPrototype):
 	var framed_pose = game.player.camera.global_transform
 	game.ui.close()
 	if not game.player.camera.global_transform.is_equal_approx(framed_pose): failures.append("Closing dialogue preserves the current camera angle")
+	await game.dialogue_camera_tween.finished
+	if not is_equal_approx(game.player.camera.fov,90.0): failures.append("Closing dialogue restores the player's custom field of view")
+	game.player.camera.fov = original_fov
 	game.player.look(Vector2(1,0))
 	if absf(game.player.camera.rotation.y) > .001: failures.append("Framed camera yaw is synchronized with movement")
 	game.dispatch({"type":"dialogue","payload":{"id":"park_intro"}})
@@ -143,6 +149,7 @@ func run(game: InvestigationPrototype):
 	game.ui.open_tablet(4)
 	game.ui.settings_screen.close_editor()
 	if game.ui.mode != "field" or not game.player.enabled or game.ui.modal.visible: failures.append("Closing settings returns to the game")
+	settings_checks(game,failures)
 	game.ui.open_tablet(4)
 	game.ui.close()
 	await get_tree().process_frame
@@ -298,6 +305,30 @@ func run(game: InvestigationPrototype):
 	if report != null: report.store_string(JSON.stringify(summary))
 	print("INVESTIGATION_SMOKE ",JSON.stringify(summary))
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+func settings_checks(game, failures: Array):
+	var original = game.settings.values.duplicate(true)
+	var viewport = game.get_viewport()
+	var original_scale = viewport.scaling_3d_scale
+	var original_msaa = viewport.msaa_3d
+	for quality in range(4):
+		var candidate = original.duplicate(true)
+		candidate.quality = quality
+		candidate.master = .2
+		if not game.settings.save_values(candidate).ok: failures.append("Settings save succeeds for quality "+str(quality))
+		var expected_scale = .65 if game.controls.mobile else (.8 if quality == 0 else 1.0)
+		var expected_msaa = Viewport.MSAA_DISABLED if game.controls.mobile else [Viewport.MSAA_DISABLED,Viewport.MSAA_2X,Viewport.MSAA_4X,Viewport.MSAA_8X][quality]
+		if not is_equal_approx(viewport.scaling_3d_scale,expected_scale) or viewport.msaa_3d != expected_msaa:
+			failures.append("Settings save preserves the platform's rendering profile at quality "+str(quality))
+		var reloaded = LabSettings.new()
+		game.add_child(reloaded)
+		reloaded.setup(game)
+		if reloaded.values.quality != quality or not is_equal_approx(viewport.scaling_3d_scale,expected_scale) or viewport.msaa_3d != expected_msaa:
+			failures.append("Reloading settings preserves the platform's rendering profile at quality "+str(quality))
+		reloaded.queue_free()
+	if not game.settings.save_values(original).ok: failures.append("Original settings can be restored after the review")
+	viewport.scaling_3d_scale = original_scale
+	viewport.msaa_3d = original_msaa
 
 func _dummy_server_pose(game):
 	game.player.global_position = Vector3(0,.01,-2)
