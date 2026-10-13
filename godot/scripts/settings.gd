@@ -39,8 +39,9 @@ func apply():
 	apply_window()
 	var quality = int(values.quality)
 	var viewport = get_viewport()
-	viewport.msaa_3d = [Viewport.MSAA_DISABLED,Viewport.MSAA_2X,Viewport.MSAA_4X,Viewport.MSAA_8X][quality]
-	viewport.scaling_3d_scale = .8 if quality == 0 else 1.0
+	var mobile = OS.has_feature("mobile") or "--mobile-qa" in OS.get_cmdline_user_args()
+	viewport.msaa_3d = Viewport.MSAA_DISABLED if mobile else [Viewport.MSAA_DISABLED,Viewport.MSAA_2X,Viewport.MSAA_4X,Viewport.MSAA_8X][quality]
+	viewport.scaling_3d_scale = .65 if mobile else (.8 if quality == 0 else 1.0)
 	var native_advanced = RenderingServer.get_current_rendering_method() == "forward_plus"
 	if game.world != null: apply_graphics(quality,native_advanced)
 	AudioServer.set_bus_volume_db(0,linear_to_db(maxf(values.master,.0001)))
