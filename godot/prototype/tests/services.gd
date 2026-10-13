@@ -63,6 +63,16 @@ func run():
 	var culled = InvestigationEnvironment.without_region(cull_mesh,Transform3D(),AABB(Vector3(4,-1,-1),Vector3(3,3,2)))
 	check(culled.surface_get_arrays(0)[Mesh.ARRAY_INDEX].size() == 3,"Culling removes only the triangles inside the box")
 	check(InvestigationEnvironment.without_region(cull_mesh,Transform3D(),AABB(Vector3(-1,-1,-1),Vector3(20,3,2))).get_surface_count() == 0,"Culling can empty a surface")
+	var override_target = "user://qa/override-test.cfg"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(override_target))
+	check(LabSettings.write_override(override_target,1) == "" and FileAccess.get_file_as_string(override_target).contains("forward_plus") and FileAccess.get_file_as_string(override_target).begins_with(LabSettings.OVERRIDE_HEADER),"Advanced renderer is stored in an override file")
+	check(LabSettings.write_override(override_target,0) == "" and not FileAccess.file_exists(override_target),"Choosing the compatible renderer removes that file")
+	write(override_target,"[rendering]
+something=else
+")
+	check(LabSettings.write_override(override_target,1) != "" and FileAccess.get_file_as_string(override_target).begins_with("[rendering]"),"A foreign override file is never overwritten")
+	check(LabSettings.write_override(override_target,0) != "" and FileAccess.file_exists(override_target),"A foreign override file is never deleted")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(override_target))
 	var reset_root = "user://qa/reset-test"
 	write(reset_root.path_join("investigation/save.json"),"progress")
 	write(reset_root.path_join("investigation/nested/save.backup.json"),"backup")

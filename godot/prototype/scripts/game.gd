@@ -127,7 +127,7 @@ func _ready():
 	load_timings.ready_ms = Time.get_ticks_msec()-load_started
 	print("PROTOTYPE_LOADING ",JSON.stringify(load_timings))
 	loading.queue_free()
-	print("PROTOTYPE_READY ",JSON.stringify({"day":state.day,"dummy":not detailed_world,"devices":content.case.devices.size(),"npcs":content.case.npcs.size(),"isolatedSave":store.directory}))
+	print("PROTOTYPE_READY ",JSON.stringify({"day":state.day,"dummy":not detailed_world,"devices":content.case.devices.size(),"npcs":content.case.npcs.size(),"isolatedSave":store.directory,"renderer":RenderingServer.get_current_rendering_method()}))
 	if DisplayServer.get_name() != "headless": _report_first_frame.call_deferred()
 	if testing:
 		var smoke = load("res://tests/input_review.gd" if "--prototype-input-review" in OS.get_cmdline_user_args() else "res://prototype/tests/smoke.gd").new()

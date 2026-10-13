@@ -272,7 +272,11 @@ func build_display(page: VBoxContainer):
 		check.button_pressed = game.settings.values[entry[0]]
 		body.add_child(check)
 		fields[entry[0]] = check
-	text(body,"현재 렌더러: "+RenderingServer.get_current_rendering_method()+"\n지원하는 효과만 적용합니다.",13,InvestigationTheme.TEXT_DIM)
+	fields.renderer = setting_options(body,"렌더러",["호환 · OpenGL (어느 PC에서나 안정적)","고급 · Vulkan (그림자·AO·글로우, 지원하는 GPU 필요)"],game.settings.values.renderer)
+	fields.renderer.disabled = not LabSettings.renderer_choice_available()
+	var running = "고급 (Vulkan)" if RenderingServer.get_current_rendering_method() == "forward_plus" else "호환 (OpenGL)"
+	var note = "지금 실행 중: "+running+(" · 렌더러는 다시 시작한 뒤 바뀝니다.\nGPU가 지원하지 않으면 자동으로 호환 렌더러로 시작합니다." if LabSettings.renderer_choice_available() else " · 설치형 Windows 빌드에서 바꿀 수 있습니다.")
+	text(body,note+"\n지원하는 효과만 적용합니다.",13,InvestigationTheme.TEXT_DIM)
 
 func build_sound(page: VBoxContainer):
 	var body = card(page)

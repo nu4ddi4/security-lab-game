@@ -9,6 +9,11 @@ var player: LabPlayer
 var functional: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/functional.json"))
 var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://resources/native-layout.json"))
 
+# The ceiling sits 0.3 m above the fill lights, so they graze it and light it in uneven cloud-like
+# patches. It gets its own render layer: the fills skip it and one soft upward light bounces off the floor.
+const CEILING_LAYER = 2
+const CEILING_MESHES = ["CORP_Suspended_Acoustic_Tiles","RL_Ceiling_T_Grid"]
+
 func setup(actor: LabPlayer, office: PackedScene = null):
 	player = actor
 	model = (office if office != null else load("res://assets/models/Interior_07_Godot.glb")).instantiate()
@@ -59,6 +64,7 @@ func collect(node: Node):
 				node.set_meta("source_name",source_id)
 				protected_nodes[source_id] = node
 	if node is MeshInstance3D:
+		if str(node.name) in CEILING_MESHES: node.layers |= CEILING_LAYER
 		for surface in range(node.mesh.get_surface_count()):
 			var material = node.mesh.surface_get_material(surface)
 			if material is StandardMaterial3D:
@@ -115,7 +121,16 @@ func lighting():
 		light.omni_range = spec[4]
 		light.omni_attenuation = 1.1
 		light.light_specular = .08
+		light.light_cull_mask = 0xFFFFF & ~CEILING_LAYER
 		add_child(light)
+	var bounce = DirectionalLight3D.new()
+	bounce.name = "CeilingBounce"
+	bounce.rotation_degrees = Vector3(90,0,0)
+	bounce.light_color = Color(.86,.91,1)
+	bounce.light_energy = .36
+	bounce.light_specular = 0
+	bounce.light_cull_mask = CEILING_LAYER
+	add_child(bounce)
 	if RenderingServer.get_current_rendering_method() == "forward_plus":
 		var probe = ReflectionProbe.new()
 		probe.name = "OfficeReflection"
