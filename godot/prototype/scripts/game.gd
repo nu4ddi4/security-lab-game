@@ -340,6 +340,11 @@ func new_game():
 	ui.refresh()
 	save_now()
 
+func quit_game():
+	if updater != null and updater.state == "preparing": return
+	save_now()
+	get_tree().quit()
+
 # Returns how many files were removed.
 func reset_all_data() -> int:
 	var removed = InvestigationDataReset.wipe(InvestigationDataReset.targets(self))
@@ -388,9 +393,7 @@ func _notification(what):
 	if what in [NOTIFICATION_APPLICATION_PAUSED,NOTIFICATION_APPLICATION_FOCUS_OUT] and ui != null:
 		save_now()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and ui != null:
-		if updater!=null and updater.state=="preparing": return
-		save_now()
-		get_tree().quit()
+		quit_game()
 
 func _box(position: Vector3, size: Vector3, color: Color, collision = true):
 	var mesh = MeshInstance3D.new()

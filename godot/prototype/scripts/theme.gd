@@ -181,6 +181,16 @@ static func build(mobile: bool) -> Theme:
 
 	theme.set_stylebox("panel","PanelContainer",box(RAISED))
 	_variation(theme,"ModalPanel","PanelContainer",box(SURFACE,BORDER_STRONG,14,22))
+	var dialogue = box(Color(.02,.04,.058,.93),ACCENT.darkened(.35),18,18,1)
+	dialogue.border_width_top = 3
+	dialogue.border_color = ACCENT.darkened(.1)
+	dialogue.shadow_color = Color(0,0,0,.5)
+	dialogue.shadow_size = 18
+	dialogue.content_margin_left = 26
+	dialogue.content_margin_right = 26
+	_variation(theme,"DialoguePanel","PanelContainer",dialogue)
+	var portrait = box(ACCENT_FILL,ACCENT,23,0,2)
+	_variation(theme,"PortraitPanel","PanelContainer",portrait)
 	_variation(theme,"ShellRoot","PanelContainer",box(Color(0,0,0,0),Color(0,0,0,0),0,24,0))
 	_variation(theme,"ShellPanel","PanelContainer",box(Color(.06,.1,.125,.8),BORDER_STRONG,14,20))
 	_variation(theme,"CardPanel","PanelContainer",box(Color(.035,.065,.085,.74),BORDER,10,14))

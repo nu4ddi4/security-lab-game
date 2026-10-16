@@ -47,6 +47,8 @@ var messenger: VBoxContainer
 var contact_title: Label
 var contact = "oh"
 var dialogue_title: Label
+var dialogue_role: Label
+var dialogue_portrait: Label
 var conversation: RichTextLabel
 var dialogue_questions: VBoxContainer
 var speaker = ""
@@ -372,20 +374,48 @@ func _build_terminal():
 
 func _build_dialogue():
 	dialogue_panel = panel(.16,.505,.84,.96)
-	dialogue_panel.add_theme_stylebox_override("panel",InvestigationTheme.box(InvestigationTheme.SURFACE,InvestigationTheme.BORDER_STRONG,14,16))
+	dialogue_panel.theme_type_variation = "DialoguePanel"
 	dialogue_panel.name = "Dialogue"
 	if game.controls.mobile:
 		dialogue_panel.anchor_left = .03
 		dialogue_panel.anchor_right = .97
 		dialogue_panel.anchor_top = .46
 	var body = VBoxContainer.new()
+	body.add_theme_constant_override("separation",8)
 	dialogue_panel.add_child(body)
-	dialogue_title = heading(body,"")
+	var head = HBoxContainer.new()
+	head.add_theme_constant_override("separation",12)
+	body.add_child(head)
+	var portrait = PanelContainer.new()
+	portrait.theme_type_variation = "PortraitPanel"
+	portrait.custom_minimum_size = Vector2(46,46)
+	head.add_child(portrait)
+	dialogue_portrait = Label.new()
+	dialogue_portrait.theme_type_variation = "TitleLabel"
+	dialogue_portrait.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dialogue_portrait.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	portrait.add_child(dialogue_portrait)
+	var who = VBoxContainer.new()
+	who.alignment = BoxContainer.ALIGNMENT_CENTER
+	who.add_theme_constant_override("separation",0)
+	who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(who)
+	dialogue_title = label(who,"","HeadingLabel")
+	dialogue_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	dialogue_role = label(who,"","CaptionLabel")
+	dialogue_role.autowrap_mode = TextServer.AUTOWRAP_OFF
+	var leave = button(head,"닫기" if game.controls.touch_enabled else "닫기 · Esc",close)
+	leave.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var rule = ColorRect.new()
+	rule.color = Color(InvestigationTheme.ACCENT,.35)
+	rule.custom_minimum_size.y = 1
+	body.add_child(rule)
 	conversation = RichTextLabel.new()
 	conversation.custom_minimum_size.y = 64 if game.controls.mobile else 80
 	conversation.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	conversation.bbcode_enabled = true
 	conversation.selection_enabled = not game.controls.mobile
+	for size in ["normal_font_size","bold_font_size"]: conversation.add_theme_font_size_override(size,17 if game.controls.mobile else 19)
 	body.add_child(conversation)
 	dialogue_scroll = ScrollContainer.new()
 	dialogue_scroll.custom_minimum_size.y = 72 if game.controls.mobile else 64
@@ -587,7 +617,7 @@ func refresh_dialogue():
 	var questions = game.engine.project(game.state).questions
 	for question in questions:
 		if question.npc == speaker and question.channel == "dialogue" and question_visible(question.id):
-			var choice = button(dialogue_questions,question.label,ask.bind(question.id),"ChoiceButton")
+			var choice = button(dialogue_questions,"%d   %s" % [dialogue_questions.get_child_count()+1,question.label],ask.bind(question.id),"ChoiceButton")
 			choice.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	if dialogue_questions.get_child_count() == 0: label(dialogue_questions,"지금 더 물어볼 내용이 없습니다.")
 	fit_choices.call_deferred()
@@ -605,8 +635,8 @@ func speech(text: String) -> String:
 	var safe = text.replace("[","[lb]")
 	var lines = safe.split("\n",true,1)
 	var name = game.content.case.npcs.get(speaker,{}).get("name","")
-	if lines.size() == 2 and not name.is_empty() and lines[0].strip_edges() == name:
-		return "[color=#%s][b]%s[/b][/color]\n%s" % [InvestigationTheme.ACCENT.to_html(false),lines[0],lines[1]]
+	# The speaker already has a name plate above the conversation.
+	if lines.size() == 2 and not name.is_empty() and lines[0].strip_edges() == name: return lines[1]
 	return safe
 
 func ask(id: String):
@@ -831,7 +861,9 @@ func open_dialogue(id: String):
 	speaker = id
 	_show("dialogue",dialogue_panel)
 	var npc = game.content.case.npcs[id]
-	dialogue_title.text = npc.name+" · "+npc.role
+	dialogue_title.text = npc.name
+	dialogue_role.text = npc.role
+	dialogue_portrait.text = npc.name.substr(0,1)
 	conversation.text = "무엇을 확인하시겠어요?"
 	refresh_dialogue()
 	game.frame_speaker(id)
@@ -982,6 +1014,16 @@ func _input(event: InputEvent):
 	elif event is InputEventScreenDrag and event.index == scroll_finger and touch_scroll != null:
 		touch_scroll.value -= event.relative.y
 		get_viewport().set_input_as_handled()
+
+# Number keys pick the matching conversation choice.
+func _unhandled_key_input(event: InputEvent):
+	if mode != "dialogue" or not event.pressed or event.echo: return
+	var index = event.keycode-KEY_1
+	if index < 0 or index >= dialogue_questions.get_child_count(): return
+	var choice = dialogue_questions.get_child(index)
+	if choice is Button:
+		get_viewport().set_input_as_handled()
+		choice.pressed.emit()
 
 func investigation_assigned() -> bool:
 	return game.engine.investigation_assigned(game.state)

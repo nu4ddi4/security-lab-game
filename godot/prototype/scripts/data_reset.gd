@@ -37,7 +37,7 @@ static func summary() -> String:
 # The confirm button unlocks after a short countdown so it cannot be hit by accident.
 static func confirm(game: InvestigationPrototype):
 	var dialog = ConfirmationDialog.new()
-	game.ui.localize_dialog(dialog,"데이터 전체 초기화","모두 삭제")
+	game.ui.localize_dialog(dialog,"게임 초기화","모두 삭제")
 	dialog.dialog_text = summary()
 	game.ui.root.add_child(dialog)
 	var ok = dialog.get_ok_button()

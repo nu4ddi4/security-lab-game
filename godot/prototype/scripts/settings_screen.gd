@@ -69,11 +69,6 @@ func _ready():
 	surface.add_child(background)
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	background.material = InvestigationTheme.backdrop_material()
-	var shade = ColorRect.new()
-	shade.color = Color(InvestigationTheme.BACKDROP,.4)
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	surface.add_child(shade)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var margin = MarginContainer.new()
 	surface.add_child(margin)
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -83,7 +78,7 @@ func _ready():
 	margin.add_child(body)
 	var assigned = game.ui.investigation_assigned()
 	var close_button = Button.new()
-	close_button.text = "닫기"
+	close_button.text = "닫기" if game.controls.touch_enabled else "닫기 · Esc"
 	close_button.custom_minimum_size.y = 48 if game.controls.mobile else 34
 	close_button.add_theme_font_size_override("font_size",16 if game.controls.mobile else 14)
 	close_button.pressed.connect(func(): close_editor())
@@ -222,6 +217,14 @@ func build_controls(page: VBoxContainer):
 	text(mouse_options,"터치: 왼쪽 엄지 이동 · 오른쪽 쓸어 시점\n장비를 탭해 선택한 뒤 상호작용합니다.",14)
 
 func build_general(page: VBoxContainer):
+	var session = card(page)
+	text(session,"게임",20)
+	text(session,"진행은 자동으로 저장됩니다. 초기화하면 이 기기의 진행·메모·설정이 모두 지워지고 처음부터 시작합니다.",14,InvestigationTheme.TEXT_DIM)
+	var session_row = HBoxContainer.new()
+	session_row.add_theme_constant_override("separation",10)
+	session.add_child(session_row)
+	action_button(session_row,"게임 종료…",func(): game.ui.confirm("지금까지의 진행을 저장하고 게임을 종료할까요?",game.quit_game))
+	action_button(session_row,"게임 초기화…",func(): InvestigationDataReset.confirm(game)).theme_type_variation = "DangerButton"
 	var updates = card(page)
 	text(updates,"업데이트",20)
 	text(updates,"현재 빌드 · "+running_version(),14)
@@ -246,10 +249,6 @@ func build_general(page: VBoxContainer):
 	game.ui.update_download = action_button(updates,"업데이트 확인하고 설치…",func():
 		if game.updater != null: game.updater.request_install()
 		else: game.ui.confirm("업데이트를 다운로드할까요? 저장은 유지됩니다.",game.updates.open_download))
-	var reset = card(page)
-	text(reset,"데이터 전체 초기화",20)
-	text(reset,"이 기기에 저장된 조사 진행·메모·설정을 모두 지우고 처음 상태로 시작합니다. 삭제 전에 지워지는 항목을 확인합니다.",14,InvestigationTheme.TEXT_DIM)
-	action_button(reset,"데이터 전체 초기화…",func(): InvestigationDataReset.confirm(game)).theme_type_variation = "DangerButton"
 	var diagnostics = card(page)
 	text(diagnostics,"진단 / 지원",20)
 	text(diagnostics,"이 기기에서만 수집합니다. 저장 원문·계정·네트워크 주소는 포함하지 않습니다.",14,InvestigationTheme.TEXT_DIM)
