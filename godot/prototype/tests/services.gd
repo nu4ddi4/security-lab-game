@@ -63,6 +63,15 @@ func run():
 	var culled = InvestigationEnvironment.without_region(cull_mesh,Transform3D(),AABB(Vector3(4,-1,-1),Vector3(3,3,2)))
 	check(culled.surface_get_arrays(0)[Mesh.ARRAY_INDEX].size() == 3,"Culling removes only the triangles inside the box")
 	check(InvestigationEnvironment.without_region(cull_mesh,Transform3D(),AABB(Vector3(-1,-1,-1),Vector3(20,3,2))).get_surface_count() == 0,"Culling can empty a surface")
+	var tile = ArrayMesh.new()
+	var tile_arrays = []
+	tile_arrays.resize(Mesh.ARRAY_MAX)
+	tile_arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array([Vector3(0,0,0),Vector3(1,0,0),Vector3(0,0,1),Vector3(1,0,1)])
+	tile_arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array([Vector3.RIGHT,Vector3.RIGHT,Vector3.RIGHT,Vector3.RIGHT])
+	tile_arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0,1,2,1,3,2])
+	tile.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,tile_arrays)
+	var flat_normals = LabWorld.flat_shaded(tile).surface_get_arrays(0)[Mesh.ARRAY_NORMAL]
+	check(flat_normals.size() == 6 and Array(flat_normals).all(func(normal): return absf(absf(normal.y)-1.0) < .001),"Flat-shaded meshes get one face normal per triangle")
 	var override_target = "user://qa/override-test.cfg"
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(override_target))
 	check(LabSettings.write_override(override_target,1) == "" and FileAccess.get_file_as_string(override_target).contains("forward_plus") and FileAccess.get_file_as_string(override_target).begins_with(LabSettings.OVERRIDE_HEADER),"Advanced renderer is stored in an override file")

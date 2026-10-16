@@ -13,6 +13,9 @@ var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://
 # patches. It gets its own render layer: the fills skip it and one soft upward light bounces off the floor.
 const CEILING_LAYER = 2
 const CEILING_MESHES = ["CORP_Suspended_Acoustic_Tiles","RL_Ceiling_T_Grid"]
+# The server-room floor tiles ship with normals smoothed across their bevels, so every tile shades like a
+# pillow. Hard-edged tiles light correctly.
+const FLAT_SHADED_MESHES = ["CORP_Server_Antistatic_Tiles"]
 
 func setup(actor: LabPlayer, office: PackedScene = null):
 	player = actor
@@ -65,6 +68,7 @@ func collect(node: Node):
 				protected_nodes[source_id] = node
 	if node is MeshInstance3D:
 		if str(node.name) in CEILING_MESHES: node.layers |= CEILING_LAYER
+		if str(node.name) in FLAT_SHADED_MESHES: node.mesh = flat_shaded(node.mesh)
 		for surface in range(node.mesh.get_surface_count()):
 			var material = node.mesh.surface_get_material(surface)
 			if material is StandardMaterial3D:
@@ -82,6 +86,32 @@ func collect(node: Node):
 					glass.refraction_enabled = false
 					node.set_surface_override_material(surface,glass)
 	for child in node.get_children(): collect(child)
+
+# Every triangle gets its own vertices and its own face normal.
+static func flat_shaded(source: Mesh) -> ArrayMesh:
+	var result = ArrayMesh.new()
+	for surface in source.get_surface_count():
+		var arrays = source.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var uvs = arrays[Mesh.ARRAY_TEX_UV]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array(range(vertices.size()))
+		var flat = PackedVector3Array()
+		var normals = PackedVector3Array()
+		var flat_uvs = PackedVector2Array()
+		for i in range(0,indices.size()-2,3):
+			var normal = Plane(vertices[indices[i]],vertices[indices[i+1]],vertices[indices[i+2]]).normal
+			for corner in 3:
+				flat.push_back(vertices[indices[i+corner]])
+				normals.push_back(normal)
+				if uvs != null: flat_uvs.push_back(uvs[indices[i+corner]])
+		var flat_arrays = []
+		flat_arrays.resize(Mesh.ARRAY_MAX)
+		flat_arrays[Mesh.ARRAY_VERTEX] = flat
+		flat_arrays[Mesh.ARRAY_NORMAL] = normals
+		if uvs != null: flat_arrays[Mesh.ARRAY_TEX_UV] = flat_uvs
+		result.add_surface_from_arrays(source.surface_get_primitive_type(surface),flat_arrays)
+		result.surface_set_material(surface,source.surface_get_material(surface))
+	return result
 
 func box_collision(body: CollisionObject3D, box: AABB):
 	var shape = BoxShape3D.new()
