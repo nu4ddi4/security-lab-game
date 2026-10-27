@@ -360,12 +360,15 @@ func progression_checks(game, failures: Array):
 	game.ui.open_tablet(0)
 	if game.ui.notes.get_child_count() != game.state.known.size(): failures.append("Read originals remain available before the formal day-four assignment")
 	game.ui.open_tablet(2)
-	game.ui.claim.select(1)
+	if not game.ui.claim.disabled: failures.append("Occurrence claim is unavailable before the player attaches independent originals")
 	for slot in ["scope","access","collection"]:
 		var id = {"scope":"approval","access":"access-night-1","collection":"staging-night-1"}[slot]
 		var picker = game.ui.attachments[slot]
 		for i in range(picker.item_count):
-			if picker.get_item_metadata(i) == id: picker.select(i)
+			if picker.get_item_metadata(i) == id: picker.select(i); picker.item_selected.emit(i)
+	if game.ui.claim.disabled: failures.append("Attached originals open the occurrence claim form")
+	game.ui.claim.select(1)
+	game.ui.claim.item_selected.emit(1)
 	game.ui.submit_report()
 	if not game.state.report.approved or not game.ui.report_submit.disabled: failures.append("Early report grants permission without forcing a duplicate report")
 	close_notices(game)

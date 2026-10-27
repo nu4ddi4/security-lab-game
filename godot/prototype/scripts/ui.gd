@@ -280,11 +280,12 @@ func _build_tablet():
 	messenger.add_theme_constant_override("separation",12)
 	thread.add_child(messenger)
 	report = tab(2)
-	label(report,"발생 보고 접수 · 보고 내용과 인용 원문을 첨부하세요.","CaptionLabel")
+	label(report,"원문을 첨부하고 보고 내용을 작성하세요.","CaptionLabel")
 	var claim_box = card_box(report)
 	label(claim_box,"보고 내용","SectionLabel")
 	claim = OptionButton.new()
-	claim.add_item("주장 선택")
+	claim.add_item("보고 내용 선택")
+	claim.item_selected.connect(func(_index): refresh_report_access())
 	for item in game.content.rules.claims:
 		claim.add_item(item.label)
 		claim.set_item_metadata(claim.item_count-1,item.id)
@@ -297,6 +298,8 @@ func _build_tablet():
 		var option = OptionButton.new()
 		attachments[slot] = option
 		evidence_box.add_child(option)
+		option.item_selected.connect(func(_index): refresh_report_access())
+	report.move_child(claim_box.get_parent(),report.get_child_count()-1)
 	report_submit = button(report,"발생 보고 제출",submit_report,"PrimaryButton")
 	button(report,"대조 기록",func(): case_desk.open(self,false))
 	var summary = PanelContainer.new()
@@ -637,7 +640,6 @@ func refresh():
 		button(row,"메모에 인용",quote_note.bind(record))
 	report_hint.visible = true
 	report_hint.text = "승인 완료 · 제출한 주장과 원본입니다. 감사 권한은 유지되며 다시 제출할 필요가 없습니다." if view.approved else "확인한 원본을 각 근거에 맞게 선택하세요." if not view.notes.is_empty() else "아직 첨부할 원본이 없습니다. 장비에서 원본을 조회하면 이곳에서 선택할 수 있습니다."
-	claim.disabled = view.approved or view.ended
 	if view.approved:
 		for i in range(1,claim.item_count):
 			if claim.get_item_metadata(i) == game.state.report.claim: claim.select(i)
@@ -670,6 +672,17 @@ func refresh():
 	if investigation_assigned(): work.text += "\n\n발생 보고: "+("승인됨 · 감사 권한 유지" if view.approved else "미승인")
 	if view.day == 7: work.text += "\n\n업무 시각 %02d:%02d" % [int(game.state.casework.minute)/60,int(game.state.casework.minute)%60]
 	if view.ended: work.text += "\n\n"+InvestigationResolution.public_ending(game.state)
+	refresh_report_access()
+
+func refresh_report_access():
+	if not is_instance_valid(report_submit): return
+	var ids = []
+	for option in attachments.values():
+		if option.selected <= 0: continue
+		var id = option.get_item_metadata(option.selected)
+		if id not in ids: ids.append(id)
+	claim.disabled = game.state.report.approved or game.state.ended or ids.size() < 2
+	report_submit.disabled = claim.disabled or claim.selected <= 0
 
 func refresh_dialogue():
 	clear(dialogue_questions)
