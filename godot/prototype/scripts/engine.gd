@@ -112,7 +112,9 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 		"status":
 			if device == "server_console" and "service" not in s.baseline: s.baseline.append("service")
 			result = _result(s,"STATUS",_t("STATUS",{"day":s.day,"service":_t("DELAY" if s.ops.backupDelay else "NORMAL"),"index":_t("NORMAL" if s.ops.indexHealthy else "DAMAGED"),"task":_t("HELD" if s.tasks["T-17"].held else "RUNNING" if s.tasks["T-17"].status == "running" else "SCHEDULED")}))
-		"checklist": result = _result(s,"CHECKLIST", "\n".join(missing_work(s)))
+		"checklist":
+			var missing = missing_work(s)
+			result = _result(s,"CHECKLIST",_t("CHECKLIST_COMPLETE") if missing.is_empty() else "\n".join(missing))
 		"read": result = _read(s,str(payload.get("kind","")))
 		"backup_disable", "backup_enable":
 			var enable = kind == "backup_enable"

@@ -21,10 +21,13 @@ var prompt_panel: PanelContainer
 var dot: Crosshair
 var checklist: VBoxContainer
 var report_hint: Label
+var report_submit: Button
+var end_day_button: Button
 var toast: PanelContainer
 var message: Label
 var source: Label
 var terminal: RichTextLabel
+var terminal_objective: Label
 var command_input: LineEdit
 var command_list: VBoxContainer
 var command_sidebar: VBoxContainer
@@ -44,6 +47,7 @@ var command_history = {}
 var history_index = 0
 var notes: VBoxContainer
 var messenger: VBoxContainer
+var latest_message: Control
 var contact_title: Label
 var contact = "oh"
 var dialogue_title: Label
@@ -282,7 +286,7 @@ func _build_tablet():
 		var option = OptionButton.new()
 		attachments[slot] = option
 		evidence_box.add_child(option)
-	button(report,"발생 보고 제출",submit_report,"PrimaryButton")
+	report_submit = button(report,"발생 보고 제출",submit_report,"PrimaryButton")
 	var summary = PanelContainer.new()
 	summary.theme_type_variation = "CardPanel"
 	tab(3).add_child(summary)
@@ -294,7 +298,7 @@ func _build_tablet():
 	checklist.add_theme_constant_override("separation",6)
 	checks.add_child(checklist)
 	var actions = tabs.get_child(3)
-	button(actions,"오늘 업무 종료",end_day,"PrimaryButton")
+	end_day_button = button(actions,"오늘 업무 종료",end_day,"PrimaryButton")
 	var more = HFlowContainer.new()
 	more.add_theme_constant_override("h_separation",8)
 	more.add_theme_constant_override("v_separation",8)
@@ -316,6 +320,7 @@ func _build_terminal():
 	var body = VBoxContainer.new()
 	terminal_panel.add_child(body)
 	source = heading(body,"")
+	terminal_objective = label(body,"","CaptionLabel")
 	if game.controls.mobile:
 		button(source.get_parent(),"키보드 닫기",func(): command_input.release_focus(); hide_keyboard())
 	var layout = HBoxContainer.new()
@@ -498,6 +503,9 @@ func reset_session():
 	help_sessions.clear()
 	terminal_buffers.clear()
 	command_history.clear()
+	command_input.clear()
+	claim.select(0)
+	for option in attachments.values(): option.select(0)
 	contact = "oh"
 	close()
 	if game.state.day == 1 and "oh_intro" not in game.state.statements: open_briefing()
@@ -506,6 +514,8 @@ func guide_info() -> Dictionary:
 	var state = game.state
 	if state.ended: return {"title":"점검 종료","text":"휴대 단말에서 기록과 진행 파일을 확인하세요.","target":""}
 	if state.day != 1:
+		var operations = operational_guide()
+		if not operations.is_empty(): return operations
 		if investigation_assigned() and not state.report.approved:
 			for item in [["E01","approval_archive","승인 범위 원본 확인"],["E06","server_console","작업의 실제 접근 기록 확인"],["E07","server_console","임시 보관 목록 확인"]]:
 				if item[0] not in state.evidence: return {"title":"조사 업무 · 팀장 지시","text":item[2]+" 후 발생 보고에 원본을 첨부하세요.","target":item[1]}
@@ -513,6 +523,7 @@ func guide_info() -> Dictionary:
 		if state.report.approved and "E08" not in state.evidence: return {"title":"확대 조사 · 제출 감사","text":"관제 단말에서 제출·적용 감사 원본을 확인하세요.","target":"control_console"}
 		if state.report.approved and "E10" not in state.evidence: return {"title":"확대 조사 · 보관 패키지","text":"관제 단말에서 보관 패키지를 확인하세요.","target":"control_console"}
 		if state.report.approved and "E09" not in state.evidence: return {"title":"확대 조사 · 정상 작업 비교","text":"업무 PC의 정상 배포 기록과 감사 원본을 대조하세요.","target":"project_pc"}
+		if state.day == 7: return {"title":"7일차 · 조사 기록 정리","text":"휴대 단말에서 기록과 대응 상태를 검토하세요. 업무 탭에서 이번 점검을 종료할 수 있습니다. 최종 행위자 판정과 반출 결과는 후속 제작 범위입니다.","target":""}
 		var remaining = game.engine.missing_work(state)
 		var target = "project_pc" if state.day == 3 and (state.ops.filesReadDay != state.day or state.ops.searchVerifiedDay != state.day) else "server_console" if state.ops.serviceVerifiedDay != state.day else "project_pc" if state.ops.searchVerifiedDay != state.day else ""
 		if remaining.is_empty(): target = ""
@@ -526,6 +537,23 @@ func guide_info() -> Dictionary:
 	if "seo_intro" not in state.statements: return {"title":"6 / 8 · 정비 담당자","text":"업무 구역의 서유진에게 유지보수 범위를 확인하세요. 이전 제출 자료는 휴대 단말의 메신저에서 볼 수 있습니다.","target":"seo"}
 	if "approval" not in state.baseline: return {"title":"7 / 8 · 승인 범위 원본","text":"승인서 보관함에서 W-218 원본을 확인하세요. 명령은 help로 확인하세요. 확인한 원본은 휴대 단말의 노트에 자동으로 모입니다.","target":"approval_archive"}
 	return {"title":"8 / 8 · 첫날 점검 완료","text":"%s 휴대 단말을 열어 노트와 메신저를 확인하세요. 업무 탭의 ‘오늘 업무 종료’로 다음 날을 시작합니다." % ("화면의 버튼으로" if game.controls.touch_enabled else "Tab으로"),"target":""}
+
+# Follow the recovery path before asking the player to verify a broken service.
+func operational_guide() -> Dictionary:
+	var state = game.state
+	if state.day == 2 or state.day in [4,5,6]:
+		if state.ops.serviceVerifiedDay != state.day:
+			if state.ops.duplicateBackup:
+				if "E03" not in state.evidence: return {"title":"운영 복구 · 백업 구성 확인","text":"서버 단말에서 logs backups로 백업 구성을 확인하세요. 필수 백업을 유지하면서 지연 원인을 찾습니다.","target":"server_console"}
+				return {"title":"운영 복구 · 중복 백업 해제","text":"서버 단말에서 backup disable B-05로 중복 백업만 해제하세요. 필수 B-01은 유지합니다.","target":"server_console"}
+			return {"title":"운영 점검 · 서비스 재검증","text":"서버 단말에서 verify service로 오늘의 필수 백업과 자료 서비스 상태를 확인하세요.","target":"server_console"}
+	if state.day in [3,4,5,6]:
+		if state.day == 3 and state.ops.filesReadDay != state.day: return {"title":"운영 점검 · 원본 존재 확인","text":"업무 PC에서 inspect files로 실제 원본이 있는지 먼저 확인하세요. 검색 누락과 파일 삭제를 구분합니다.","target":"project_pc"}
+		if not state.ops.indexHealthy:
+			if "E05" not in state.evidence: return {"title":"운영 복구 · 검색 장애 확인","text":"업무 PC에서 logs indexing으로 색인 장애 기록을 확인하세요. 원본 파일과 검색 색인은 별개입니다.","target":"project_pc"}
+			return {"title":"운영 복구 · 검색 색인 복구","text":"서버 단말에서 repair index로 색인을 복구하세요. 복구 후 업무 PC에서 검색 상태를 재검증합니다.","target":"server_console"}
+		if state.ops.searchVerifiedDay != state.day: return {"title":"운영 점검 · 검색 재검증","text":"업무 PC에서 verify search로 오늘의 검색 상태를 확인하세요.","target":"project_pc"}
+	return {}
 
 func refresh_settings():
 	if update_status == null: return
@@ -574,6 +602,7 @@ func refresh():
 	guide.text = LabInputBindings.hint(objective.text)
 	field_objective.reset_size.call_deferred()
 	source.text = view.device.get("label","현장 단말")+" · 운영 점검 세션"
+	terminal_objective.text = LabInputBindings.hint(objective.title+" · "+objective.text)
 	clear(notes)
 	if view.notes.is_empty(): label(notes,"아직 확보한 원본이 없습니다. 현장 장비에서 원본을 조회하거나 메신저의 첨부를 확인하세요.")
 	for record in view.notes:
@@ -585,16 +614,26 @@ func refresh():
 		open_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		open_note.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button(row,"메모에 인용",func(): memo.text += "\n["+record.title+" · "+record.source+" · "+record.time+"]\n")
-	report_hint.visible = view.notes.is_empty()
+	report_hint.visible = true
+	report_hint.text = "승인 완료 · 제출한 주장과 원본입니다. 감사 권한은 유지되며 다시 제출할 필요가 없습니다." if view.approved else "확인한 원본을 각 근거에 맞게 선택하세요." if not view.notes.is_empty() else "아직 첨부할 원본이 없습니다. 장비에서 원본을 조회하면 이곳에서 선택할 수 있습니다."
+	claim.disabled = view.approved or view.ended
+	if view.approved:
+		for i in range(1,claim.item_count):
+			if claim.get_item_metadata(i) == game.state.report.claim: claim.select(i)
 	for slot in attachments:
 		var option = attachments[slot]
-		var selected = option.get_item_metadata(option.selected) if option.selected >= 0 and option.item_count else null
+		var selected = game.state.report.attachments.get(slot) if view.approved else option.get_item_metadata(option.selected) if option.selected >= 0 and option.item_count else null
 		option.clear()
 		option.add_item("원본 선택")
 		for record in view.notes:
-			option.add_item(record.title)
+			option.add_item(record.title+" · "+record.time)
 			option.set_item_metadata(option.item_count-1,record.id)
 			if record.id == selected: option.select(option.item_count-1)
+		option.disabled = view.approved or view.ended
+	report_submit.disabled = view.approved or view.ended
+	report_submit.text = "승인된 보고" if view.approved else "점검 종료" if view.ended else "발생 보고 제출"
+	end_day_button.disabled = view.ended
+	end_day_button.text = "점검 종료됨" if view.ended else "이번 점검 종료" if view.day == 7 else "오늘 업무 종료"
 	refresh_dialogue()
 	refresh_messenger()
 	refresh_commands()
@@ -617,7 +656,8 @@ func refresh_dialogue():
 	var questions = game.engine.project(game.state).questions
 	for question in questions:
 		if question.npc == speaker and question.channel == "dialogue" and question_visible(question.id):
-			var choice = button(dialogue_questions,"%d   %s" % [dialogue_questions.get_child_count()+1,question.label],ask.bind(question.id),"ChoiceButton")
+			var visited = "  · 확인함" if question.id in game.state.statements else ""
+			var choice = button(dialogue_questions,"%d   %s%s" % [dialogue_questions.get_child_count()+1,question.label,visited],ask.bind(question.id),"ChoiceButton")
 			choice.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	if dialogue_questions.get_child_count() == 0: label(dialogue_questions,"지금 더 물어볼 내용이 없습니다.")
 	fit_choices.call_deferred()
@@ -641,6 +681,7 @@ func speech(text: String) -> String:
 
 func ask(id: String):
 	conversation.text = speech(game.dispatch({"type":"dialogue","payload":{"id":id}}).text)
+	conversation.scroll_to_line(0)
 
 func bubble(sender: String, text: String, outgoing = false):
 	var row = HBoxContainer.new()
@@ -659,18 +700,22 @@ func bubble(sender: String, text: String, outgoing = false):
 		var from = label(content,sender,"CaptionLabel")
 		if outgoing: from.add_theme_color_override("font_color",InvestigationTheme.ACCENT)
 	label(content,text)
+	return row
 
 func refresh_messenger():
 	clear(messenger)
+	latest_message = null
 	var npc = game.content.case.npcs[contact]
 	contact_title.text = npc.name+" · "+npc.role
 	var ids = game.content.case.npcs.keys()
+	contact_picker.select(ids.find(contact))
 	for i in messenger_contacts.get_child_count():
 		messenger_contacts.get_child(i).theme_type_variation = "PrimaryButton" if ids[i] == contact else ""
 	var count = 0
 	for msg in game.state.messages:
 		if msg.npc == contact:
-			bubble("%d일차 · %s" % [msg.day,npc.name],msg.text)
+			var row = bubble("%d일차 · %s" % [msg.day,npc.name],msg.text)
+			if msg.day == game.state.day: latest_message = row
 			count += 1
 	for question in game.content.dialogue:
 		if question.npc == contact and question.get("channel","dialogue") == "messenger" and question.id in game.state.statements:
@@ -776,7 +821,9 @@ func print_output(command: String, text: String, kind = "output"):
 
 func render_terminal():
 	terminal.text = terminal_markup(terminal_buffers.get(game.context,[]))
-	terminal.scroll_to_line(maxi(0,terminal.get_line_count()-1))
+	# Wrapping and scrollbar bounds are updated during the next layout pass.
+	await get_tree().process_frame
+	if mode == "terminal": terminal.scroll_to_line(maxi(0,terminal.get_line_count()-1))
 
 static func color_tag(color: Color) -> String:
 	return "[color=#%s]" % color.to_html(false)
@@ -865,6 +912,8 @@ func open_dialogue(id: String):
 	dialogue_role.text = npc.role
 	dialogue_portrait.text = npc.name.substr(0,1)
 	conversation.text = "무엇을 확인하시겠어요?"
+	conversation.scroll_to_line(0)
+	dialogue_scroll.scroll_vertical = 0
 	refresh_dialogue()
 	game.frame_speaker(id)
 
@@ -950,10 +999,36 @@ func submit_report():
 	notice(game.dispatch({"type":"report","payload":{"claim":value,"attachments":selected}}).text)
 
 func end_day():
+	if game.state.ended: return
+	var missing = game.engine.missing_work(game.state)
+	if not missing.is_empty():
+		notice("오늘 업무를 마치기 전에 확인해 주세요.\n\n"+"\n".join(missing))
+		return
 	var day = game.state.day
 	var text = game.engine._t("CONFIRM_END")
 	if day == 7: text = game.engine._t("PROTOTYPE_ENDED_KNOWN" if "E12" in game.state.evidence else "PROTOTYPE_ENDED")+"\n조사로 돌아가려면 취소하세요."
-	confirm(text,func(): notice(game.dispatch({"type":"day.end","payload":{"expectedDay":day,"confirmed":true}}).text))
+	confirm(text,finish_day.bind(day))
+
+func finish_day(day: int):
+	var result = game.dispatch({"type":"day.end","payload":{"expectedDay":day,"confirmed":true}})
+	if result.code != "DAY_STARTED":
+		notice(result.text)
+		return
+	# Open the new assignment at its sender instead of leaving yesterday's page open.
+	for i in range(game.state.messages.size()-1,-1,-1):
+		var msg = game.state.messages[i]
+		if msg.day == game.state.day:
+			contact = msg.npc
+			open_tablet(1)
+			reveal_assignment()
+			return
+	open_tablet(3)
+
+func reveal_assignment():
+	await get_tree().process_frame
+	if mode != "tablet" or tabs.current_tab != 1 or not is_instance_valid(latest_message): return
+	var scroll = tabs.get_child(1)
+	if scroll.is_ancestor_of(latest_message): scroll.ensure_control_visible(latest_message)
 
 func file_dialog(exporting: bool):
 	var dialog = FileDialog.new()

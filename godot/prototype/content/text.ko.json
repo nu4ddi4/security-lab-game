@@ -49,6 +49,7 @@
   "INTRO": "담당 업무와 인계 확인",
   "CHECK_SERVICE_VERIFY": "백업·자료 서비스 정상 재검증",
   "CHECK_SEARCH_VERIFY": "검색 정상 상태 재검증",
+  "CHECKLIST_COMPLETE": "오늘의 필수 운영 확인을 모두 마쳤습니다. 휴대 단말의 업무 탭에서 오늘 업무를 종료할 수 있습니다.",
   "CONFIRM_END": "오늘 업무를 종료할까요? 운영 상태에 따라 야간 작업이 실행됩니다.",
   "DAY_NOT_READY": "필수 운영 업무를 확인하세요.",
   "STALE_ACTION": "날짜가 변경됐습니다. 현재 상태를 다시 확인하세요.",

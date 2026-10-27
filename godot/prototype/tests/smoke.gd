@@ -59,6 +59,7 @@ func run(game: InvestigationPrototype):
 	if not is_equal_approx(game.player.camera.fov,68.0): failures.append("Conversation gently adjusts the camera")
 	game.ui.dialogue_questions.get_child(0).pressed.emit()
 	if "oh_intro" not in game.state.statements or not game.ui.guide_info().title.begins_with("2 / 8"): failures.append("Actual conversation advances the tutorial")
+	if not game.ui.dialogue_questions.get_child(0).text.contains("확인함"): failures.append("Previously asked questions stay available and are marked as read")
 	await capture(game,"02-dialogue")
 	var framed_pose = game.player.camera.global_transform
 	game.ui.close()
@@ -104,6 +105,10 @@ func run(game: InvestigationPrototype):
 	var server_output = game.ui.terminal.get_parsed_text()
 	if not server_output.contains("sec.ops > status"): failures.append("Terminal shows the session transcript")
 	await capture(game,"03-terminal")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var output_scroll = game.ui.terminal.get_v_scroll_bar()
+	if output_scroll.value+output_scroll.page < output_scroll.max_value-1: failures.append("Terminal keeps the latest command result in view after layout")
 	game._use("project_pc","device",true)
 	var bad = game.dispatch(game.engine.parse("logs access --task T-17",game.context,game.state))
 	if bad.code != "WRONG_DEVICE": failures.append("Device command guard remains enforced")
@@ -275,6 +280,7 @@ func run(game: InvestigationPrototype):
 	if game.ui.tabs.is_tab_hidden(2) or not game.ui.work.text.contains("발생 보고"): failures.append("Investigation UI appears at the day-four assignment")
 	game.state = previous_state
 	game.ui.refresh()
+	await progression_checks(game,failures)
 	await focus_checks(game,failures)
 	await interaction_checks(game,failures)
 	await responsive_checks(game,failures)
@@ -305,6 +311,69 @@ func run(game: InvestigationPrototype):
 	if report != null: report.store_string(JSON.stringify(summary))
 	print("INVESTIGATION_SMOKE ",JSON.stringify(summary))
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+func progression_checks(game, failures: Array):
+	var original = game.state.duplicate(true)
+	var checklist = game.engine.step(game.state,game.engine.parse("inspect checklist","briefing_board",game.state))
+	if not checklist.text.contains("모두 마쳤습니다"): failures.append("Completed checklist explains how to finish the day")
+	game.ui.finish_day(1)
+	if game.state.day != 2 or game.ui.mode != "tablet" or game.ui.tabs.current_tab != 1 or game.ui.contact != "han": failures.append("Next day opens the new assignment at its sender")
+	if game.ui.contact_picker.get_item_metadata(game.ui.contact_picker.selected) != "han" or game.ui.latest_message == null: failures.append("Mobile contact picker and new assignment match the displayed conversation")
+	if not game.ui.guide_info().text.contains("logs backups"): failures.append("Service recovery starts by inspecting the backup configuration")
+	game.dispatch(game.engine.parse("logs backups","server_console",game.state))
+	if not game.ui.guide_info().text.contains("backup disable B-05"): failures.append("Service recovery explains how to preserve the primary backup")
+	game.dispatch(game.engine.parse("backup disable B-05","server_console",game.state))
+	if not game.ui.guide_info().text.contains("verify service"): failures.append("Recovered service is verified before ending the day")
+	game.dispatch(game.engine.parse("verify service","server_console",game.state))
+	game.ui.finish_day(2)
+	if game.state.day != 3 or game.ui.guide_info().target != "project_pc" or not game.ui.guide_info().text.contains("inspect files"): failures.append("Search recovery first distinguishes missing results from missing originals")
+	game.dispatch(game.engine.parse("inspect files","project_pc",game.state))
+	if not game.ui.guide_info().text.contains("logs indexing"): failures.append("Search recovery exposes the actual fault record")
+	game.dispatch(game.engine.parse("logs indexing","project_pc",game.state))
+	if game.ui.guide_info().target != "server_console" or not game.ui.guide_info().text.contains("repair index"): failures.append("Broken search directs the player to the server that can repair it")
+	await capture(game,"08-search-recovery")
+	game.dispatch(game.engine.parse("repair index","server_console",game.state))
+	if game.ui.guide_info().target != "project_pc" or not game.ui.guide_info().text.contains("verify search"): failures.append("Repaired search returns the player to the PC for verification")
+	game.dispatch(game.engine.parse("verify search","project_pc",game.state))
+	game.ui.finish_day(3)
+	if game.state.day != 4 or game.ui.contact != "oh" or game.ui.tabs.current_tab != 1: failures.append("Investigation assignment opens the team-lead message")
+	if not game.ui.guide_info().text.contains("verify service"): failures.append("Required operations stay actionable during investigation")
+	await get_tree().process_frame
+	await capture(game,"09-investigation-assignment")
+	game.dispatch(game.engine.parse("verify service","server_console",game.state))
+	game.dispatch(game.engine.parse("verify search","project_pc",game.state))
+	for command in ["logs access --task T-17","inspect staging"]:
+		game.dispatch(game.engine.parse(command,"server_console",game.state))
+	game.ui.open_tablet(2)
+	game.ui.claim.select(1)
+	var selected = {"scope":"approval","access":"access-night-1","collection":"staging-night-1"}
+	for slot in selected:
+		var option = game.ui.attachments[slot]
+		for i in range(1,option.item_count):
+			if option.get_item_metadata(i) == selected[slot]: option.select(i)
+	game.ui.submit_report()
+	if not game.state.report.approved or not game.ui.report_submit.disabled or not game.ui.claim.disabled: failures.append("Approved report is displayed as a completed submission")
+	for slot in selected:
+		var option = game.ui.attachments[slot]
+		if not option.disabled or option.get_item_metadata(option.selected) != selected[slot]: failures.append("Approved report preserves its submitted source: "+slot)
+	for child in game.ui.root.get_children():
+		if child is AcceptDialog: child.hide(); child.queue_free()
+	await capture(game,"10-approved-report")
+	game.state.day = 7
+	game.ui.refresh()
+	if game.ui.end_day_button.disabled or game.ui.end_day_button.text != "이번 점검 종료": failures.append("Last day uses an explicit final action")
+	game.state.ended = true
+	game.ui.refresh()
+	if not game.ui.end_day_button.disabled or not game.ui.report_submit.disabled: failures.append("Finished investigation does not offer further submissions or day endings")
+	game.state = game.engine.create_state()
+	game.ui.reset_session()
+	game.ui.refresh()
+	if game.ui.claim.selected != 0 or game.ui.report_submit.disabled: failures.append("New investigation clears the previous report draft and approval presentation")
+	for option in game.ui.attachments.values():
+		if option.selected != 0 or option.disabled: failures.append("New investigation clears previous attachments")
+	game.state = original
+	game.ui.refresh()
+	game.ui.close()
 
 func settings_checks(game, failures: Array):
 	var original = game.settings.values.duplicate(true)
@@ -446,7 +515,12 @@ func responsive_checks(game, failures: Array):
 		var viewport = get_viewport().get_visible_rect()
 		var settings = game.ui.settings_screen
 		if not is_instance_valid(settings) or not settings.visible or not viewport.grow(1).encloses(Rect2(Vector2(settings.position),Vector2(settings.size))): failures.append("Embedded settings fit the viewport at "+str(dimensions))
+		if viewport.size.x < viewport.size.y and settings.layout.get_global_rect().position.y > viewport.size.y*.3: failures.append("Portrait settings leave room for the content below navigation")
 		await capture(game,"settings-%dx%d" % [dimensions.x,dimensions.y])
+		game.ui.open_tablet(1)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		if viewport.size.x < viewport.size.y and game.ui.tabs.get_global_rect().position.y > viewport.size.y*.3: failures.append("Portrait tablet navigation does not consume the conversation area")
 		for panel in [game.ui.modal,game.ui.terminal_panel,game.ui.dialogue_panel,game.ui.briefing_panel]:
 			if panel == game.ui.modal: game.ui.open_tablet(4)
 			elif panel == game.ui.terminal_panel: game._use("server_console","device",true)
