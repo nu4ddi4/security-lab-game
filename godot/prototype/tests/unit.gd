@@ -111,6 +111,7 @@ func _initialize():
 	check(repeated.state == last,"Ending repeated without new event")
 	check(not engine.condition(original,{"op":"evidence_known","id":"E07"}),"Unknown evidence cannot unlock question")
 	check(engine.step(original,{"type":"read","deviceId":"project_pc","payload":{"kind":"submissions"}}).code == "WRONG_DEVICE","Direct action still checks device")
+	story_checks(engine,content)
 	print("INVESTIGATION_UNIT ",JSON.stringify({"scenarios":fixtures.scenarios.size(),"assertions":checks,"passed":failures.is_empty(),"failures":failures}))
 	quit(0 if failures.is_empty() else 1)
 
@@ -120,3 +121,150 @@ func release_fixture(version: String, prerelease: bool) -> Dictionary:
 	for ext in [".apk",".exe"]:
 		assets.append({"name":tag+ext,"state":"uploaded","size":100.0,"browser_download_url":InvestigationUpdates.DOWNLOAD+tag+"/"+tag+ext})
 	return {"tag_name":tag,"prerelease":prerelease,"draft":false,"assets":assets}
+
+func transition(engine, s: Dictionary, kind: String, payload: Dictionary = {}, device = "control_console") -> Dictionary:
+	var before = JSON.stringify(s)
+	var result = engine.step(s,{"type":kind,"payload":payload,"deviceId":device})
+	check(JSON.stringify(s) == before,"Story transitions preserve their input: "+kind)
+	var roundtrip = InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(result.state,engine.content),engine.content)
+	check(roundtrip.has("state"),"Story save roundtrip: "+kind+" / "+result.code)
+	return result.state
+
+func query(engine, s: Dictionary, command: String, device = "server_console") -> Dictionary:
+	var result = engine.step(s,engine.parse(command,device,s))
+	check(InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(result.state,engine.content),engine.content).has("state"),"Read save roundtrip: "+command)
+	return result.state
+
+func story_base(engine, approved = true, stop = true, empty = false) -> Dictionary:
+	var s = engine.create_state()
+	if empty: s.maintenanceAllowed = false
+	for command in ["status","inspect account","logs tasks","logs backups"]: s = query(engine,s,command)
+	s = query(engine,s,"inspect files","project_pc")
+	s = query(engine,s,"inspect W-218","approval_archive")
+	for id in ["oh_intro","park_intro","han_intro","seo_intro"]: s = transition(engine,s,"dialogue",{"id":id})
+	s = transition(engine,s,"day.end",{"expectedDay":1,"confirmed":true})
+	s = query(engine,s,"backup disable B-05")
+	s = query(engine,s,"verify service")
+	if approved:
+		s = query(engine,s,"logs access --task T-17")
+		s = query(engine,s,"inspect staging")
+		s = transition(engine,s,"report",{"claim":"unauthorized_collection","attachments":{"scope":"approval","access":"access-night-1","collection":"staging-night-1"}})
+		check(s.report.approved and s.day == 2,"Early report opens the actual audit permission on day two")
+		for command in ["logs submissions","logs application","inspect PKG-218-R2","inspect metadata","inspect T-19"]: s = query(engine,s,command,"control_console")
+		s = query(engine,s,"logs channel","maintenance_terminal")
+	if stop and not empty: s = transition(engine,s,"pause",{"confirmed":true},"server_console")
+	for day in range(2,7):
+		if day == 3:
+			s = query(engine,s,"inspect files","project_pc")
+			if not s.ops.indexHealthy: s = query(engine,s,"repair index")
+			s = query(engine,s,"verify search","project_pc")
+		if day >= 4:
+			s = query(engine,s,"verify service")
+			s = query(engine,s,"verify search","project_pc")
+		if approved and day == 5: s = query(engine,s,"logs requests","maintenance_terminal")
+		if approved and day == 6: s = query(engine,s,"logs contracts","maintenance_terminal")
+		s = transition(engine,s,"day.end",{"expectedDay":day,"confirmed":true})
+	if approved:
+		var links = {"C05":["message","submissions"],"C06":["submissions","application","package"],"C07":["metadata","message","submissions"],"C08":["request","message","approval"],"C09":["purpose","package","metadata"],"C10":["application","transfer"]}
+		for claim in links: s = transition(engine,s,"inference",{"claim":claim,"records":links[claim]})
+	return s
+
+func report_fields(transfer: String, partial = false) -> Dictionary:
+	return {"scope":"violation","collection":"collected","submission":"unknown" if partial else "seo","authorship":"unknown" if partial else "vendor","awareness":"unknown" if partial else "warning_seen","purpose":"unknown" if partial else "contract_support","transfer":transfer,"material":"unknown"}
+
+func close_story(engine, s: Dictionary, fields: Dictionary, ending: String) -> Dictionary:
+	s = transition(engine,s,"final.report",{"fields":fields})
+	s = transition(engine,s,"day.end",{"expectedDay":7,"confirmed":true})
+	check(s.ended and s.casework.ending.get("id") == ending,"Ending matrix "+ending)
+	return s
+
+func story_checks(engine, content):
+	var base = story_base(engine)
+	check(base.ops.indexHealthy and not base.records.values().any(func(r): return r.template == "index_damage"),"Early stop prevents a later index fault without removing past records")
+	check(base.records.has("access-night-1") and base.records.has("staging-night-1"),"Early stop preserves previous access and staging history")
+	check(base.casework.minute == 540 and base.casework.phase == "morning","Early report does not move the fixed day-seven dispatch time")
+	var premature = engine.create_state()
+	check(engine.step(premature,engine.parse("logs requests","maintenance_terminal",premature)).code == "NOT_YET_AVAILABLE","Request distribution is unavailable before day five")
+	check(engine.step(premature,engine.parse("inspect metadata","control_console",premature)).code == "PERMISSION_REQUIRED","Audit permission cannot be bypassed by a direct command")
+	check(not InvestigationResolution.supports(base,content,"C05",["message"]),"One channel message cannot prove the central submission chain")
+	check(not InvestigationResolution.supports(base,content,"C07",["account"]),"Account ownership cannot prove package authorship")
+	check(base.casework.links.has("C08") and base.casework.links.has("C09"),"Warning receipt and organization purpose require separate original documents")
+	var a = transition(engine,base,"control.request",{"records":["application","transfer"]})
+	a = transition(engine,a,"control.execute")
+	a = transition(engine,a,"time.advance")
+	check(a.casework.dispatch == "not_run" and a.casework.control.mode == "blocked_pre_run","Approved pre-run control prevents dispatch")
+	a = query(engine,a,"logs controls","control_console")
+	a = query(engine,a,"logs dispatch","control_console")
+	a = query(engine,a,"logs receipts","control_console")
+	a = transition(engine,a,"inference",{"claim":"C11","records":["control-execute","dispatch-7"]})
+	a = close_story(engine,a,report_fields("not_run"),"A")
+	check(a.records["final-report"].body.find("개인 판매") == -1,"Closing document does not disclose an unselected or hidden motive")
+	close_story(engine,with_open_report(a),report_fields("not_run",true),"B")
+	var sent = transition(engine,base,"time.advance")
+	check(sent.casework.minute == 1050 and sent.casework.phase == "dispatching","17:30 starts the reserved job")
+	var blocked = transition(engine,base,"control.request",{"records":["application","transfer"]})
+	blocked = transition(engine,blocked,"time.advance")
+	blocked = transition(engine,blocked,"control.execute")
+	blocked = transition(engine,blocked,"time.advance")
+	check(blocked.casework.dispatch == "blocked" and blocked.casework.control.mode == "blocked_during","In-flight control only claims a block before dispatch completes")
+	sent = transition(engine,sent,"time.advance")
+	check(sent.casework.dispatch == "sent" and sent.casework.receipt == "unconfirmed","Dispatch completion alone does not create a receipt")
+	var late_control = transition(engine,sent,"control.request",{"records":["application","transfer"]})
+	late_control = transition(engine,late_control,"control.execute")
+	check(late_control.casework.dispatch == "sent","A control executed after completion never rewrites the dispatch result")
+	sent = query(engine,sent,"logs dispatch","control_console")
+	sent = query(engine,sent,"logs receipts","control_console")
+	check(not InvestigationResolution.supports(sent,content,"C12",["dispatch-7","receipt-unconfirmed"]),"Pending channel response cannot support a receipt finding")
+	close_story(engine,sent,report_fields("sent"),"E")
+	var unsupported_receipt = report_fields("received")
+	check(InvestigationResolution.evaluate(sent,content,unsupported_receipt).attribution_quality == "overclaimed","A receipt assertion without its original is marked unsupported")
+	var confirmed = transition(engine,sent,"time.advance")
+	var unobserved = close_story(engine,confirmed,report_fields("sent"),"D")
+	check(InvestigationResolution.public_ending(unobserved) == "조사 종결" and not unobserved.records["final-report"].body.contains("receipt=confirmed"),"An unqueried receipt is not disclosed by the ending title or closing originals")
+	confirmed = query(engine,confirmed,"logs receipts","control_console")
+	confirmed = transition(engine,confirmed,"inference",{"claim":"C12","records":["dispatch-7","receipt-confirmed"]})
+	close_story(engine,confirmed,report_fields("received"),"C")
+	close_story(engine,confirmed,report_fields("received",true),"D")
+	var intention = report_fields("received")
+	intention.awareness = "full_intent"
+	check(InvestigationResolution.evaluate(confirmed,content,intention).attribution_quality == "overclaimed","Organization documents do not prove the submitter directed the full external transfer")
+	var wrong = report_fields("not_run")
+	wrong.submission = "han"
+	var f = close_story(engine,with_open_report(a),wrong,"F")
+	check(f.casework.dispatch == "not_run","An unsupported report does not overwrite a successful physical block")
+	var isolated = transition(engine,base,"staging.isolate")
+	isolated = transition(engine,isolated,"time.advance")
+	check(isolated.casework.dispatch == "not_run" and isolated.documents == base.documents,"Isolation blocks the reserved source while preserving historical documents")
+	var empty = story_base(engine,false,false,true)
+	check(engine.step(empty,{"type":"control.execute","deviceId":"control_console"}).code == "PERMISSION_REQUIRED","General work never grants high-privilege control")
+	empty = transition(engine,empty,"time.advance")
+	check(empty.casework.dispatch == "not_run" and empty.records["dispatch-7"].facts.reason == "NO_SOURCE","An empty staging location yields a no-source result")
+	var unknown = {}
+	for row in content.rules.finalFields: unknown[row.id] = "unknown"
+	close_story(engine,empty,unknown,"F")
+	var legacy_raw = FileAccess.get_file_as_string("res://prototype/tests/legacy-save.json")
+	var migrated = InvestigationSaveCodec.decode(legacy_raw,content)
+	check(migrated.has("state"),"A real completed beta save migrates without losing progress")
+	if migrated.has("state"):
+		check(migrated.state.day == 7 and not migrated.state.ended and migrated.state.casework.phase == "morning","Old prototype closure resumes at the day-seven work window")
+		check(InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(migrated.state,content),content).has("state"),"Migrated save roundtrips in the unchanged envelope")
+	check(InvestigationSaveCodec.decode(legacy_raw.replace('"schemaVersion": 1','"schemaVersion": 999'),content).has("error"),"Migration does not accept an unsupported envelope")
+	var closing = engine.step(a,{"type":"dialogue","payload":{"id":"oh_closing"}})
+	check(closing.code == "DIALOGUE" and not closing.text.contains("VENDOR-OPS"),"Post-case NPC handover stays within the NPC's own business role")
+	var tampered = base.duplicate(true)
+	tampered.casework.receipt = "confirmed"
+	check(not InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(tampered,content),content).has("state"),"Forged future receipt state is rejected")
+	tampered = base.duplicate(true)
+	tampered.casework.links.C12 = ["access-night-1","staging-night-1"]
+	check(not InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(tampered,content),content).has("state"),"Forged inference references are rejected")
+	for id in content.records:
+		check(not content.records[id].body.contains("단정하지") and not content.records[id].body.contains("별도 확인해야"),"Original records contain operational content without inference coaching: "+id)
+
+func with_open_report(s: Dictionary) -> Dictionary:
+	var next = s.duplicate(true)
+	next.ended = false
+	next.casework.ending.clear()
+	next.casework.final.clear()
+	next.known.erase("final-report")
+	next.records.erase("final-report")
+	return next

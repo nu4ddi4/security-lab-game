@@ -14,17 +14,52 @@
         {
           "name": "scope.txt",
           "command": "inspect W-218",
-          "description": "유지보수 승인 범위"
+          "description": "승인 대장"
         },
         {
           "name": "submissions.log",
           "command": "logs submissions",
-          "description": "제출·적용 감사 원본"
+          "description": "접수 세션 대장"
+        },
+        {
+          "name": "application.log",
+          "command": "logs application",
+          "description": "적용 처리 대장"
         },
         {
           "name": "package.txt",
           "command": "inspect PKG-218-R2",
-          "description": "중앙 보관 패키지"
+          "description": "구성 내역"
+        },
+        {
+          "name": "metadata.txt",
+          "command": "inspect metadata",
+          "description": "패키지 등록 정보"
+        },
+        {
+          "name": "schedule.txt",
+          "command": "inspect T-19",
+          "description": "예약 작업 대장"
+        },
+        {
+          "name": "controls.log",
+          "command": "logs controls",
+          "description": "조치 처리 대장"
+        },
+        {
+          "name": "dispatch.log",
+          "command": "logs dispatch",
+          "description": "작업 처리 대장"
+        },
+        {
+          "name": "receipts.log",
+          "command": "logs receipts",
+          "description": "채널 응답 대장"
+        },
+        {
+          "name": "closing.txt",
+          "command": "inspect closing",
+          "description": "종결 문서"
         }
       ]
     },
@@ -42,22 +77,22 @@
         {
           "name": "account.txt",
           "command": "inspect account",
-          "description": "서비스 계정 원본"
+          "description": "계정 대장"
         },
         {
           "name": "backups.log",
           "command": "logs backups",
-          "description": "백업 구성과 변경"
+          "description": "백업 스케줄 대장"
         },
         {
           "name": "access-t17.log",
           "command": "logs access --task T-17",
-          "description": "작업별 파일 접근"
+          "description": "문서 접근 내역"
         },
         {
           "name": "staging.log",
           "command": "inspect staging",
-          "description": "임시 보관 목록"
+          "description": "보관 위치 변경 내역"
         }
       ]
     },
@@ -93,12 +128,27 @@
         {
           "name": "scope.txt",
           "command": "inspect assignment",
-          "description": "장비 배정과 승인 범위"
+          "description": "정비 배정 대장"
+        },
+        {
+          "name": "channel.txt",
+          "command": "logs channel",
+          "description": "업무 채널 이력"
+        },
+        {
+          "name": "requests.log",
+          "command": "logs requests",
+          "description": "정비 요청 이력"
+        },
+        {
+          "name": "contracts.log",
+          "command": "logs contracts",
+          "description": "계약 지원 기록"
         },
         {
           "name": "submissions.log",
           "command": "logs submissions",
-          "description": "제출·적용 감사 원본"
+          "description": "접수 세션 대장"
         }
       ]
     },
@@ -183,8 +233,8 @@
   "briefing": {
     "heading": "첫 출근 · 보안 운영 점검",
     "background": "이 회사는 사내 문서 서비스와 LUMEN 프로젝트를 운영합니다. 설계 자료와 계약·가격 문서는 업무 담당자와 승인된 정비 인력만 다룰 수 있습니다.",
-    "assignment": "당신은 유지보수 이후의 운영 상태와 접근 권한을 점검하러 온 보안 담당자입니다. 오늘은 문제가 생기기 전의 정상 상태와 각 담당자의 업무 범위를 인계받습니다.",
-    "method": "장비에서 운영 상태를 확인하고 업무 기록을 남기세요. 명령이 필요하면 장비 단말에서 help를 입력하세요. 이상이 확인되면 서비스를 복구하고 정상 상태를 다시 검증합니다.",
+    "assignment": "당신은 유지보수 이후의 운영 상태와 접근 권한을 점검하는 보안 담당자입니다. 담당자들에게 업무를 인계받고 오늘의 점검 기록을 남기세요.",
+    "method": "장비 단말에서 기록을 조회하고 필요한 운영 조치를 수행합니다. 명령어 책에는 조회·조작 방법이 정리돼 있습니다. 기록은 휴대 단말에서 다시 열거나 보고서에 첨부할 수 있습니다.",
     "first": "먼저 눈앞의 보안팀장 오세진에게 다가가 대화를 시작하세요. 오늘의 점검 순서는 왼쪽 업무 안내와 휴대 단말에서 확인할 수 있습니다."
   }
 }

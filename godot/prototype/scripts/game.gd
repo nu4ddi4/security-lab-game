@@ -306,11 +306,6 @@ func dispatch(action: Dictionary) -> Dictionary:
 	return result
 
 func command(text: String):
-	var normalized = " ".join(text.strip_edges().split(" ",false)).to_lower()
-	for row in content.commands:
-		if row.text.to_lower() == normalized and context in row.devices and not engine.command_visible(state,row):
-			ui.print_output(text,"현재 맡은 업무에서 사용할 수 없는 명령입니다.","error")
-			return
 	var action = engine.parse(text,context,state)
 	if action.type == "pause":
 		var preview = engine.step(state,action)
