@@ -10,12 +10,16 @@ func load_state(content: Dictionary) -> Dictionary:
 	return InvestigationSaveCodec.decode(FileAccess.get_file_as_string(path),content)
 
 func save(state: Dictionary, content: Dictionary) -> bool:
+	var raw = InvestigationSaveCodec.encode(state,content)
+	if InvestigationSaveCodec.decode(raw,content).has("error"):
+		error = "진행 상태를 검증하지 못했습니다. 기존 저장은 보존됩니다."
+		return false
 	DirAccess.make_dir_recursive_absolute(directory)
 	var path = directory.path_join("save.json")
 	var temp = directory.path_join("save.tmp")
 	var file = FileAccess.open(temp,FileAccess.WRITE)
 	if file == null: error = "진행 파일을 열지 못했습니다."; return false
-	file.store_string(InvestigationSaveCodec.encode(state,content))
+	file.store_string(raw)
 	file.flush()
 	var written = file.get_error()
 	file.close()
@@ -35,9 +39,13 @@ func preserve() -> bool:
 	return result == OK
 
 func export_file(path: String, state: Dictionary, content: Dictionary) -> bool:
+	var raw = InvestigationSaveCodec.encode(state,content)
+	if InvestigationSaveCodec.decode(raw,content).has("error"):
+		error = "진행 상태를 검증하지 못해 내보내지 않았습니다."
+		return false
 	var file = FileAccess.open(path,FileAccess.WRITE)
 	if file == null: error = "내보내기 파일을 열지 못했습니다."; return false
-	file.store_string(InvestigationSaveCodec.encode(state,content))
+	file.store_string(raw)
 	file.flush()
 	var written = file.get_error()
 	file.close()

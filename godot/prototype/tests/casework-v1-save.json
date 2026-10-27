@@ -1,0 +1,799 @@
+{
+	"caseId": "residual-permissions",
+	"contentVersion": "prototype-1",
+	"contractVersion": 1,
+	"format": "security-lab-investigation",
+	"schemaVersion": 1,
+	"state": {
+		"baseline": [
+			"service",
+			"account",
+			"tasks",
+			"files",
+			"approval"
+		],
+		"casework": {
+			"control": {
+				"approved": true,
+				"mode": "none"
+			},
+			"dispatch": "not_run",
+			"ending": {},
+			"final": {
+				"evaluation": {
+					"attribution_quality": "bounded",
+					"id": "A",
+					"name": "남겨진 기록",
+					"truth_level": "complete",
+					"unsupported": []
+				},
+				"fields": {
+					"authorship": "vendor",
+					"awareness": "warning_seen",
+					"collection": "collected",
+					"material": "unknown",
+					"purpose": "contract_support",
+					"scope": "violation",
+					"submission": "seo",
+					"transfer": "not_run"
+				},
+				"known": [
+					"status-1-0",
+					"account",
+					"task_definition",
+					"backup",
+					"files-1-1",
+					"approval",
+					"access-night-1",
+					"staging-night-1",
+					"submissions",
+					"application",
+					"package",
+					"metadata",
+					"transfer",
+					"message",
+					"files-3-1",
+					"request",
+					"purpose",
+					"control-request",
+					"staging-isolate",
+					"dispatch-7",
+					"receipt-none"
+				],
+				"links": {
+					"C01": [
+						"approval",
+						"access-night-1"
+					],
+					"C02": [
+						"access-night-1",
+						"staging-night-1"
+					],
+					"C05": [
+						"message",
+						"submissions"
+					],
+					"C06": [
+						"submissions",
+						"application",
+						"package"
+					],
+					"C07": [
+						"metadata",
+						"message",
+						"submissions"
+					],
+					"C08": [
+						"request",
+						"message",
+						"approval"
+					],
+					"C09": [
+						"purpose",
+						"package",
+						"metadata"
+					],
+					"C10": [
+						"application",
+						"transfer"
+					],
+					"C11": [
+						"control-request",
+						"dispatch-7"
+					]
+				}
+			},
+			"links": {
+				"C01": [
+					"approval",
+					"access-night-1"
+				],
+				"C02": [
+					"access-night-1",
+					"staging-night-1"
+				],
+				"C05": [
+					"message",
+					"submissions"
+				],
+				"C06": [
+					"submissions",
+					"application",
+					"package"
+				],
+				"C07": [
+					"metadata",
+					"message",
+					"submissions"
+				],
+				"C08": [
+					"request",
+					"message",
+					"approval"
+				],
+				"C09": [
+					"purpose",
+					"package",
+					"metadata"
+				],
+				"C10": [
+					"application",
+					"transfer"
+				],
+				"C11": [
+					"control-request",
+					"dispatch-7"
+				]
+			},
+			"minute": 1050,
+			"phase": "after",
+			"receipt": "none",
+			"stagingIsolated": true,
+			"version": 1
+		},
+		"day": 7,
+		"documents": [
+			"LUMEN/design-private.pdf",
+			"LUMEN/pricing-internal.xlsx"
+		],
+		"ended": false,
+		"eventIds": [
+			"night-1",
+			"t17-run-1",
+			"audit-approved",
+			"night-2",
+			"night-3",
+			"night-4",
+			"night-5",
+			"night-6"
+		],
+		"evidence": [
+			"R05",
+			"E02",
+			"R02",
+			"E03",
+			"R06",
+			"E01",
+			"E06",
+			"E07",
+			"E08",
+			"R10",
+			"E10",
+			"R13",
+			"E12",
+			"E11",
+			"R12",
+			"R14",
+			"R16",
+			"R17",
+			"R18"
+		],
+		"introduced": [
+			"oh",
+			"park",
+			"han",
+			"seo"
+		],
+		"known": [
+			"status-1-0",
+			"account",
+			"task_definition",
+			"backup",
+			"files-1-1",
+			"approval",
+			"access-night-1",
+			"staging-night-1",
+			"submissions",
+			"application",
+			"package",
+			"metadata",
+			"transfer",
+			"message",
+			"files-3-1",
+			"request",
+			"purpose",
+			"control-request",
+			"staging-isolate",
+			"dispatch-7",
+			"receipt-none"
+		],
+		"maintenanceAllowed": true,
+		"memo": "",
+		"messages": [
+			{
+				"day": 1,
+				"id": "handover",
+				"npc": "oh",
+				"text": "오늘의 서버·업무 자료·정비 배정을 확인하고 운영 인계를 남겨 주세요."
+			},
+			{
+				"day": 2,
+				"id": "day2-work",
+				"npc": "han",
+				"text": "자료 서비스 응답이 늦습니다. 오늘 서버 운영 상태를 점검해 주세요."
+			},
+			{
+				"day": 2,
+				"id": "audit-approved",
+				"npc": "oh",
+				"text": "발생 보고를 접수했습니다. 감사 원본 열람 권한을 부여합니다."
+			},
+			{
+				"day": 3,
+				"id": "day3-work",
+				"npc": "han",
+				"text": "오늘의 원본 목록과 검색 응답 확인을 부탁드립니다."
+			},
+			{
+				"day": 4,
+				"id": "day4-work",
+				"npc": "oh",
+				"text": "감사 열람 권한은 유지됩니다. 접수된 보고와 관련 원문을 검토해 주세요."
+			},
+			{
+				"day": 5,
+				"id": "late-followup",
+				"npc": "oh",
+				"text": "금일 정비 요청과 적용 이력 검토를 부탁드립니다."
+			},
+			{
+				"day": 6,
+				"id": "day6-work",
+				"npc": "oh",
+				"text": "금일 요청 문서와 보관 작업을 검토하고 필요한 변경 요청을 접수해 주세요."
+			},
+			{
+				"day": 7,
+				"id": "day7-work",
+				"npc": "oh",
+				"text": "오늘 정시 작업 확인은 17:30입니다. 처리 대장 확인 후 종결 보고를 접수해 주세요."
+			}
+		],
+		"ops": {
+			"backupDelay": false,
+			"duplicateBackup": false,
+			"filesReadDay": 3,
+			"indexHealthy": true,
+			"primaryBackup": true,
+			"searchVerifiedDay": 6,
+			"serviceVerifiedDay": 6
+		},
+		"records": {
+			"access-night-1": {
+				"acquiredDay": 2,
+				"body": "operation=READ | job=T-17 | account=svc_release\nnamespace=LUMEN | classification=INTERNAL\nLUMEN/design-private.pdf\nLUMEN/pricing-internal.xlsx",
+				"evidence": "E06",
+				"facts": {
+					"account": "svc_release",
+					"documents": [
+						"LUMEN/design-private.pdf",
+						"LUMEN/pricing-internal.xlsx"
+					],
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"graphId": "E03",
+				"id": "access-night-1",
+				"initial": false,
+				"source": "문서 저장소 · 접근 감사",
+				"template": "access",
+				"time": {
+					"dayOffset": 1,
+					"minute": 1390
+				},
+				"title": "파일 접근 내역"
+			},
+			"account": {
+				"acquiredDay": 1,
+				"body": "account=svc_release\n업무 담당=한지우\n용도=자동 배포 / 유지보수\n실행 경로=/legacy/maintenance/runner\n권한 검토 상태=이관 전 설정 유지",
+				"evidence": "E02",
+				"facts": {
+					"account": "svc_release",
+					"owner": "한지우"
+				},
+				"graphId": "E02",
+				"id": "account",
+				"initial": true,
+				"source": "서버 계정 관리",
+				"template": "account",
+				"time": {
+					"dayOffset": 1,
+					"minute": 540
+				},
+				"title": "서비스 계정 대장"
+			},
+			"application": {
+				"acquiredDay": 2,
+				"audit": true,
+				"availableDay": 1.0,
+				"body": "전날 16:35 | upload=UP-218 | package=PKG-218-R2\noperation=UPDATE T-17, REGISTER T-19\nsession_validation=PASS | format_validation=PASS\nwork_scope_validation=NOT_CONFIGURED\nresult=SUCCESS",
+				"evidence": "R10",
+				"facts": {
+					"package": "PKG-218-R2",
+					"upload": "UP-218"
+				},
+				"graphId": "E10",
+				"id": "application",
+				"initial": true,
+				"source": "중앙 적용 서비스",
+				"template": "application",
+				"time": {
+					"dayOffset": -1,
+					"minute": 995
+				},
+				"title": "적용 처리 대장"
+			},
+			"approval": {
+				"acquiredDay": 1,
+				"body": "작업 항목: 상태 조회 / 진단 로그 수집 / 임시 파일 정리\n대상 구분: 운영 상태 및 진단 산출물\n제외 경로: /workspace/LUMEN/*\n배정 장비: SUPPORT-07\n배정 담당: 서유진\n추가 승인 번호: —",
+				"evidence": "E01",
+				"facts": {
+					"collectionAllowed": false,
+					"workOrder": "W-218"
+				},
+				"graphId": "E01",
+				"id": "approval",
+				"initial": true,
+				"source": "문서 관리 · 승인 대장",
+				"template": "approval",
+				"time": {
+					"dayOffset": -14,
+					"minute": 900
+				},
+				"title": "W-218 / 작업 승인서"
+			},
+			"backup": {
+				"acquiredDay": 1,
+				"body": "B-01 | source=documents | start=23:00 | enabled=true\nB-05 | source=documents | start=23:00 | enabled=true\nB-05 변경자=박도윤 | 변경 구분=이관 설정",
+				"evidence": "E03",
+				"facts": {
+					"duplicate": "B-05"
+				},
+				"graphId": "E05",
+				"id": "backup",
+				"initial": true,
+				"source": "운영 스케줄러",
+				"template": "backup",
+				"time": {
+					"dayOffset": 1,
+					"minute": 540
+				},
+				"title": "백업 스케줄 대장"
+			},
+			"backup-change-12": {
+				"body": "operation=UPDATE | target=B-05\nB-01=ENABLED\nB-05=DISABLED | B-01=ENABLED",
+				"evidence": "E03",
+				"facts": {
+					"duplicateEnabled": false
+				},
+				"graphId": "E05",
+				"id": "backup-change-12",
+				"initial": false,
+				"source": "서버 · 설정 감사",
+				"template": "backup_change",
+				"time": {
+					"dayOffset": 2,
+					"minute": 600
+				},
+				"title": "백업 설정 변경 대장"
+			},
+			"control-request": {
+				"acquiredDay": 7,
+				"audit": false,
+				"availableDay": 1.0,
+				"body": "decision=APPROVED\njob=T-19\noperation=AUTHORIZE",
+				"evidence": "R16",
+				"facts": {
+					"decision": "APPROVED",
+					"job": "T-19",
+					"operation": "AUTHORIZE"
+				},
+				"graphId": "E16",
+				"id": "control-request",
+				"initial": false,
+				"source": "관제 · 조치 감사",
+				"template": "control_audit",
+				"time": {
+					"dayOffset": 7,
+					"minute": 540
+				},
+				"title": "조치 처리 대장"
+			},
+			"dispatch-7": {
+				"acquiredDay": 7,
+				"audit": false,
+				"availableDay": 1.0,
+				"body": "dispatch=not_run\njob=T-19\nreason=SOURCE_ISOLATED\ntransaction=TX-19",
+				"evidence": "R17",
+				"facts": {
+					"dispatch": "not_run",
+					"job": "T-19",
+					"reason": "SOURCE_ISOLATED",
+					"transaction": "TX-19"
+				},
+				"graphId": "E17",
+				"id": "dispatch-7",
+				"initial": false,
+				"source": "전송 서비스 · 발송 감사",
+				"template": "dispatch_audit",
+				"time": {
+					"dayOffset": 7,
+					"minute": 1050
+				},
+				"title": "작업 처리 대장 / T-19"
+			},
+			"files-1-1": {
+				"acquiredDay": 1,
+				"body": "원본 저장소: AVAILABLE\nLUMEN/design-private.pdf\nLUMEN/pricing-internal.xlsx\nLUMEN/release-draft.txt\nLUMEN/contracts-internal.pdf\nLUMEN/architecture-private.pdf\nLUMEN/forecast-internal.xlsx\nindex_state=READY",
+				"evidence": "R06",
+				"facts": {
+					"indexHealthy": true,
+					"originalsExist": true
+				},
+				"graphId": "E06",
+				"id": "files-1-1",
+				"initial": false,
+				"source": "업무 PC · 조회 기록",
+				"template": "files_sample",
+				"time": {
+					"dayOffset": 1,
+					"minute": 540
+				},
+				"title": "원본·검색 상태 표본"
+			},
+			"files-3-1": {
+				"acquiredDay": 3,
+				"body": "원본 저장소: AVAILABLE\nLUMEN/design-private.pdf\nLUMEN/pricing-internal.xlsx\nLUMEN/release-draft.txt\nLUMEN/contracts-internal.pdf\nLUMEN/architecture-private.pdf\nLUMEN/forecast-internal.xlsx\nindex_state=READY",
+				"evidence": "R06",
+				"facts": {
+					"indexHealthy": true,
+					"originalsExist": true
+				},
+				"graphId": "E06",
+				"id": "files-3-1",
+				"initial": false,
+				"source": "업무 PC · 조회 기록",
+				"template": "files_sample",
+				"time": {
+					"dayOffset": 3,
+					"minute": 540
+				},
+				"title": "원본·검색 상태 표본"
+			},
+			"message": {
+				"acquiredDay": 2,
+				"body": "전날 16:20 | 서유진\n진단 항목을 수정했습니다. 전달받은 항목을 반영해 올립니다.\n첨부=PKG-218-R2 | work_order=W-218",
+				"evidence": "E11",
+				"facts": {
+					"package": "PKG-218-R2",
+					"sender": "서유진"
+				},
+				"graphId": "E08",
+				"id": "message",
+				"initial": true,
+				"source": "유지보수 업무 메신저",
+				"template": "message",
+				"time": {
+					"dayOffset": -1,
+					"minute": 980
+				},
+				"title": "정비 채널 / 전날 대화"
+			},
+			"metadata": {
+				"acquiredDay": 2,
+				"audit": true,
+				"availableDay": 1.0,
+				"body": "PACKAGE_ID=PKG-218-R2\nAUTHOR_GROUP=VENDOR-OPS\nREQUEST_REF=VR-41\nBUILD_PROFILE=diagnostic-support",
+				"evidence": "R13",
+				"facts": {
+					"authorGroup": "VENDOR-OPS",
+					"package": "PKG-218-R2"
+				},
+				"graphId": "E13",
+				"id": "metadata",
+				"initial": true,
+				"source": "빌드 저장소 · 패키지 메타데이터",
+				"template": "metadata",
+				"time": {
+					"dayOffset": -1,
+					"minute": 995
+				},
+				"title": "패키지 등록 정보"
+			},
+			"normal_jobs": {
+				"body": "시작 전 2일 15:30 | request=DEP-108 | requester=한지우\naccount=svc_release | source=/releases/approved\ndestination=/services/LUMEN | result=COMPLETED",
+				"evidence": "E09",
+				"facts": {},
+				"graphId": "E06",
+				"id": "normal_jobs",
+				"initial": true,
+				"source": "개발 배포 서비스",
+				"template": "normal_jobs",
+				"time": {
+					"dayOffset": -2,
+					"minute": 930
+				},
+				"title": "배포 실행 대장"
+			},
+			"package": {
+				"acquiredDay": 2,
+				"audit": true,
+				"body": "package=PKG-218-R2\nbase_items=status,diagnostic_logs,temp_cleanup\nselect=/workspace/LUMEN/*-private.*,/workspace/LUMEN/*-internal.*,release-draft.txt\ncopy_to=/staging/maintenance/PKG-218-R2\npost_job=T-19 | post_profile=vendor-intake",
+				"evidence": "E10",
+				"facts": {
+					"package": "PKG-218-R2",
+					"task": "T-17"
+				},
+				"graphId": "E11",
+				"id": "package",
+				"initial": true,
+				"source": "관제 · 패키지 보관소",
+				"template": "package",
+				"time": {
+					"dayOffset": -1,
+					"minute": 995
+				},
+				"title": "PKG-218-R2 / 구성 내역"
+			},
+			"purpose": {
+				"acquiredDay": 6,
+				"audit": false,
+				"availableDay": 6.0,
+				"body": "요청 조직=VENDOR-OPS | 참조=VR-41\n구분=계약 갱신 실적 이견 대응\n요청 자료=정비 완료 보고와 LUMEN 설계·가격 산정 항목의 대조본\n사용처=실적 분쟁 검토 회의\n공식 자료 제공 요청 번호=—",
+				"evidence": "R14",
+				"facts": {
+					"authorGroup": "VENDOR-OPS",
+					"reference": "VR-41"
+				},
+				"graphId": "E14",
+				"id": "purpose",
+				"initial": true,
+				"source": "협력업체 계약 지원 문서함",
+				"template": "purpose",
+				"time": {
+					"dayOffset": -1,
+					"minute": 930
+				},
+				"title": "계약 지원 기록 / VR-41"
+			},
+			"receipt-none": {
+				"acquiredDay": 7,
+				"audit": false,
+				"availableDay": 1.0,
+				"body": "job=T-19\nreceipt=none\nresponse=NOT_APPLICABLE\ntransaction=TX-19",
+				"evidence": "R18",
+				"facts": {
+					"job": "T-19",
+					"receipt": "none",
+					"response": "NOT_APPLICABLE",
+					"transaction": "TX-19"
+				},
+				"graphId": "E18",
+				"id": "receipt-none",
+				"initial": false,
+				"source": "협력업체 접수 게이트웨이",
+				"template": "receipt_audit",
+				"time": {
+					"dayOffset": 7,
+					"minute": 1050
+				},
+				"title": "채널 응답 대장"
+			},
+			"request": {
+				"acquiredDay": 5,
+				"audit": false,
+				"availableDay": 5.0,
+				"body": "참조=VR-41 | 수신 대상=서유진\n작업=진단 항목 대조본 반영\n범위 검토란=W-218 기재 대상 외 자료 대조 항목 포함\n추가 승인 번호=미등록\n전날 15:56 | 서유진 | 열람 확인",
+				"evidence": "R12",
+				"facts": {
+					"acknowledgedBy": "서유진",
+					"reference": "VR-41",
+					"scopeWarning": true
+				},
+				"graphId": "E12",
+				"id": "request",
+				"initial": true,
+				"source": "협력업체 업무 요청 시스템",
+				"template": "request",
+				"time": {
+					"dayOffset": -1,
+					"minute": 956
+				},
+				"title": "정비 요청 이력 / VR-41"
+			},
+			"run-night-1": {
+				"body": "23:10 | job=T-17 | account=svc_release | result=STARTED\nrunner=/legacy/maintenance/runner",
+				"evidence": "E04",
+				"facts": {
+					"account": "svc_release",
+					"task": "T-17"
+				},
+				"graphId": "E07",
+				"id": "run-night-1",
+				"initial": false,
+				"source": "운영 스케줄러 · 실행 대장",
+				"template": "run",
+				"time": {
+					"dayOffset": 1,
+					"minute": 1390
+				},
+				"title": "작업 실행 이력"
+			},
+			"staging-isolate": {
+				"acquiredDay": 7,
+				"audit": false,
+				"availableDay": 1.0,
+				"body": "operation=ISOLATE\npath=/staging/maintenance/PKG-218-R2",
+				"evidence": "R16",
+				"facts": {
+					"operation": "ISOLATE",
+					"path": "/staging/maintenance/PKG-218-R2"
+				},
+				"graphId": "E16",
+				"id": "staging-isolate",
+				"initial": false,
+				"source": "저장소 관리 · 조치 감사",
+				"template": "quarantine_audit",
+				"time": {
+					"dayOffset": 7,
+					"minute": 540
+				},
+				"title": "보관 위치 조치 대장"
+			},
+			"staging-night-1": {
+				"acquiredDay": 2,
+				"body": "operation=COPY | job=T-17\ndestination=/staging/maintenance/PKG-218-R2\n분류=INTERNAL\nLUMEN/design-private.pdf\nLUMEN/pricing-internal.xlsx",
+				"evidence": "E07",
+				"facts": {
+					"documents": [
+						"LUMEN/design-private.pdf",
+						"LUMEN/pricing-internal.xlsx"
+					],
+					"nonpublic": true,
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"graphId": "E04",
+				"id": "staging-night-1",
+				"initial": false,
+				"source": "저장소 · 변경 감사",
+				"template": "staging",
+				"time": {
+					"dayOffset": 1,
+					"minute": 1390
+				},
+				"title": "보관 위치 변경 내역"
+			},
+			"status-1-0": {
+				"acquiredDay": 1,
+				"audit": false,
+				"availableDay": 1.0,
+				"body": "response_ms=120\nservice=documents",
+				"evidence": "R05",
+				"facts": {
+					"delay": false,
+					"latencyMs": 120
+				},
+				"graphId": "E05",
+				"id": "status-1-0",
+				"initial": false,
+				"source": "서비스 모니터 · 측정 대장",
+				"template": "status_sample",
+				"time": {
+					"dayOffset": 1,
+					"minute": 540
+				},
+				"title": "서비스 응답 표본"
+			},
+			"submissions": {
+				"acquiredDay": 2,
+				"audit": true,
+				"body": "전날 16:35 | session=SUPPORT-07 | upload=UP-218\npackage=PKG-218-R2 | receipt=ACCEPTED\nwork_order=W-218",
+				"evidence": "E08",
+				"facts": {
+					"device": "SUPPORT-07",
+					"package": "PKG-218-R2"
+				},
+				"graphId": "E09",
+				"id": "submissions",
+				"initial": true,
+				"source": "관제 · 제출 접수 서비스",
+				"template": "submissions",
+				"time": {
+					"dayOffset": -1,
+					"minute": 995
+				},
+				"title": "접수 세션 대장"
+			},
+			"task_definition": {
+				"acquiredDay": 1,
+				"audit": false,
+				"availableDay": 1.0,
+				"body": "job=T-17 | label=자료 색인 점검\ncreated=시작 전 14일 15:00 | modified=전날 16:35\naccount=svc_release | runner=/legacy/maintenance/runner",
+				"evidence": "R02",
+				"facts": {
+					"account": "svc_release",
+					"task": "T-17"
+				},
+				"graphId": "E02",
+				"id": "task_definition",
+				"initial": true,
+				"source": "운영 관리 · 작업 등록",
+				"template": "task_definition",
+				"time": {
+					"dayOffset": -1,
+					"minute": 995
+				},
+				"title": "등록 작업 정의"
+			},
+			"transfer": {
+				"acquiredDay": 2,
+				"audit": true,
+				"body": "job=T-19 | label=정비 결과 전달\nstart=D7 17:30 | state=SCHEDULED\nsource=/staging/maintenance/PKG-218-R2\nprofile=vendor-intake | destination=협력업체 접수 채널",
+				"evidence": "E12",
+				"facts": {
+					"destination": "contractor-channel",
+					"task": "T-19"
+				},
+				"graphId": "E15",
+				"id": "transfer",
+				"initial": true,
+				"source": "관제 · 작업 예약 서비스",
+				"template": "transfer",
+				"time": {
+					"dayOffset": -1,
+					"minute": 995
+				},
+				"title": "예약 작업 대장 / T-19"
+			}
+		},
+		"report": {
+			"approved": true,
+			"attachments": {
+				"access": "access-night-1",
+				"collection": "staging-night-1",
+				"scope": "approval"
+			},
+			"claim": "unauthorized_collection",
+			"feedback": "approved"
+		},
+		"revision": 52,
+		"schemaVersion": 1,
+		"statements": [
+			"oh_intro",
+			"park_intro",
+			"han_intro",
+			"seo_intro"
+		],
+		"tasks": {
+			"T-17": {
+				"held": true,
+				"status": "held"
+			},
+			"T-19": {
+				"held": false,
+				"status": "scheduled"
+			}
+		}
+	}
+}

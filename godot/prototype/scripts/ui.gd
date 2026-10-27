@@ -534,8 +534,7 @@ func quote_note(record: Dictionary):
 	tabs.get_child(0).ensure_control_visible.call_deferred(memo)
 
 func reset_session():
-	if is_instance_valid(case_desk.dialog): case_desk.dialog.hide(); case_desk.dialog.queue_free()
-	case_desk.view = 0
+	case_desk.reset()
 	help_sessions.clear()
 	terminal_buffers.clear()
 	terminal_drafts.clear()
@@ -962,6 +961,18 @@ func remember_terminal_draft():
 		terminal_drafts[terminal_context] = command_input.text
 
 func toggle():
+	# Android Back does not send the cancel key to embedded windows.
+	for option in root.find_children("*","OptionButton",true,false):
+		if option.get_popup().visible:
+			option.get_popup().hide()
+			return
+	var dialogs = root.find_children("*","AcceptDialog",true,false)
+	dialogs.reverse()
+	for dialog in dialogs:
+		if dialog.visible:
+			dialog.hide()
+			dialog.canceled.emit()
+			return
 	if modal_open: close()
 	else: open_tablet()
 

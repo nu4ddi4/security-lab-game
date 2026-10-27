@@ -80,7 +80,10 @@
           ],
           "properties": {
             "version": {
-              "const": 1
+              "enum": [
+                1,
+                2
+              ]
             },
             "phase": {
               "enum": [

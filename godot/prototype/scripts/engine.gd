@@ -141,9 +141,9 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 			s.ops.duplicateBackup = enable
 			s.ops.backupDelay = enable and s.day > 1
 			s.ops.serviceVerifiedDay = 0
-			_append(s,"backup_change","backup-change-%d" % (s.revision+1),int(s.day),600)
-			s.records["backup-change-%d" % (s.revision+1)].facts["duplicateEnabled"] = enable
-			s.records["backup-change-%d" % (s.revision+1)].body += "\n"+_t("BACKUP_ENABLED" if enable else "BACKUP_DISABLED")
+			var entries = s.records.get("backup-change-history",{}).get("facts",{}).get("entries",[]).duplicate(true)
+			entries.append({"revision":int(s.revision)+1,"day":int(s.day),"enabled":enable})
+			backup_journal(s,entries)
 			result = _result(s,"BACKUP_ENABLED" if enable else "BACKUP_DISABLED")
 		"index_repair":
 			if s.ops.indexHealthy: return _result(original,"INDEX_NORMAL")
@@ -186,6 +186,23 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 	if s != original: s.revision = int(original.revision)+1
 	return result
 
+func backup_journal(s: Dictionary, entries: Array):
+	entries = entries.slice(maxi(0,entries.size()-16))
+	if entries.is_empty(): return
+	var last = entries[-1]
+	_append(s,"backup_change","backup-change-history",int(last.day),600)
+	var journal = s.records["backup-change-history"]
+	journal.time = {"dayOffset":int(last.day),"minute":600}
+	journal.facts = {"duplicateEnabled":last.enabled,"entries":entries}
+	journal.body = backup_journal_body(entries)
+	if "backup-change-history" in s.known: journal.acquiredDay = int(s.day)
+
+static func backup_journal_body(entries: Array) -> String:
+	var lines = ["operation=UPDATE | target=B-05","B-01=ENABLED","retention=16"]
+	for entry in entries:
+		lines.append("revision=%d | day=%d | enabled=%s" % [entry.revision,entry.day,"true" if entry.enabled else "false"])
+	return "\n".join(lines)
+
 func _read(s: Dictionary, kind: String) -> Dictionary:
 	if kind in InvestigationResolution.AUDIT_KINDS and not s.report.approved: return _result(s,"PERMISSION_REQUIRED")
 	var ids = []
@@ -197,7 +214,10 @@ func _read(s: Dictionary, kind: String) -> Dictionary:
 		"account":
 			ids = ["account"]
 			if "account" not in s.baseline: s.baseline.append("account")
-		"backup": ids = ["backup"]
+		"backup":
+			ids = ["backup"]
+			for id in s.records:
+				if s.records[id].template == "backup_change": ids.append(id)
 		"submissions": ids = ["submissions"]
 		"package": ids = ["package"]
 		"application","metadata","request","purpose": ids = [kind]
