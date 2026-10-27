@@ -2,7 +2,8 @@
   "rules": [
     "godot/prototype/tests/unit.gd",
     "godot/prototype/tests/scenarios.json",
-    "godot/prototype/tests/save.schema.json"
+    "godot/prototype/tests/save.schema.json",
+    "godot/prototype/tests/legacy-save.json"
   ],
   "services": [
     "godot/prototype/tests/services.gd",
