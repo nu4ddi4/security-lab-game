@@ -2,6 +2,15 @@ extends Node
 
 var capture_directory = ""
 
+class FailedStore extends InvestigationStore:
+	var preserved = false
+	func save(_state: Dictionary, _content: Dictionary) -> bool:
+		error = "저장 장치 쓰기 실패"
+		return false
+	func preserve() -> bool:
+		preserved = true
+		return true
+
 func capture(game: InvestigationPrototype, name: String):
 	if capture_directory.is_empty() or DisplayServer.get_name() == "headless": return
 	await get_tree().process_frame
@@ -285,6 +294,7 @@ func run(game: InvestigationPrototype):
 	await focus_checks(game,failures)
 	await interaction_checks(game,failures)
 	await responsive_checks(game,failures)
+	await save_failure_checks(game,failures)
 	if not game.store.load_state(game.content).has("state"): failures.append("Existing save format accepts the new UI flow")
 	var path = game.store.directory.path_join("save.json")
 	var broken = "{broken-prototype-save"
@@ -661,6 +671,18 @@ func responsive_checks(game, failures: Array):
 		await get_tree().process_frame
 		if game.ui.notes.get_global_rect().end.x > viewport.end.x: failures.append("Long note titles do not push citation buttons or the tablet outside the screen")
 		if dimensions == Vector2i(540,960): await capture(game,"notes-540x960")
+		game.ui.notice("업무 원문\n".repeat(80))
+		await get_tree().process_frame
+		await get_tree().process_frame
+		for popup in game.ui.root.find_children("*","AcceptDialog",true,false):
+			if not popup.visible or not popup.has_meta("scroll_notice"): continue
+			if not viewport.grow(1).encloses(Rect2(Vector2(popup.position),Vector2(popup.size))): failures.append("Long original notices stay inside the screen: "+str(dimensions))
+			var documents = popup.find_children("*","RichTextLabel",true,false)
+			if documents.is_empty() or documents[0].text != "업무 원문\n".repeat(80): failures.append("Long notices retain the complete original document")
+			var scrolls = popup.find_children("*","ScrollContainer",true,false)
+			if scrolls.is_empty() or scrolls[0].get_v_scroll_bar().max_value <= scrolls[0].size.y: failures.append("Long original notices can be scrolled to their end")
+			if dimensions == Vector2i(540,960): await capture(game,"long-record-540x960")
+		close_notices(game)
 		game._use("control_console","device",true)
 		game.ui.case_work_button.pressed.emit()
 		await get_tree().process_frame
@@ -703,3 +725,48 @@ func responsive_checks(game, failures: Array):
 	await get_tree().process_frame
 	game.ui.fit_screen()
 	game.controls.set_touch(original_touch)
+
+func save_failure_checks(game, failures: Array):
+	var original = game.state.duplicate(true)
+	var store = game.store
+	var source = store.directory.path_join("qa-import.json")
+	store.export_file(source,original,game.content)
+	var failed = FailedStore.new()
+	failed.directory = store.directory
+	game.store = failed
+	game.ui.open_tablet(0)
+	game.new_game()
+	if game.state != original or failed.preserved: failures.append("New game aborts when current progress cannot be saved")
+	close_notices(game)
+	game.transfer_file(source,false)
+	if game.state != original or failed.preserved: failures.append("Import aborts when current progress cannot be saved")
+	close_notices(game)
+	game.ui.case_desk.open(game.ui,true)
+	game.quit_game()
+	if get_tree().auto_accept_quit: failures.append("Window close waits for the game's save result")
+	if not game.ui.case_desk.dialog.visible: failures.append("A failed exit keeps console work open")
+	game.ui.toggle() # dismiss the save error before closing the case desk
+	game.ui.toggle()
+	game.store = store
+	var memo = "unsaved-"+str(Time.get_ticks_usec())
+	game.state.memo = memo
+	game.new_game()
+	var copies = Array(DirAccess.get_files_at(store.directory))
+	if not copies.any(func(name):
+		if not name.begins_with("save.preserved."): return false
+		var decoded = InvestigationSaveCodec.decode(FileAccess.get_file_as_string(store.directory.path_join(name)),game.content)
+		return decoded.has("state") and decoded.state.memo == memo): failures.append("Starting a new game preserves the latest unsaved changes")
+	game.state.memo = memo+"-import"
+	game.transfer_file(source,false)
+	close_notices(game)
+	copies = Array(DirAccess.get_files_at(store.directory))
+	if not copies.any(func(name):
+		if not name.begins_with("save.preserved."): return false
+		var decoded = InvestigationSaveCodec.decode(FileAccess.get_file_as_string(store.directory.path_join(name)),game.content)
+		return decoded.has("state") and decoded.state.memo == memo+"-import"): failures.append("Import preserves the latest unsaved changes before replacing progress")
+	game.state = original
+	game.ui.reset_session()
+	game.ui.sync_memo()
+	game.ui.refresh()
+	game.ui.close()
+	game.save_now()

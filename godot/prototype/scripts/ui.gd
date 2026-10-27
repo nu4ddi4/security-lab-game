@@ -1008,11 +1008,31 @@ func notice(text: String):
 	if modal_open or text.length() > 220:
 		var popup = AcceptDialog.new()
 		localize_dialog(popup,"조사 기록" if investigation_assigned() else "업무 알림")
-		popup.dialog_text = text
-		root.add_child(popup)
+		popup.set_meta("scroll_notice",true)
+		var parent: Node = root
+		for candidate in root.find_children("*","AcceptDialog",true,false):
+			if candidate.visible: parent = candidate
+		parent.add_child(popup)
+		var scroll = ScrollContainer.new()
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		popup.add_child(scroll)
+		var document = RichTextLabel.new()
+		document.fit_content = true
+		document.scroll_active = false
+		document.selection_enabled = true
+		document.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		document.text = text
+		scroll.add_child(document)
 		popup.confirmed.connect(popup.queue_free)
 		popup.canceled.connect(popup.queue_free)
-		open_dialog(popup,560)
+		popup.popup()
+		fit_notice(popup)
+
+func fit_notice(popup: Window):
+	if not is_instance_valid(popup) or not popup.visible: return
+	var area = game.safe_rect()
+	popup.size = Vector2i(mini(600,int(area.size.x)-32),mini(520,int(area.size.y)-88))
+	popup.position = Vector2i(area.position+(area.size-Vector2(popup.size))*.5)
 
 func confirm(text: String, callback: Callable):
 	var dialog = ConfirmationDialog.new()
@@ -1166,6 +1186,8 @@ func fit_screen():
 		settings_screen.size = Vector2i(safe.size)
 		settings_screen.position = Vector2i(safe.position)
 	if is_instance_valid(case_desk.dialog): case_desk.fit.call_deferred()
+	for popup in root.find_children("*","AcceptDialog",true,false):
+		if popup.visible and popup.has_meta("scroll_notice"): fit_notice.call_deferred(popup)
 	modal.add_theme_constant_override("margin_left",14 if game.controls.mobile else 24)
 	for item in [modal,terminal_panel,briefing_panel,dialogue_panel]:
 		if compact and item != modal:

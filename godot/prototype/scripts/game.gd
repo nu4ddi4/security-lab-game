@@ -20,6 +20,7 @@ var detailed_world = false
 var context = ""
 var blocked_save = false
 var save_timer: Timer
+var saving = false
 var targets = {}
 var dialogue_camera_fov = 72.0
 var dialogue_camera_active = false
@@ -38,6 +39,7 @@ func _ready():
 	if "--prototype-services" in OS.get_cmdline_user_args():
 		add_child(load("res://prototype/tests/services.gd").new())
 		return
+	get_tree().auto_accept_quit = false
 	if OS.has_feature("Android"): get_tree().quit_on_go_back = false
 	get_window().content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
 	get_window().size_changed.connect(_fit_screen)
@@ -319,13 +321,15 @@ func command(text: String):
 		ui.print_output(text,result.text,"error" if result.code in InvestigationUI.ERROR_CODES else "output")
 
 func save_now() -> bool:
-	if blocked_save: return false
+	if blocked_save or saving: return false
+	saving = true
 	var saved = store.save(state,content)
 	if not saved: ui.notice(store.error)
+	saving = false
 	return saved
 
 func new_game():
-	if not store.preserve(): ui.notice(store.error); return
+	if not preserve_current(): return
 	state = engine.create_state()
 	if investigation_environment != null: investigation_environment.sync(state)
 	blocked_save = false
@@ -337,8 +341,13 @@ func new_game():
 
 func quit_game():
 	if updater != null and updater.state == "preparing": return
-	save_now()
+	if not blocked_save and not save_now(): return
 	get_tree().quit()
+
+func preserve_current() -> bool:
+	if not blocked_save and not save_now(): return false
+	if not store.preserve(): ui.notice(store.error); return false
+	return true
 
 # Returns how many files were removed.
 func reset_all_data() -> int:
@@ -366,7 +375,7 @@ func transfer_file(path: String, exporting: bool):
 		return
 	var candidate = store.import_file(path,content)
 	if candidate.has("error"): ui.notice(candidate.error); return
-	if not store.preserve(): ui.notice(store.error); return
+	if not preserve_current(): return
 	state = candidate.state
 	if investigation_environment != null: investigation_environment.sync(state)
 	blocked_save = false
