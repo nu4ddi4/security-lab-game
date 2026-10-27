@@ -136,6 +136,7 @@ func run(game: InvestigationPrototype):
 	if not game.ui.guide_info().title.begins_with("8 / 8") or not game.engine.missing_work(game.state).is_empty(): failures.append("First-day tutorial finishes only after required work")
 	game.ui.open_tablet(0)
 	await capture(game,"05-notes")
+	await note_and_terminal_checks(game,failures)
 	game.ui.close()
 	if not game.player.enabled: failures.append("Closing the UI restores movement")
 	var original_touch = game.controls.touch_enabled
@@ -312,6 +313,39 @@ func run(game: InvestigationPrototype):
 	print("INVESTIGATION_SMOKE ",JSON.stringify(summary))
 	get_tree().quit(0 if failures.is_empty() else 1)
 
+func note_and_terminal_checks(game, failures: Array):
+	var original_memo = game.state.memo
+	game.ui.notes.get_child(0).get_child(1).pressed.emit()
+	if game.state.memo == original_memo or game.ui.memo.text != game.state.memo: failures.append("Quoting a note updates the persisted memo as well as the editor")
+	game.save_now()
+	var saved = game.store.load_state(game.content)
+	if not saved.has("state") or saved.state.memo != game.ui.memo.text: failures.append("Quoted note survives a save reload")
+	await capture(game,"05-notes-quoted")
+	game.dispatch({"type":"memo","payload":{"text":original_memo}})
+	game.ui.sync_memo()
+	game.ui.memo.text = "x".repeat(int(game.content.rules.maxMemoLength)+1)
+	game.ui.memo.text_changed.emit()
+	if game.state.memo != original_memo or not game.ui.memo_status.text.contains("저장되지 않습니다"): failures.append("Oversized memo keeps the last accepted text and explains why the draft is not saved")
+	game.ui.memo.text = original_memo
+	game.ui.memo.text_changed.emit()
+	if game.ui.memo_status.text.contains("저장되지 않습니다"): failures.append("Reducing the memo length clears the unsaved draft warning")
+	game._use("server_console","device",true)
+	game.ui.command_input.text = "inspect account"
+	game._use("project_pc","device",true)
+	if game.ui.command_input.text != "": failures.append("Pending server commands do not follow the player to another device")
+	game.ui.command_input.text = "inspect files"
+	game._use("server_console","device",true)
+	if game.ui.command_input.text != "inspect account": failures.append("Returning to a device restores its pending command")
+	game.ui.command_input.text = "logs t"
+	game.ui.recall_command(-1)
+	game.ui.recall_command(1)
+	if game.ui.command_input.text != "logs t": failures.append("Leaving command history restores the command being written")
+	game.ui.close()
+	game._use("server_console","device",true)
+	if game.ui.command_input.text != "logs t": failures.append("Closing and reopening a terminal preserves its pending input")
+	game.ui.command_input.clear()
+	game.ui.close()
+
 func progression_checks(game, failures: Array):
 	var original = game.state.duplicate(true)
 	var checklist = game.engine.step(game.state,game.engine.parse("inspect checklist","briefing_board",game.state))
@@ -359,6 +393,24 @@ func progression_checks(game, failures: Array):
 	for child in game.ui.root.get_children():
 		if child is AcceptDialog: child.hide(); child.queue_free()
 	await capture(game,"10-approved-report")
+	game.dispatch(game.engine.parse("logs submissions","control_console",game.state))
+	if not game.ui.guide_info().text.contains("보관 패키지"): failures.append("Approved investigation continues from audit records to the stored package")
+	game.dispatch(game.engine.parse("inspect PKG-218-R2","control_console",game.state))
+	game.dispatch(game.engine.parse("logs deployments","project_pc",game.state))
+	# Exercise a player who has not opened the optional first-day attachment.
+	game.state.evidence.erase("E11")
+	game.state.known.erase("message")
+	game.state.statements.erase("seo_message")
+	if not game.ui.guide_info().text.contains("메신저"): failures.append("Missing submission attachment is discoverable after the audit")
+	game.dispatch({"type":"dialogue","payload":{"id":"seo_message"}})
+	if game.ui.guide_info().target != "seo": failures.append("Matching submission records lead back to the maintenance contact")
+	game.dispatch({"type":"dialogue","payload":{"id":"seo_submission"}})
+	if game.ui.guide_info().target != "server_console" or not game.ui.guide_info().text.contains("inspect T-19"): failures.append("Maintenance follow-up leads to the transfer settings")
+	game.dispatch(game.engine.parse("inspect T-19","server_console",game.state))
+	if not game.ui.guide_info().title.contains("원본 대조 완료") or "E12" not in game.state.evidence: failures.append("Available follow-up ends with a clear investigation summary")
+	if not game.ui.work.text.contains("pause T-17") or not game.engine.missing_work(game.state).is_empty() or game.state.tasks["T-17"].held: failures.append("Running collection is explained while containment stays an optional player decision")
+	game.ui.open_tablet(3)
+	await capture(game,"11-investigation-followthrough")
 	game.state.day = 7
 	game.ui.refresh()
 	if game.ui.end_day_button.disabled or game.ui.end_day_button.text != "이번 점검 종료": failures.append("Last day uses an explicit final action")
@@ -369,6 +421,7 @@ func progression_checks(game, failures: Array):
 	game.ui.reset_session()
 	game.ui.refresh()
 	if game.ui.claim.selected != 0 or game.ui.report_submit.disabled: failures.append("New investigation clears the previous report draft and approval presentation")
+	if not game.ui.terminal_drafts.is_empty() or not game.ui.command_input.text.is_empty(): failures.append("New investigation clears terminal drafts from the previous case")
 	for option in game.ui.attachments.values():
 		if option.selected != 0 or option.disabled: failures.append("New investigation clears previous attachments")
 	game.state = original
@@ -521,6 +574,11 @@ func responsive_checks(game, failures: Array):
 		await get_tree().process_frame
 		await get_tree().process_frame
 		if viewport.size.x < viewport.size.y and game.ui.tabs.get_global_rect().position.y > viewport.size.y*.3: failures.append("Portrait tablet navigation does not consume the conversation area")
+		game.ui.open_tablet(0)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		if game.ui.notes.get_global_rect().end.x > viewport.end.x: failures.append("Long note titles do not push citation buttons or the tablet outside the screen")
+		if dimensions == Vector2i(540,960): await capture(game,"notes-540x960")
 		for panel in [game.ui.modal,game.ui.terminal_panel,game.ui.dialogue_panel,game.ui.briefing_panel]:
 			if panel == game.ui.modal: game.ui.open_tablet(4)
 			elif panel == game.ui.terminal_panel: game._use("server_console","device",true)

@@ -40,6 +40,9 @@ var new_session_button: Button
 var scroll_finger = -1
 var touch_scroll: Range
 var terminal_buffers = {}
+var terminal_drafts = {}
+var terminal_context = ""
+var history_draft = ""
 const ERROR_CODES = ["DEVICE_REQUIRED","UNKNOWN_COMMAND","WRONG_DEVICE","PERMISSION_REQUIRED","NO_RECORDS","INVALID_ACTION","QUESTION_UNAVAILABLE","REPORT_INCOMPLETE","DAY_NOT_READY","STALE_ACTION","SAVE_BLOCKED"]
 const GOOD_WORDS = ["정상","완료","허용","승인","확인됨"]
 const WARNING_WORDS = ["지연","필요","비활성","실패","오류","없음","미확인","불가","중단"]
@@ -61,6 +64,7 @@ var claim: OptionButton
 var attachments = {}
 var work: Label
 var memo: TextEdit
+var memo_status: Label
 var ready_memo = false
 var touch_setting: CheckButton
 var update_setting: CheckButton
@@ -240,10 +244,14 @@ func _build_tablet():
 	label(tab(0),"개인 메모","SectionLabel")
 	memo = TextEdit.new()
 	memo.custom_minimum_size.y = 160
+	memo.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	memo.placeholder_text = "오늘 확인한 업무 내용을 적으세요."
 	tab(0).add_child(memo)
+	memo_status = label(tab(0),"","CaptionLabel")
 	memo.text_changed.connect(func():
-		if ready_memo: game.dispatch({"type":"memo","payload":{"text":memo.text}}))
+		if ready_memo:
+			game.dispatch({"type":"memo","payload":{"text":memo.text}})
+			refresh_memo_status())
 	label(tab(1),"사내 메신저 · 비동기 업무 연락과 이전 제출 자료","CaptionLabel")
 	var layout = HBoxContainer.new()
 	layout.add_theme_constant_override("separation",20)
@@ -498,10 +506,30 @@ func sync_memo():
 	ready_memo = false
 	memo.text = game.state.memo
 	ready_memo = true
+	refresh_memo_status()
+
+func refresh_memo_status():
+	var limit = int(game.content.rules.maxMemoLength)
+	var overflow = memo.text.length() > limit
+	memo_status.text = "%d / %d자" % [memo.text.length(),limit]
+	if overflow: memo_status.text += " · 초과한 내용은 저장되지 않습니다. 글자 수를 줄여 주세요."
+	memo_status.add_theme_color_override("font_color",InvestigationTheme.WARNING if overflow else InvestigationTheme.TEXT_DIM)
+
+func quote_note(record: Dictionary):
+	var text = memo.text+"\n["+record.title+" · "+record.source+" · "+record.time+"]\n"
+	var result = game.dispatch({"type":"memo","payload":{"text":text}})
+	if result.code != "MEMO_SAVED": notice(result.text); return
+	sync_memo()
+	memo.set_caret_line(memo.get_line_count()-1)
+	memo.set_caret_column(memo.get_line(memo.get_caret_line()).length())
+	tabs.get_child(0).ensure_control_visible.call_deferred(memo)
 
 func reset_session():
 	help_sessions.clear()
 	terminal_buffers.clear()
+	terminal_drafts.clear()
+	terminal_context = ""
+	history_draft = ""
 	command_history.clear()
 	command_input.clear()
 	claim.select(0)
@@ -523,7 +551,11 @@ func guide_info() -> Dictionary:
 		if state.report.approved and "E08" not in state.evidence: return {"title":"확대 조사 · 제출 감사","text":"관제 단말에서 제출·적용 감사 원본을 확인하세요.","target":"control_console"}
 		if state.report.approved and "E10" not in state.evidence: return {"title":"확대 조사 · 보관 패키지","text":"관제 단말에서 보관 패키지를 확인하세요.","target":"control_console"}
 		if state.report.approved and "E09" not in state.evidence: return {"title":"확대 조사 · 정상 작업 비교","text":"업무 PC의 정상 배포 기록과 감사 원본을 대조하세요.","target":"project_pc"}
+		if state.report.approved and "E11" not in state.evidence: return {"title":"확대 조사 · 제출 채널 대조","text":"휴대 단말의 메신저에서 서유진의 ‘유지보수 채널의 이전 제출 보기’를 열어 첨부 원본을 확인하세요.","target":""}
+		if state.report.approved and "seo_submission" not in state.statements: return {"title":"확대 조사 · 정비 담당자 확인","text":"서유진에게 제출·적용 기록을 대조하는 질문을 하세요. 중앙 감사 기록과 메신저 첨부를 함께 확인합니다.","target":"seo"}
+		if state.report.approved and "E12" not in state.evidence: return {"title":"확대 조사 · 후속 전달 설정","text":"서버 단말에서 inspect T-19로 후속 작업 설정을 확인하세요. 전달 계획과 실제 반출 결과는 구분합니다.","target":"server_console"}
 		if state.day == 7: return {"title":"7일차 · 조사 기록 정리","text":"휴대 단말에서 기록과 대응 상태를 검토하세요. 업무 탭에서 이번 점검을 종료할 수 있습니다. 최종 행위자 판정과 반출 결과는 후속 제작 범위입니다.","target":""}
+		if state.report.approved: return {"title":"확대 조사 · 원본 대조 완료","text":"확보한 원본은 노트에서 다시 대조할 수 있습니다. 전달 설정만으로 실제 반출을 단정할 수는 없습니다. 오늘 기록을 정리하고 업무를 종료하세요.","target":""}
 		var remaining = game.engine.missing_work(state)
 		var target = "project_pc" if state.day == 3 and (state.ops.filesReadDay != state.day or state.ops.searchVerifiedDay != state.day) else "server_console" if state.ops.serviceVerifiedDay != state.day else "project_pc" if state.ops.searchVerifiedDay != state.day else ""
 		if remaining.is_empty(): target = ""
@@ -613,7 +645,10 @@ func refresh():
 		var open_note = button(row,record.title+" · "+record.source,func(): notice(record.title+"\n"+record.source+" · "+record.time+" · 확보 %d일차\n" % record.acquiredDay+record.body),"TileButton")
 		open_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		open_note.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button(row,"메모에 인용",func(): memo.text += "\n["+record.title+" · "+record.source+" · "+record.time+"]\n")
+		open_note.clip_text = true
+		open_note.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		open_note.tooltip_text = record.title+" · "+record.source
+		button(row,"메모에 인용",quote_note.bind(record))
 	report_hint.visible = true
 	report_hint.text = "승인 완료 · 제출한 주장과 원본입니다. 감사 권한은 유지되며 다시 제출할 필요가 없습니다." if view.approved else "확인한 원본을 각 근거에 맞게 선택하세요." if not view.notes.is_empty() else "아직 첨부할 원본이 없습니다. 장비에서 원본을 조회하면 이곳에서 선택할 수 있습니다."
 	claim.disabled = view.approved or view.ended
@@ -648,6 +683,8 @@ func refresh():
 	for line in view.work: label(checklist,"○  "+line)
 	if assigned: work.text += "\n\n발생 보고: "+("승인됨 · 감사 권한 유지" if view.approved else "미승인")
 	if assigned: work.text += "\n확인한 내부 수집 문서: "+("미확인" if view.documentCount < 0 else "%d개 · 반출과 별도" % view.documentCount)
+	if view.approved and not view.held and not view.ended and game.state.tasks["T-17"].status == "running":
+		work.text += "\n\nT-17은 계속 실행 중입니다. 통제가 필요하면 서버 단말에서 pause T-17을 사용할 수 있습니다. snapshot T-17로 실행 상태를 먼저 보존할 수도 있습니다. 통제 여부는 직접 선택합니다."
 	if view.ended: work.text += "\n\n"+game.engine._t("PROTOTYPE_ENDED")
 
 func refresh_dialogue():
@@ -759,6 +796,7 @@ func execute_command():
 	if mode != "terminal": return
 	var text = command_input.text.strip_edges()
 	command_input.clear()
+	history_draft = ""
 	if text.is_empty(): return
 	if not command_history.has(game.context): command_history[game.context] = []
 	var history = command_history[game.context]
@@ -800,8 +838,9 @@ func _terminal_input(event: InputEvent):
 
 func recall_command(direction: int):
 	var history = command_history.get(game.context,[])
+	if history_index == history.size() and direction < 0: history_draft = command_input.text
 	history_index = clampi(history_index+direction,0,history.size())
-	command_input.text = history[history_index] if history_index < history.size() else ""
+	command_input.text = history[history_index] if history_index < history.size() else history_draft
 	command_input.caret_column = command_input.text.length()
 
 func clear_terminal():
@@ -863,6 +902,7 @@ static func style_line(line: String, heading: bool) -> String:
 	return "[b]"+safe+"[/b]" if heading and safe.length() < 40 else safe
 
 func _show(next_mode: String, window: Control):
+	remember_terminal_draft()
 	if is_instance_valid(settings_screen): settings_screen.close_editor()
 	if mode == "field" and DisplayServer.get_name() != "headless":
 		settings_backdrop = ImageTexture.create_from_image(get_viewport().get_texture().get_image())
@@ -896,6 +936,10 @@ func open_briefing(): _show("briefing",briefing_panel)
 
 func open_terminal():
 	_show("terminal",terminal_panel)
+	terminal_context = game.context
+	command_input.text = terminal_drafts.get(terminal_context,"")
+	history_draft = command_input.text
+	command_input.caret_column = command_input.text.length()
 	refresh()
 	if not terminal_buffers.has(game.context):
 		var device = game.content.case.devices[game.context]
@@ -922,6 +966,7 @@ func close():
 		settings_screen.close_editor()
 		return
 	if game.blocked_save: return
+	remember_terminal_draft()
 	var focused = get_viewport().gui_get_focus_owner()
 	if focused != null: focused.release_focus()
 	hide_keyboard()
@@ -938,6 +983,10 @@ func close():
 	dot.show()
 	prompt.text = ""
 	set_prompt_visible(false)
+
+func remember_terminal_draft():
+	if mode == "terminal" and not terminal_context.is_empty():
+		terminal_drafts[terminal_context] = command_input.text
 
 func toggle():
 	if modal_open: close()

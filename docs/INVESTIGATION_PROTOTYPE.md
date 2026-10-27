@@ -31,6 +31,8 @@ NPC 대화는 화면 아래 대화창을 사용합니다. 대화 중 이동·시
 
 터미널은 출력 배치가 끝난 뒤 최신 명령 결과로 스크롤합니다. 작은 화면의 휴대 단말·설정은 브랜드와 닫기 버튼 아래에 페이지 메뉴를 배치해 본문 공간을 확보합니다.
 
+보고 승인 후에는 감사 원본·패키지·정상 작업 → 메신저의 이전 제출 첨부 → 정비 담당자 확인 → T-19 설정까지 안내합니다. 업무 화면은 실행 중인 T-17의 선택적 보존·통제를 함께 알려 주며, 필수 업무 조건을 추가하지 않습니다. 노트 인용은 메모 저장에 즉시 반영하고 길이 초과 시 저장되지 않는다는 안내를 표시합니다. 터미널을 닫거나 장비를 바꿔도 작성 중인 입력과 명령 이력 탐색 전의 초안을 장비별로 복원합니다. 단말 입력 초안은 현재 실행 중에만 유지하며 저장 형식은 변경하지 않습니다.
+
 ### 조사 공간 authoring / runtime
 
 Interior 07의 고품질 사무실과 기존 Native 배치 보정을 그대로 사용합니다. `assets/authoring/Security_Lab_Investigation.blend`의 `Investigation_Environment` 컬렉션을 Interior 07에 Append하여 배치를 편집합니다. 별도 조사 master에는 장비 6개, 인물 4명, 현장 표지와 추가 충돌체만 들어 있습니다. `scripts/export_investigation.py`를 Blender에서 실행하면 `godot/assets/models/Investigation_Environment.glb`만 내보냅니다. 기존 `Interior_07_Godot.glb`를 덮어쓰지 않습니다.
