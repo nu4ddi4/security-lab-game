@@ -11,7 +11,7 @@ func create_state() -> Dictionary:
 		"ops":{"duplicateBackup":true,"primaryBackup":true,"backupDelay":false,"indexHealthy":true,"serviceVerifiedDay":0,"searchVerifiedDay":0,"filesReadDay":0},
 		"tasks":{"T-17":{"status":"scheduled","held":false},"T-19":{"status":"scheduled","held":false}},
 		"maintenanceAllowed":true,"records":{},"known":[],"evidence":[],"baseline":[],"introduced":[],"statements":[],"eventIds":[],"documents":[],"messages":[],
-		"report":{"approved":false,"claim":"","attachments":{},"feedback":""},"memo":""}
+		"casework":InvestigationResolution.initial(),"report":{"approved":false,"claim":"","attachments":{},"feedback":""},"memo":""}
 	for id in content.records:
 		if content.records[id].initial: _append(s,id,id,int(content.records[id].time.dayOffset),int(content.records[id].time.minute))
 	s.messages.append({"id":"handover","npc":"oh","day":1,"text":_t("HANDOVER")})
@@ -55,6 +55,9 @@ func condition(s: Dictionary, rule: Dictionary) -> bool:
 		"not": return not condition(s,rule.arg)
 		"evidence_known": return rule.id in s.evidence
 		"statement_known": return rule.id in s.statements
+		"record_known": return rule.id in s.known
+		"day_at_least": return s.day >= int(rule.value)
+		"case_closed": return s.ended
 		"record_exists": return s.records.has(rule.id)
 		"permission_granted", "report_approved": return s.report.approved
 		"task_state": return s.tasks.has(rule.id) and s.tasks[rule.id].status == rule.value
@@ -77,15 +80,16 @@ func investigation_assigned(s: Dictionary) -> bool:
 
 func command_visible(s: Dictionary, row: Dictionary) -> bool:
 	var kind = row.args.get("kind","")
-	if kind in ["submissions","package"] and not s.report.approved: return false
-	return investigation_assigned(s) or (kind not in ["access","staging"] and row.action not in ["snapshot","pause"])
+	if kind in InvestigationResolution.AUDIT_KINDS and not s.report.approved: return false
+	if kind in ["request","purpose"] and s.day < (5 if kind == "request" else 6): return false
+	return s.day >= 2 or (kind not in ["access","staging"] and row.action not in ["snapshot","pause"])
 
 func step(original: Dictionary, action: Dictionary) -> Dictionary:
 	var kind = action.get("type","")
 	var payload = action.get("payload",{})
 	var device = action.get("deviceId","")
 	if kind == "invalid": return _result(original,action.get("code","INVALID_ACTION"))
-	if original.ended and kind != "memo": return _result(original,"PROTOTYPE_ENDED")
+	if original.ended and kind not in ["memo","read","directory","working_directory","help","status","checklist","dialogue"]: return _result(original,"PROTOTYPE_ENDED")
 	if not payload is Dictionary: return _result(original,"INVALID_ACTION")
 	if kind in ["help","status","directory","working_directory","checklist","read","backup_disable","backup_enable","index_repair","snapshot","pause","verify_service","verify_search"]:
 		var allowed = false
@@ -94,14 +98,17 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 		if not allowed: return _result(original,"WRONG_DEVICE")
 	var s = original.duplicate(true)
 	var result: Dictionary
+	if kind in InvestigationResolution.ACTIONS:
+		result = InvestigationResolution.handle(self,s,kind,payload,device)
+		if s != original: s.revision = int(original.revision)+1
+		return result
 	match kind:
 		"working_directory": result = _result(s,"DIRECTORY",content.case.devices[device].directory)
 		"directory":
 			var rows = [content.case.devices[device].directory]
 			for file in content.case.devices[device].files:
 				var command = parse(file.command,device,s)
-				if not s.report.approved and command.payload.get("kind","") in ["submissions","package"]: continue
-				if not investigation_assigned(s) and command.payload.get("kind","") in ["access","staging"]: continue
+				if not command_visible(s,{"args":command.payload,"action":command.type}): continue
 				rows.append(file.name+"  —  "+file.description)
 			result = _result(s,"DIRECTORY","\n".join(rows))
 		"help":
@@ -112,9 +119,21 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 		"status":
 			if device == "server_console" and "service" not in s.baseline: s.baseline.append("service")
 			result = _result(s,"STATUS",_t("STATUS",{"day":s.day,"service":_t("DELAY" if s.ops.backupDelay else "NORMAL"),"index":_t("NORMAL" if s.ops.indexHealthy else "DAMAGED"),"task":_t("HELD" if s.tasks["T-17"].held else "RUNNING" if s.tasks["T-17"].status == "running" else "SCHEDULED")}))
+			if not s.ended:
+				var id = "status-%d-%d" % [s.day,1 if s.ops.backupDelay else 0]
+				_append(s,"status_sample",id,int(s.day),540)
+				s.records[id].facts = {"delay":s.ops.backupDelay,"latencyMs":3200 if s.ops.backupDelay else 120}
+				s.records[id].body = "response_ms=%d\nservice=documents" % s.records[id].facts.latencyMs
+				result.text += "\n"+_know(s,id)
+
 		"checklist":
 			var missing = missing_work(s)
 			result = _result(s,"CHECKLIST",_t("CHECKLIST_COMPLETE") if missing.is_empty() else "\n".join(missing))
+			if not s.ended:
+				var id = "checklist-%d" % s.day
+				_append(s,"checklist_log",id,int(s.day),540)
+				s.records[id].body = result.text
+				_know(s,id)
 		"read": result = _read(s,str(payload.get("kind","")))
 		"backup_disable", "backup_enable":
 			var enable = kind == "backup_enable"
@@ -168,8 +187,9 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 	return result
 
 func _read(s: Dictionary, kind: String) -> Dictionary:
-	if kind in ["submissions","package"] and not s.report.approved: return _result(s,"PERMISSION_REQUIRED")
+	if kind in InvestigationResolution.AUDIT_KINDS and not s.report.approved: return _result(s,"PERMISSION_REQUIRED")
 	var ids = []
+	if kind in ["request","purpose"] and s.day < (5 if kind == "request" else 6): return _result(s,"NOT_YET_AVAILABLE")
 	match kind:
 		"approval":
 			ids = ["approval"]
@@ -180,12 +200,26 @@ func _read(s: Dictionary, kind: String) -> Dictionary:
 		"backup": ids = ["backup"]
 		"submissions": ids = ["submissions"]
 		"package": ids = ["package"]
+		"application","metadata","request","purpose": ids = [kind]
+		"channel": ids = ["message"]
+		"controls":
+			for id in s.records:
+				if s.records[id].template in ["control_audit","quarantine_audit"]: ids.append(id)
+		"dispatch":
+			if s.records.has("dispatch-7"): ids = ["dispatch-7"]
+		"receipts":
+			if s.casework.phase not in ["after","replies"]: return _result(s,"NO_RECORDS")
+			var id = "receipt-"+s.casework.receipt
+			InvestigationResolution.audit(self,s,"receipt_audit",id,{"job":"T-19","transaction":"TX-19","receipt":s.casework.receipt,"response":"202 ACCEPTED" if s.casework.receipt == "confirmed" else "NO_RESPONSE" if s.casework.receipt == "unconfirmed" else "NOT_APPLICABLE"})
+			ids = [id]
+		"closing":
+			if s.records.has("final-report"): ids = ["final-report"]
 		"normal_jobs": ids = ["normal_jobs"]
 		"tasks", "task17", "task19":
 			if "tasks" not in s.baseline: s.baseline.append("tasks")
 			if kind == "task19" and s.report.approved: ids = ["transfer"]
 			else:
-				var text = _t("TASKS",{"status":_t("HELD" if s.tasks["T-17"].held else "RUNNING" if s.tasks["T-17"].status == "running" else "SCHEDULED")})
+				var text = _know(s,"task_definition")+"\n\n"+_t("TASKS",{"status":_t("HELD" if s.tasks["T-17"].held else "RUNNING" if s.tasks["T-17"].status == "running" else "SCHEDULED")})
 				if kind != "task19":
 					for id in s.records:
 						if s.records[id].template == "run": text += "\n\n" + _know(s,id)
@@ -196,7 +230,11 @@ func _read(s: Dictionary, kind: String) -> Dictionary:
 		"files":
 			s.ops.filesReadDay = s.day
 			if "files" not in s.baseline: s.baseline.append("files")
-			return _result(s,"FILES",_t("FILES"))
+			var id = "files-%d-%d" % [s.day,1 if s.ops.indexHealthy else 0]
+			_append(s,"files_sample",id,int(s.day),540)
+			s.records[id].facts = {"originalsExist":true,"indexHealthy":s.ops.indexHealthy}
+			s.records[id].body = _t("FILES")+"\nindex_state="+("READY" if s.ops.indexHealthy else "INCOMPLETE")
+			return _result(s,"FILES",_know(s,id))
 		"search": return _result(s,"SEARCH_RESULT",_t("SEARCH_OK" if s.ops.indexHealthy else "SEARCH_NOT_NORMAL"))
 		"index":
 			for id in s.records:
@@ -212,6 +250,7 @@ func _read(s: Dictionary, kind: String) -> Dictionary:
 func _dialogue(s: Dictionary, id: String) -> Dictionary:
 	for q in content.dialogue:
 		if q.id != id: continue
+		if s.ended != (q.get("phase","") == "closing"): return _result(s,"QUESTION_UNAVAILABLE")
 		if not condition(s,q.condition): return _result(s,"QUESTION_UNAVAILABLE")
 		if q.npc not in s.introduced: s.introduced.append(q.npc)
 		if id not in s.statements: s.statements.append(id)
@@ -236,6 +275,8 @@ func _report(s: Dictionary, payload: Dictionary) -> Dictionary:
 	if failure != "": return _result(s,"REPORT_INCOMPLETE",_t(failure))
 	s.report = {"approved":true,"claim":payload.claim,"attachments":payload.attachments.duplicate(true),"feedback":"approved"}
 	s.eventIds.append("audit-approved")
+	s.casework.links.C01 = [payload.attachments.scope,payload.attachments.access]
+	s.casework.links.C02 = [payload.attachments.access,payload.attachments.collection]
 	s.messages.append({"id":"audit-approved","npc":"oh","day":s.day,"text":_t("REPORT_APPROVED_HELD" if s.tasks["T-17"].held else "REPORT_APPROVED")})
 	return _result(s,"REPORT_APPROVED_HELD" if s.tasks["T-17"].held else "REPORT_APPROVED","",[{"type":"audit.approved"}])
 
@@ -262,8 +303,7 @@ func _end_day(s: Dictionary, payload: Dictionary) -> Dictionary:
 	var missing = missing_work(s)
 	if not missing.is_empty(): return _result(s,"DAY_NOT_READY","\n".join(missing))
 	if s.day == 7:
-		s.ended = true
-		return _result(s,"PROTOTYPE_ENDED")
+		return InvestigationResolution.close_case(self,s)
 	var previous = int(s.day)
 	var event = "night-%d" % previous
 	if event in s.eventIds: return _result(s,"STALE_ACTION")
@@ -277,6 +317,8 @@ func _end_day(s: Dictionary, payload: Dictionary) -> Dictionary:
 		for i in range(mini(previous*2,content.case.documents.size())):
 			var document = content.case.documents[i]
 			if document not in s.documents: s.documents.append(document)
+		s.records["access-night-%d" % previous].facts["documents"] = s.documents.duplicate()
+		s.records["access-night-%d" % previous].body += "\n"+"\n".join(s.documents)
 		s.records["staging-night-%d" % previous].facts["documents"] = s.documents.duplicate()
 		s.records["staging-night-%d" % previous].body += "\n" + "\n".join(s.documents)
 		if s.eventIds.filter(func(id): return id.begins_with("t17-run-")).size() == 2 and s.ops.indexHealthy:
@@ -286,6 +328,8 @@ func _end_day(s: Dictionary, payload: Dictionary) -> Dictionary:
 	if s.day == 2: s.messages.append({"id":"day2-work","npc":"han","day":2,"text":_t("DAY2_DELAY" if s.ops.backupDelay else "DAY2_NORMAL")})
 	if s.day == 3: s.messages.append({"id":"day3-work","npc":"han","day":3,"text":_t("DAY3_NORMAL" if s.ops.indexHealthy else "DAY3_DAMAGE")})
 	if s.day == 4: s.messages.append({"id":"day4-work","npc":"oh","day":4,"text":_t("DAY4_APPROVED" if s.report.approved else "DAY4_COMPARE")})
+	if s.day == 6: s.messages.append({"id":"day6-work","npc":"oh","day":6,"text":"금일 요청 문서와 보관 작업을 검토하고 필요한 변경 요청을 접수해 주세요."})
+	if s.day == 7: s.messages.append({"id":"day7-work","npc":"oh","day":7,"text":"오늘 정시 작업 확인은 17:30입니다. 처리 대장 확인 후 종결 보고를 접수해 주세요."})
 	if s.day == content.rules.lateFollowupDay:
 		var text = _t("LATE_APPROVED" if s.report.approved else "LATE_HELD" if task.held else "LATE_COLLECTION")
 		s.messages.append({"id":"late-followup","npc":"oh","day":s.day,"text":text})
@@ -294,7 +338,7 @@ func _end_day(s: Dictionary, payload: Dictionary) -> Dictionary:
 func project(s: Dictionary, context: String = "") -> Dictionary:
 	var questions = []
 	for q in content.dialogue:
-		if condition(s,q.condition): questions.append({"id":q.id,"npc":q.npc,"label":q.label,"channel":q.get("channel","dialogue")})
+		if s.ended == (q.get("phase","") == "closing") and condition(s,q.condition): questions.append({"id":q.id,"npc":q.npc,"label":q.label,"channel":q.get("channel","dialogue")})
 	var notes = []
 	var observed_documents = []
 	var collection_observed = false
@@ -305,4 +349,4 @@ func project(s: Dictionary, context: String = "") -> Dictionary:
 			collection_observed = true
 			for document in r.facts.get("documents",[]):
 				if document not in observed_documents: observed_documents.append(document)
-	return {"day":s.day,"ended":s.ended,"device":content.case.devices.get(context,{}),"notes":notes,"questions":questions,"messages":s.messages.duplicate(true),"work":missing_work(s),"approved":s.report.approved,"held":s.tasks["T-17"].held,"indexHealthy":s.ops.indexHealthy,"backupDelay":s.ops.backupDelay,"documentCount":observed_documents.size() if collection_observed else -1,"memo":s.memo,"knowsTransfer":"E12" in s.evidence}
+	return {"day":s.day,"ended":s.ended,"device":content.case.devices.get(context,{}),"notes":notes,"questions":questions,"messages":s.messages.duplicate(true),"work":missing_work(s),"approved":s.report.approved,"held":s.tasks["T-17"].held,"indexHealthy":s.ops.indexHealthy,"backupDelay":s.ops.backupDelay,"documentCount":observed_documents.size() if collection_observed else -1,"memo":s.memo,"knowsTransfer":"transfer" in s.known}

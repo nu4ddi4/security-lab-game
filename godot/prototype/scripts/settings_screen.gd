@@ -76,7 +76,7 @@ func _ready():
 	var body = VBoxContainer.new()
 	body.add_theme_constant_override("separation",14)
 	margin.add_child(body)
-	var assigned = game.ui.investigation_assigned()
+	var assigned = game.state.day >= 2 or game.ui.investigation_assigned()
 	var close_button = Button.new()
 	close_button.text = "닫기" if game.controls.touch_enabled else "닫기 · Esc"
 	close_button.custom_minimum_size.y = 48 if game.controls.mobile else 34

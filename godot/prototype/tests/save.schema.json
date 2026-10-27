@@ -62,6 +62,90 @@
         "memo": {
           "type": "string",
           "maxLength": 4000
+        },
+        "casework": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "phase",
+            "minute",
+            "links",
+            "control",
+            "stagingIsolated",
+            "dispatch",
+            "receipt",
+            "final",
+            "ending"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "phase": {
+              "enum": [
+                "morning",
+                "dispatching",
+                "after",
+                "replies"
+              ]
+            },
+            "minute": {
+              "enum": [
+                540,
+                1050,
+                1051,
+                1055
+              ]
+            },
+            "links": {
+              "type": "object"
+            },
+            "control": {
+              "type": "object",
+              "required": [
+                "approved",
+                "mode"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "approved": {
+                  "type": "boolean"
+                },
+                "mode": {
+                  "enum": [
+                    "none",
+                    "blocked_pre_run",
+                    "blocked_during"
+                  ]
+                }
+              }
+            },
+            "stagingIsolated": {
+              "type": "boolean"
+            },
+            "dispatch": {
+              "enum": [
+                "pending",
+                "not_run",
+                "blocked",
+                "sent"
+              ]
+            },
+            "receipt": {
+              "enum": [
+                "none",
+                "unconfirmed",
+                "confirmed"
+              ]
+            },
+            "final": {
+              "type": "object"
+            },
+            "ending": {
+              "type": "object"
+            }
+          }
         }
       }
     }

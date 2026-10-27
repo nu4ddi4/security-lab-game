@@ -1,0 +1,683 @@
+{
+	"caseId": "residual-permissions",
+	"contentVersion": "prototype-1",
+	"contractVersion": 1,
+	"format": "security-lab-investigation",
+	"schemaVersion": 1,
+	"state": {
+		"baseline": [
+			"service",
+			"account",
+			"tasks",
+			"files",
+			"approval"
+		],
+		"day": 7,
+		"documents": [
+			"LUMEN/design-private.pdf",
+			"LUMEN/pricing-internal.xlsx",
+			"LUMEN/release-draft.txt",
+			"LUMEN/contracts-internal.pdf",
+			"LUMEN/architecture-private.pdf",
+			"LUMEN/forecast-internal.xlsx"
+		],
+		"ended": true,
+		"eventIds": [
+			"night-1",
+			"t17-run-1",
+			"night-2",
+			"t17-run-2",
+			"night-3",
+			"t17-run-3",
+			"night-4",
+			"t17-run-4",
+			"audit-approved",
+			"night-5",
+			"t17-run-5",
+			"night-6",
+			"t17-run-6"
+		],
+		"evidence": [
+			"E02",
+			"E01",
+			"E03",
+			"E06",
+			"E07",
+			"E08"
+		],
+		"introduced": [
+			"park",
+			"han",
+			"seo"
+		],
+		"known": [
+			"account",
+			"approval",
+			"backup",
+			"access-night-1",
+			"access-night-2",
+			"access-night-3",
+			"access-night-4",
+			"staging-night-1",
+			"staging-night-2",
+			"staging-night-3",
+			"staging-night-4",
+			"submissions"
+		],
+		"maintenanceAllowed": true,
+		"memo": "",
+		"messages": [
+			{
+				"day": 1,
+				"id": "handover",
+				"npc": "oh",
+				"text": "서비스·계정·작업·원본·승인 범위를 확인하고 담당자들과 인계를 마쳐 주세요. 첫날에는 점검만 마치면 됩니다."
+			},
+			{
+				"day": 2,
+				"id": "day2-work",
+				"npc": "han",
+				"text": "자료 서비스가 느립니다. 백업 구성과 실제 실행을 확인하고 필수 서비스를 유지해 주세요."
+			},
+			{
+				"day": 3,
+				"id": "day3-work",
+				"npc": "han",
+				"text": "자료 검색 결과가 누락됩니다. 먼저 원본이 있는지 확인하고 실제 장애를 복구해 주세요."
+			},
+			{
+				"day": 4,
+				"id": "day4-work",
+				"npc": "oh",
+				"text": "보안팀장 오세진: 오늘부터 승인 범위와 실제 작업 행동을 대조하는 조사 업무를 맡아 주세요. 실제 접근·임시 보관 원본을 확인하고, 확인한 사실과 미확정 사항을 나눠 발생 보고를 제출하세요."
+			},
+			{
+				"day": 5,
+				"id": "late-followup",
+				"npc": "oh",
+				"text": "임시 보관량이 늘었습니다. 현재 자료가 모인 경위를 확인해 주세요."
+			},
+			{
+				"day": 5,
+				"id": "audit-approved",
+				"npc": "oh",
+				"text": "승인 범위를 벗어난 수집을 확인했습니다. 감사 기록과 보관 원본 열람을 승인합니다. 실행 상태를 보존·통제할 수 있으며 행위자·고의성·외부 반출은 추가 확인 대상입니다."
+			}
+		],
+		"ops": {
+			"backupDelay": false,
+			"duplicateBackup": false,
+			"filesReadDay": 3,
+			"indexHealthy": true,
+			"primaryBackup": true,
+			"searchVerifiedDay": 6,
+			"serviceVerifiedDay": 6
+		},
+		"records": {
+			"access-night-1": {
+				"acquiredDay": 5,
+				"body": "T-17 / svc_release가 LUMEN 비공개 문서를 읽었습니다.\n읽기 기록은 접근을 보여주며 보관·외부 전달 여부는 별도 확인해야 합니다.",
+				"evidence": "E06",
+				"facts": {
+					"account": "svc_release",
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "access-night-1",
+				"initial": false,
+				"source": "서버 접근 기록",
+				"template": "access",
+				"time": {
+					"dayOffset": 1,
+					"minute": 1390
+				},
+				"title": "LUMEN 자료 접근"
+			},
+			"access-night-2": {
+				"acquiredDay": 5,
+				"body": "T-17 / svc_release가 LUMEN 비공개 문서를 읽었습니다.\n읽기 기록은 접근을 보여주며 보관·외부 전달 여부는 별도 확인해야 합니다.",
+				"evidence": "E06",
+				"facts": {
+					"account": "svc_release",
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "access-night-2",
+				"initial": false,
+				"source": "서버 접근 기록",
+				"template": "access",
+				"time": {
+					"dayOffset": 2,
+					"minute": 1390
+				},
+				"title": "LUMEN 자료 접근"
+			},
+			"access-night-3": {
+				"acquiredDay": 5,
+				"body": "T-17 / svc_release가 LUMEN 비공개 문서를 읽었습니다.\n읽기 기록은 접근을 보여주며 보관·외부 전달 여부는 별도 확인해야 합니다.",
+				"evidence": "E06",
+				"facts": {
+					"account": "svc_release",
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "access-night-3",
+				"initial": false,
+				"source": "서버 접근 기록",
+				"template": "access",
+				"time": {
+					"dayOffset": 3,
+					"minute": 1390
+				},
+				"title": "LUMEN 자료 접근"
+			},
+			"access-night-4": {
+				"acquiredDay": 5,
+				"body": "T-17 / svc_release가 LUMEN 비공개 문서를 읽었습니다.\n읽기 기록은 접근을 보여주며 보관·외부 전달 여부는 별도 확인해야 합니다.",
+				"evidence": "E06",
+				"facts": {
+					"account": "svc_release",
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "access-night-4",
+				"initial": false,
+				"source": "서버 접근 기록",
+				"template": "access",
+				"time": {
+					"dayOffset": 4,
+					"minute": 1390
+				},
+				"title": "LUMEN 자료 접근"
+			},
+			"access-night-5": {
+				"body": "T-17 / svc_release가 LUMEN 비공개 문서를 읽었습니다.\n읽기 기록은 접근을 보여주며 보관·외부 전달 여부는 별도 확인해야 합니다.",
+				"evidence": "E06",
+				"facts": {
+					"account": "svc_release",
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "access-night-5",
+				"initial": false,
+				"source": "서버 접근 기록",
+				"template": "access",
+				"time": {
+					"dayOffset": 5,
+					"minute": 1390
+				},
+				"title": "LUMEN 자료 접근"
+			},
+			"access-night-6": {
+				"body": "T-17 / svc_release가 LUMEN 비공개 문서를 읽었습니다.\n읽기 기록은 접근을 보여주며 보관·외부 전달 여부는 별도 확인해야 합니다.",
+				"evidence": "E06",
+				"facts": {
+					"account": "svc_release",
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "access-night-6",
+				"initial": false,
+				"source": "서버 접근 기록",
+				"template": "access",
+				"time": {
+					"dayOffset": 6,
+					"minute": 1390
+				},
+				"title": "LUMEN 자료 접근"
+			},
+			"account": {
+				"acquiredDay": 1,
+				"body": "svc_release는 자동 배포·유지보수 작업의 실행 계정입니다.\n업무 담당자는 한지우이며, 계정 이름만으로 작업 제출자를 알 수 없습니다.",
+				"evidence": "E02",
+				"facts": {
+					"account": "svc_release",
+					"owner": "한지우"
+				},
+				"id": "account",
+				"initial": true,
+				"source": "서버 계정 목록",
+				"template": "account",
+				"time": {
+					"dayOffset": 1,
+					"minute": 540
+				},
+				"title": "svc_release 계정 역할"
+			},
+			"approval": {
+				"acquiredDay": 1,
+				"body": "허용 범위: 상태 조회, 진단 로그 수집, 임시 파일 정리.\nLUMEN 프로젝트 문서 수집은 승인 범위에 없습니다.\nSUPPORT-07 배정: 협력업체 정비 담당 서유진.",
+				"evidence": "E01",
+				"facts": {
+					"collectionAllowed": false,
+					"workOrder": "W-218"
+				},
+				"id": "approval",
+				"initial": true,
+				"source": "승인서 보관함",
+				"template": "approval",
+				"time": {
+					"dayOffset": -14,
+					"minute": 900
+				},
+				"title": "승인서 W-218"
+			},
+			"backup": {
+				"acquiredDay": 2,
+				"body": "B-01: 필수 자료 백업. B-05: 이관 때 함께 활성화된 중복 백업.\n같은 자료를 같은 시간에 처리합니다. T-17과는 다른 작업입니다.",
+				"evidence": "E03",
+				"facts": {
+					"duplicate": "B-05"
+				},
+				"id": "backup",
+				"initial": true,
+				"source": "서버 백업 기록",
+				"template": "backup",
+				"time": {
+					"dayOffset": 1,
+					"minute": 540
+				},
+				"title": "백업 설정과 지연"
+			},
+			"backup-change-11": {
+				"body": "B-05 설정을 변경했습니다. 필수 B-01은 유지됩니다. 변경 이후 자료 서비스 정상 상태를 다시 검증해야 합니다.\n중복 B-05를 해제했습니다. 필수 B-01은 유지됩니다. verify service로 재검증하세요.",
+				"evidence": "E03",
+				"facts": {
+					"duplicateEnabled": false
+				},
+				"id": "backup-change-11",
+				"initial": false,
+				"source": "서버 설정 이력",
+				"template": "backup_change",
+				"time": {
+					"dayOffset": 2,
+					"minute": 600
+				},
+				"title": "백업 설정 변경 기록"
+			},
+			"index-night-2": {
+				"body": "T-17 정리 동작과 같은 시각에 검색 색인이 변경됐습니다.\n원본 파일은 존재하며 검색 색인을 복구할 수 있습니다.",
+				"evidence": "E05",
+				"facts": {
+					"originalsExist": true,
+					"task": "T-17"
+				},
+				"id": "index-night-2",
+				"initial": false,
+				"source": "업무 PC 색인 기록",
+				"template": "index_damage",
+				"time": {
+					"dayOffset": 2,
+					"minute": 1390
+				},
+				"title": "색인 처리 오류"
+			},
+			"message": {
+				"body": "시작 전날 16:20 / 서유진: 진단 항목을 수정했습니다.\n첨부: PKG-218-R2. 중앙 적용 기록·보관 원본과 패키지 식별값을 대조할 수 있습니다.",
+				"evidence": "E11",
+				"facts": {
+					"package": "PKG-218-R2",
+					"sender": "서유진"
+				},
+				"id": "message",
+				"initial": true,
+				"source": "유지보수 업무 메신저",
+				"template": "message",
+				"time": {
+					"dayOffset": -1,
+					"minute": 980
+				},
+				"title": "정비 채널 제출 메시지"
+			},
+			"normal_jobs": {
+				"body": "한지우의 정상 배포와 박도윤의 백업 설정 이력은 별도 기록입니다.\n실행 계정, 업무 담당자, 패키지 제출자를 구분해야 합니다.",
+				"evidence": "E09",
+				"facts": {},
+				"id": "normal_jobs",
+				"initial": true,
+				"source": "업무 PC 배포 기록",
+				"template": "normal_jobs",
+				"time": {
+					"dayOffset": -2,
+					"minute": 930
+				},
+				"title": "정상 배포·운영 비교"
+			},
+			"package": {
+				"body": "원래 작업: 상태·로그 조회와 임시 파일 정리.\n수정본: LUMEN 비공개 문서 선택 → 내부 staging 보관.\n후속 등록 작업 T-19는 보관 자료를 협력업체 전달 경로로 보내도록 설정됐습니다.\n이 내용은 계획이며 전달 완료 기록은 아닙니다.",
+				"evidence": "E10",
+				"facts": {
+					"package": "PKG-218-R2",
+					"task": "T-17"
+				},
+				"id": "package",
+				"initial": true,
+				"source": "관제 패키지 보관함",
+				"template": "package",
+				"time": {
+					"dayOffset": -1,
+					"minute": 995
+				},
+				"title": "보관 패키지 PKG-218-R2"
+			},
+			"run-night-1": {
+				"body": "23:10 자료 색인 점검이 svc_release로 시작됐습니다.\n등록 작업: T-17. 실행 경로: 이전 유지보수 경로.",
+				"evidence": "E04",
+				"facts": {
+					"account": "svc_release",
+					"task": "T-17"
+				},
+				"id": "run-night-1",
+				"initial": false,
+				"source": "서버 작업 기록",
+				"template": "run",
+				"time": {
+					"dayOffset": 1,
+					"minute": 1390
+				},
+				"title": "T-17 실행 기록"
+			},
+			"run-night-2": {
+				"body": "23:10 자료 색인 점검이 svc_release로 시작됐습니다.\n등록 작업: T-17. 실행 경로: 이전 유지보수 경로.",
+				"evidence": "E04",
+				"facts": {
+					"account": "svc_release",
+					"task": "T-17"
+				},
+				"id": "run-night-2",
+				"initial": false,
+				"source": "서버 작업 기록",
+				"template": "run",
+				"time": {
+					"dayOffset": 2,
+					"minute": 1390
+				},
+				"title": "T-17 실행 기록"
+			},
+			"run-night-3": {
+				"body": "23:10 자료 색인 점검이 svc_release로 시작됐습니다.\n등록 작업: T-17. 실행 경로: 이전 유지보수 경로.",
+				"evidence": "E04",
+				"facts": {
+					"account": "svc_release",
+					"task": "T-17"
+				},
+				"id": "run-night-3",
+				"initial": false,
+				"source": "서버 작업 기록",
+				"template": "run",
+				"time": {
+					"dayOffset": 3,
+					"minute": 1390
+				},
+				"title": "T-17 실행 기록"
+			},
+			"run-night-4": {
+				"body": "23:10 자료 색인 점검이 svc_release로 시작됐습니다.\n등록 작업: T-17. 실행 경로: 이전 유지보수 경로.",
+				"evidence": "E04",
+				"facts": {
+					"account": "svc_release",
+					"task": "T-17"
+				},
+				"id": "run-night-4",
+				"initial": false,
+				"source": "서버 작업 기록",
+				"template": "run",
+				"time": {
+					"dayOffset": 4,
+					"minute": 1390
+				},
+				"title": "T-17 실행 기록"
+			},
+			"run-night-5": {
+				"body": "23:10 자료 색인 점검이 svc_release로 시작됐습니다.\n등록 작업: T-17. 실행 경로: 이전 유지보수 경로.",
+				"evidence": "E04",
+				"facts": {
+					"account": "svc_release",
+					"task": "T-17"
+				},
+				"id": "run-night-5",
+				"initial": false,
+				"source": "서버 작업 기록",
+				"template": "run",
+				"time": {
+					"dayOffset": 5,
+					"minute": 1390
+				},
+				"title": "T-17 실행 기록"
+			},
+			"run-night-6": {
+				"body": "23:10 자료 색인 점검이 svc_release로 시작됐습니다.\n등록 작업: T-17. 실행 경로: 이전 유지보수 경로.",
+				"evidence": "E04",
+				"facts": {
+					"account": "svc_release",
+					"task": "T-17"
+				},
+				"id": "run-night-6",
+				"initial": false,
+				"source": "서버 작업 기록",
+				"template": "run",
+				"time": {
+					"dayOffset": 6,
+					"minute": 1390
+				},
+				"title": "T-17 실행 기록"
+			},
+			"staging-night-1": {
+				"acquiredDay": 5,
+				"body": "T-17이 읽은 LUMEN 비공개 자료가 내부 임시 보관 위치에 모였습니다.\n이 기록은 수집을 보여주며 외부 전달 성공을 의미하지 않습니다.\nLUMEN/design-private.pdf\nLUMEN/pricing-internal.xlsx",
+				"evidence": "E07",
+				"facts": {
+					"documents": [
+						"LUMEN/design-private.pdf",
+						"LUMEN/pricing-internal.xlsx"
+					],
+					"nonpublic": true,
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "staging-night-1",
+				"initial": false,
+				"source": "서버 staging 기록",
+				"template": "staging",
+				"time": {
+					"dayOffset": 1,
+					"minute": 1390
+				},
+				"title": "임시 보관 목록"
+			},
+			"staging-night-2": {
+				"acquiredDay": 5,
+				"body": "T-17이 읽은 LUMEN 비공개 자료가 내부 임시 보관 위치에 모였습니다.\n이 기록은 수집을 보여주며 외부 전달 성공을 의미하지 않습니다.\nLUMEN/design-private.pdf\nLUMEN/pricing-internal.xlsx\nLUMEN/release-draft.txt\nLUMEN/contracts-internal.pdf",
+				"evidence": "E07",
+				"facts": {
+					"documents": [
+						"LUMEN/design-private.pdf",
+						"LUMEN/pricing-internal.xlsx",
+						"LUMEN/release-draft.txt",
+						"LUMEN/contracts-internal.pdf"
+					],
+					"nonpublic": true,
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "staging-night-2",
+				"initial": false,
+				"source": "서버 staging 기록",
+				"template": "staging",
+				"time": {
+					"dayOffset": 2,
+					"minute": 1390
+				},
+				"title": "임시 보관 목록"
+			},
+			"staging-night-3": {
+				"acquiredDay": 5,
+				"body": "T-17이 읽은 LUMEN 비공개 자료가 내부 임시 보관 위치에 모였습니다.\n이 기록은 수집을 보여주며 외부 전달 성공을 의미하지 않습니다.\nLUMEN/design-private.pdf\nLUMEN/pricing-internal.xlsx\nLUMEN/release-draft.txt\nLUMEN/contracts-internal.pdf\nLUMEN/architecture-private.pdf\nLUMEN/forecast-internal.xlsx",
+				"evidence": "E07",
+				"facts": {
+					"documents": [
+						"LUMEN/design-private.pdf",
+						"LUMEN/pricing-internal.xlsx",
+						"LUMEN/release-draft.txt",
+						"LUMEN/contracts-internal.pdf",
+						"LUMEN/architecture-private.pdf",
+						"LUMEN/forecast-internal.xlsx"
+					],
+					"nonpublic": true,
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "staging-night-3",
+				"initial": false,
+				"source": "서버 staging 기록",
+				"template": "staging",
+				"time": {
+					"dayOffset": 3,
+					"minute": 1390
+				},
+				"title": "임시 보관 목록"
+			},
+			"staging-night-4": {
+				"acquiredDay": 5,
+				"body": "T-17이 읽은 LUMEN 비공개 자료가 내부 임시 보관 위치에 모였습니다.\n이 기록은 수집을 보여주며 외부 전달 성공을 의미하지 않습니다.\nLUMEN/design-private.pdf\nLUMEN/pricing-internal.xlsx\nLUMEN/release-draft.txt\nLUMEN/contracts-internal.pdf\nLUMEN/architecture-private.pdf\nLUMEN/forecast-internal.xlsx",
+				"evidence": "E07",
+				"facts": {
+					"documents": [
+						"LUMEN/design-private.pdf",
+						"LUMEN/pricing-internal.xlsx",
+						"LUMEN/release-draft.txt",
+						"LUMEN/contracts-internal.pdf",
+						"LUMEN/architecture-private.pdf",
+						"LUMEN/forecast-internal.xlsx"
+					],
+					"nonpublic": true,
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "staging-night-4",
+				"initial": false,
+				"source": "서버 staging 기록",
+				"template": "staging",
+				"time": {
+					"dayOffset": 4,
+					"minute": 1390
+				},
+				"title": "임시 보관 목록"
+			},
+			"staging-night-5": {
+				"body": "T-17이 읽은 LUMEN 비공개 자료가 내부 임시 보관 위치에 모였습니다.\n이 기록은 수집을 보여주며 외부 전달 성공을 의미하지 않습니다.\nLUMEN/design-private.pdf\nLUMEN/pricing-internal.xlsx\nLUMEN/release-draft.txt\nLUMEN/contracts-internal.pdf\nLUMEN/architecture-private.pdf\nLUMEN/forecast-internal.xlsx",
+				"evidence": "E07",
+				"facts": {
+					"documents": [
+						"LUMEN/design-private.pdf",
+						"LUMEN/pricing-internal.xlsx",
+						"LUMEN/release-draft.txt",
+						"LUMEN/contracts-internal.pdf",
+						"LUMEN/architecture-private.pdf",
+						"LUMEN/forecast-internal.xlsx"
+					],
+					"nonpublic": true,
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "staging-night-5",
+				"initial": false,
+				"source": "서버 staging 기록",
+				"template": "staging",
+				"time": {
+					"dayOffset": 5,
+					"minute": 1390
+				},
+				"title": "임시 보관 목록"
+			},
+			"staging-night-6": {
+				"body": "T-17이 읽은 LUMEN 비공개 자료가 내부 임시 보관 위치에 모였습니다.\n이 기록은 수집을 보여주며 외부 전달 성공을 의미하지 않습니다.\nLUMEN/design-private.pdf\nLUMEN/pricing-internal.xlsx\nLUMEN/release-draft.txt\nLUMEN/contracts-internal.pdf\nLUMEN/architecture-private.pdf\nLUMEN/forecast-internal.xlsx",
+				"evidence": "E07",
+				"facts": {
+					"documents": [
+						"LUMEN/design-private.pdf",
+						"LUMEN/pricing-internal.xlsx",
+						"LUMEN/release-draft.txt",
+						"LUMEN/contracts-internal.pdf",
+						"LUMEN/architecture-private.pdf",
+						"LUMEN/forecast-internal.xlsx"
+					],
+					"nonpublic": true,
+					"project": "LUMEN",
+					"task": "T-17"
+				},
+				"id": "staging-night-6",
+				"initial": false,
+				"source": "서버 staging 기록",
+				"template": "staging",
+				"time": {
+					"dayOffset": 6,
+					"minute": 1390
+				},
+				"title": "임시 보관 목록"
+			},
+			"submissions": {
+				"acquiredDay": 5,
+				"body": "시작 전날 16:35 / SUPPORT-07 제출 세션 / PKG-218-R2 적용.\nT-17 수정과 T-19 등록이 같은 적용 기록에 연결됩니다.\n배정 장비만으로 제출 내용과 행위자 결론을 확정하지 마세요.",
+				"evidence": "E08",
+				"facts": {
+					"device": "SUPPORT-07",
+					"package": "PKG-218-R2"
+				},
+				"id": "submissions",
+				"initial": true,
+				"source": "관제 감사 기록",
+				"template": "submissions",
+				"time": {
+					"dayOffset": -1,
+					"minute": 995
+				},
+				"title": "패키지 제출·적용 감사"
+			},
+			"transfer": {
+				"body": "T-19 / 정비 결과 전달 / 7일차 17:30 예정.\n대상: 내부 staging. 경로: 협력업체 접수 채널.\n아직 실제 전달 결과는 없습니다. T-17 중지와 이 전달 작업 통제는 다른 조치입니다.",
+				"evidence": "E12",
+				"facts": {
+					"destination": "contractor-channel",
+					"task": "T-19"
+				},
+				"id": "transfer",
+				"initial": true,
+				"source": "서버 작업 상세",
+				"template": "transfer",
+				"time": {
+					"dayOffset": -1,
+					"minute": 995
+				},
+				"title": "T-19 전달 설정"
+			}
+		},
+		"report": {
+			"approved": true,
+			"attachments": {
+				"access": "access-night-1",
+				"collection": "staging-night-1",
+				"scope": "approval"
+			},
+			"claim": "unauthorized_collection",
+			"feedback": "approved"
+		},
+		"revision": 31,
+		"schemaVersion": 1,
+		"statements": [
+			"park_intro",
+			"han_intro",
+			"seo_intro"
+		],
+		"tasks": {
+			"T-17": {
+				"held": false,
+				"status": "running"
+			},
+			"T-19": {
+				"held": false,
+				"status": "scheduled"
+			}
+		}
+	}
+}

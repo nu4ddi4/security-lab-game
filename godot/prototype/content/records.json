@@ -1,8 +1,8 @@
 {
   "approval": {
-    "title": "승인서 W-218",
-    "source": "승인서 보관함",
-    "body": "허용 범위: 상태 조회, 진단 로그 수집, 임시 파일 정리.\nLUMEN 프로젝트 문서 수집은 승인 범위에 없습니다.\nSUPPORT-07 배정: 협력업체 정비 담당 서유진.",
+    "title": "W-218 / 작업 승인서",
+    "source": "문서 관리 · 승인 대장",
+    "body": "작업 항목: 상태 조회 / 진단 로그 수집 / 임시 파일 정리\n대상 구분: 운영 상태 및 진단 산출물\n제외 경로: /workspace/LUMEN/*\n배정 장비: SUPPORT-07\n배정 담당: 서유진\n추가 승인 번호: —",
     "evidence": "E01",
     "facts": {
       "workOrder": "W-218",
@@ -12,12 +12,13 @@
       "dayOffset": -14,
       "minute": 900
     },
-    "initial": true
+    "initial": true,
+    "graphId": "E01"
   },
   "account": {
-    "title": "svc_release 계정 역할",
-    "source": "서버 계정 목록",
-    "body": "svc_release는 자동 배포·유지보수 작업의 실행 계정입니다.\n업무 담당자는 한지우이며, 계정 이름만으로 작업 제출자를 알 수 없습니다.",
+    "title": "서비스 계정 대장",
+    "source": "서버 계정 관리",
+    "body": "account=svc_release\n업무 담당=한지우\n용도=자동 배포 / 유지보수\n실행 경로=/legacy/maintenance/runner\n권한 검토 상태=이관 전 설정 유지",
     "evidence": "E02",
     "facts": {
       "account": "svc_release",
@@ -27,12 +28,13 @@
       "dayOffset": 1,
       "minute": 540
     },
-    "initial": true
+    "initial": true,
+    "graphId": "E02"
   },
   "backup": {
-    "title": "백업 설정과 지연",
-    "source": "서버 백업 기록",
-    "body": "B-01: 필수 자료 백업. B-05: 이관 때 함께 활성화된 중복 백업.\n같은 자료를 같은 시간에 처리합니다. T-17과는 다른 작업입니다.",
+    "title": "백업 스케줄 대장",
+    "source": "운영 스케줄러",
+    "body": "B-01 | source=documents | start=23:00 | enabled=true\nB-05 | source=documents | start=23:00 | enabled=true\nB-05 변경자=박도윤 | 변경 구분=이관 설정",
     "evidence": "E03",
     "facts": {
       "duplicate": "B-05"
@@ -41,12 +43,13 @@
       "dayOffset": 1,
       "minute": 540
     },
-    "initial": true
+    "initial": true,
+    "graphId": "E05"
   },
   "run": {
-    "title": "T-17 실행 기록",
-    "source": "서버 작업 기록",
-    "body": "23:10 자료 색인 점검이 svc_release로 시작됐습니다.\n등록 작업: T-17. 실행 경로: 이전 유지보수 경로.",
+    "title": "작업 실행 이력",
+    "source": "운영 스케줄러 · 실행 대장",
+    "body": "23:10 | job=T-17 | account=svc_release | result=STARTED\nrunner=/legacy/maintenance/runner",
     "evidence": "E04",
     "facts": {
       "task": "T-17",
@@ -56,12 +59,13 @@
       "dayOffset": 1,
       "minute": 540
     },
-    "initial": false
+    "initial": false,
+    "graphId": "E07"
   },
   "index_damage": {
-    "title": "색인 처리 오류",
-    "source": "업무 PC 색인 기록",
-    "body": "T-17 정리 동작과 같은 시각에 검색 색인이 변경됐습니다.\n원본 파일은 존재하며 검색 색인을 복구할 수 있습니다.",
+    "title": "색인 세대 변경 이력",
+    "source": "검색 서비스 · 색인 대장",
+    "body": "23:10 | caller_job=T-17 | operation=CLEAN_TEMP\n23:10 | generation=42 | result=INCOMPLETE\n원본 저장소 응답=AVAILABLE",
     "evidence": "E05",
     "facts": {
       "task": "T-17",
@@ -71,12 +75,13 @@
       "dayOffset": 1,
       "minute": 540
     },
-    "initial": false
+    "initial": false,
+    "graphId": "E07"
   },
   "access": {
-    "title": "LUMEN 자료 접근",
-    "source": "서버 접근 기록",
-    "body": "T-17 / svc_release가 LUMEN 비공개 문서를 읽었습니다.\n읽기 기록은 접근을 보여주며 보관·외부 전달 여부는 별도 확인해야 합니다.",
+    "title": "파일 접근 내역",
+    "source": "문서 저장소 · 접근 감사",
+    "body": "operation=READ | job=T-17 | account=svc_release\nnamespace=LUMEN | classification=INTERNAL",
     "evidence": "E06",
     "facts": {
       "task": "T-17",
@@ -87,12 +92,13 @@
       "dayOffset": 1,
       "minute": 540
     },
-    "initial": false
+    "initial": false,
+    "graphId": "E03"
   },
   "staging": {
-    "title": "임시 보관 목록",
-    "source": "서버 staging 기록",
-    "body": "T-17이 읽은 LUMEN 비공개 자료가 내부 임시 보관 위치에 모였습니다.\n이 기록은 수집을 보여주며 외부 전달 성공을 의미하지 않습니다.",
+    "title": "보관 위치 변경 내역",
+    "source": "저장소 · 변경 감사",
+    "body": "operation=COPY | job=T-17\ndestination=/staging/maintenance/PKG-218-R2\n분류=INTERNAL",
     "evidence": "E07",
     "facts": {
       "task": "T-17",
@@ -103,12 +109,13 @@
       "dayOffset": 1,
       "minute": 540
     },
-    "initial": false
+    "initial": false,
+    "graphId": "E04"
   },
   "submissions": {
-    "title": "패키지 제출·적용 감사",
-    "source": "관제 감사 기록",
-    "body": "시작 전날 16:35 / SUPPORT-07 제출 세션 / PKG-218-R2 적용.\nT-17 수정과 T-19 등록이 같은 적용 기록에 연결됩니다.\n배정 장비만으로 제출 내용과 행위자 결론을 확정하지 마세요.",
+    "title": "접수 세션 대장",
+    "source": "관제 · 제출 접수 서비스",
+    "body": "전날 16:35 | session=SUPPORT-07 | upload=UP-218\npackage=PKG-218-R2 | receipt=ACCEPTED\nwork_order=W-218",
     "evidence": "E08",
     "facts": {
       "package": "PKG-218-R2",
@@ -118,24 +125,27 @@
       "dayOffset": -1,
       "minute": 995
     },
-    "initial": true
+    "initial": true,
+    "graphId": "E09",
+    "audit": true
   },
   "normal_jobs": {
-    "title": "정상 배포·운영 비교",
-    "source": "업무 PC 배포 기록",
-    "body": "한지우의 정상 배포와 박도윤의 백업 설정 이력은 별도 기록입니다.\n실행 계정, 업무 담당자, 패키지 제출자를 구분해야 합니다.",
+    "title": "배포 실행 대장",
+    "source": "개발 배포 서비스",
+    "body": "시작 전 2일 15:30 | request=DEP-108 | requester=한지우\naccount=svc_release | source=/releases/approved\ndestination=/services/LUMEN | result=COMPLETED",
     "evidence": "E09",
     "facts": {},
     "time": {
       "dayOffset": -2,
       "minute": 930
     },
-    "initial": true
+    "initial": true,
+    "graphId": "E06"
   },
   "package": {
-    "title": "보관 패키지 PKG-218-R2",
-    "source": "관제 패키지 보관함",
-    "body": "원래 작업: 상태·로그 조회와 임시 파일 정리.\n수정본: LUMEN 비공개 문서 선택 → 내부 staging 보관.\n후속 등록 작업 T-19는 보관 자료를 협력업체 전달 경로로 보내도록 설정됐습니다.\n이 내용은 계획이며 전달 완료 기록은 아닙니다.",
+    "title": "PKG-218-R2 / 구성 내역",
+    "source": "관제 · 패키지 보관소",
+    "body": "package=PKG-218-R2\nbase_items=status,diagnostic_logs,temp_cleanup\nselect=/workspace/LUMEN/*-private.*,/workspace/LUMEN/*-internal.*,release-draft.txt\ncopy_to=/staging/maintenance/PKG-218-R2\npost_job=T-19 | post_profile=vendor-intake",
     "evidence": "E10",
     "facts": {
       "package": "PKG-218-R2",
@@ -145,12 +155,14 @@
       "dayOffset": -1,
       "minute": 995
     },
-    "initial": true
+    "initial": true,
+    "graphId": "E11",
+    "audit": true
   },
   "message": {
-    "title": "정비 채널 제출 메시지",
+    "title": "정비 채널 / 전날 대화",
     "source": "유지보수 업무 메신저",
-    "body": "시작 전날 16:20 / 서유진: 진단 항목을 수정했습니다.\n첨부: PKG-218-R2. 중앙 적용 기록·보관 원본과 패키지 식별값을 대조할 수 있습니다.",
+    "body": "전날 16:20 | 서유진\n진단 항목을 수정했습니다. 전달받은 항목을 반영해 올립니다.\n첨부=PKG-218-R2 | work_order=W-218",
     "evidence": "E11",
     "facts": {
       "sender": "서유진",
@@ -160,12 +172,13 @@
       "dayOffset": -1,
       "minute": 980
     },
-    "initial": true
+    "initial": true,
+    "graphId": "E08"
   },
   "transfer": {
-    "title": "T-19 전달 설정",
-    "source": "서버 작업 상세",
-    "body": "T-19 / 정비 결과 전달 / 7일차 17:30 예정.\n대상: 내부 staging. 경로: 협력업체 접수 채널.\n아직 실제 전달 결과는 없습니다. T-17 중지와 이 전달 작업 통제는 다른 조치입니다.",
+    "title": "예약 작업 대장 / T-19",
+    "source": "관제 · 작업 예약 서비스",
+    "body": "job=T-19 | label=정비 결과 전달\nstart=D7 17:30 | state=SCHEDULED\nsource=/staging/maintenance/PKG-218-R2\nprofile=vendor-intake | destination=협력업체 접수 채널",
     "evidence": "E12",
     "facts": {
       "task": "T-19",
@@ -175,25 +188,238 @@
       "dayOffset": -1,
       "minute": 995
     },
-    "initial": true
+    "initial": true,
+    "graphId": "E15",
+    "audit": true
   },
   "snapshot": {
-    "title": "보존한 T-17 실행 상태",
-    "source": "서버 실행 상태",
-    "body": "현재 실행 중인 T-17의 작업·계정·보관 상태를 보존했습니다. 핵심 중앙 기록은 중지 이후에도 남습니다.",
+    "title": "실행 상태 사본",
+    "source": "서버 · 상태 보관",
+    "body": "operation=SNAPSHOT | job=T-17",
     "evidence": "",
     "facts": {},
     "time": {
       "dayOffset": 1,
       "minute": 540
     },
-    "initial": false
+    "initial": false,
+    "graphId": ""
   },
   "backup_change": {
-    "title": "백업 설정 변경 기록",
-    "source": "서버 설정 이력",
-    "body": "B-05 설정을 변경했습니다. 필수 B-01은 유지됩니다. 변경 이후 자료 서비스 정상 상태를 다시 검증해야 합니다.",
+    "title": "백업 설정 변경 대장",
+    "source": "서버 · 설정 감사",
+    "body": "operation=UPDATE | target=B-05\nB-01=ENABLED",
     "evidence": "E03",
+    "facts": {},
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false,
+    "graphId": "E05"
+  },
+  "task_definition": {
+    "title": "등록 작업 정의",
+    "source": "운영 관리 · 작업 등록",
+    "body": "job=T-17 | label=자료 색인 점검\ncreated=시작 전 14일 15:00 | modified=전날 16:35\naccount=svc_release | runner=/legacy/maintenance/runner",
+    "evidence": "R02",
+    "graphId": "E02",
+    "facts": {
+      "task": "T-17",
+      "account": "svc_release"
+    },
+    "time": {
+      "dayOffset": -1,
+      "minute": 995
+    },
+    "initial": true,
+    "availableDay": 1,
+    "audit": false
+  },
+  "application": {
+    "title": "적용 처리 대장",
+    "source": "중앙 적용 서비스",
+    "body": "전날 16:35 | upload=UP-218 | package=PKG-218-R2\noperation=UPDATE T-17, REGISTER T-19\nsession_validation=PASS | format_validation=PASS\nwork_scope_validation=NOT_CONFIGURED\nresult=SUCCESS",
+    "evidence": "R10",
+    "graphId": "E10",
+    "facts": {
+      "package": "PKG-218-R2",
+      "upload": "UP-218"
+    },
+    "time": {
+      "dayOffset": -1,
+      "minute": 995
+    },
+    "initial": true,
+    "availableDay": 1,
+    "audit": true
+  },
+  "metadata": {
+    "title": "패키지 등록 정보",
+    "source": "빌드 저장소 · 패키지 메타데이터",
+    "body": "PACKAGE_ID=PKG-218-R2\nAUTHOR_GROUP=VENDOR-OPS\nREQUEST_REF=VR-41\nBUILD_PROFILE=diagnostic-support",
+    "evidence": "R13",
+    "graphId": "E13",
+    "facts": {
+      "package": "PKG-218-R2",
+      "authorGroup": "VENDOR-OPS"
+    },
+    "time": {
+      "dayOffset": -1,
+      "minute": 995
+    },
+    "initial": true,
+    "availableDay": 1,
+    "audit": true
+  },
+  "request": {
+    "title": "정비 요청 이력 / VR-41",
+    "source": "협력업체 업무 요청 시스템",
+    "body": "참조=VR-41 | 수신 대상=서유진\n작업=진단 항목 대조본 반영\n범위 검토란=W-218 기재 대상 외 자료 대조 항목 포함\n추가 승인 번호=미등록\n전날 15:56 | 서유진 | 열람 확인",
+    "evidence": "R12",
+    "graphId": "E12",
+    "facts": {
+      "reference": "VR-41",
+      "acknowledgedBy": "서유진",
+      "scopeWarning": true
+    },
+    "time": {
+      "dayOffset": -1,
+      "minute": 956
+    },
+    "initial": true,
+    "availableDay": 5,
+    "audit": false
+  },
+  "purpose": {
+    "title": "계약 지원 기록 / VR-41",
+    "source": "협력업체 계약 지원 문서함",
+    "body": "요청 조직=VENDOR-OPS | 참조=VR-41\n구분=계약 갱신 실적 이견 대응\n요청 자료=정비 완료 보고와 LUMEN 설계·가격 산정 항목의 대조본\n사용처=실적 분쟁 검토 회의\n공식 자료 제공 요청 번호=—",
+    "evidence": "R14",
+    "graphId": "E14",
+    "facts": {
+      "reference": "VR-41",
+      "authorGroup": "VENDOR-OPS"
+    },
+    "time": {
+      "dayOffset": -1,
+      "minute": 930
+    },
+    "initial": true,
+    "availableDay": 6,
+    "audit": false
+  },
+  "control_audit": {
+    "title": "조치 처리 대장",
+    "source": "관제 · 조치 감사",
+    "body": "",
+    "evidence": "R16",
+    "graphId": "E16",
+    "facts": {},
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false,
+    "availableDay": 1,
+    "audit": false
+  },
+  "dispatch_audit": {
+    "title": "작업 처리 대장 / T-19",
+    "source": "전송 서비스 · 발송 감사",
+    "body": "",
+    "evidence": "R17",
+    "graphId": "E17",
+    "facts": {},
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false,
+    "availableDay": 1,
+    "audit": false
+  },
+  "receipt_audit": {
+    "title": "채널 응답 대장",
+    "source": "협력업체 접수 게이트웨이",
+    "body": "",
+    "evidence": "R18",
+    "graphId": "E18",
+    "facts": {},
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false,
+    "availableDay": 1,
+    "audit": false
+  },
+  "quarantine_audit": {
+    "title": "보관 위치 조치 대장",
+    "source": "저장소 관리 · 조치 감사",
+    "body": "",
+    "evidence": "R16",
+    "graphId": "E16",
+    "facts": {},
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false,
+    "availableDay": 1,
+    "audit": false
+  },
+  "status_sample": {
+    "title": "서비스 응답 표본",
+    "source": "서비스 모니터 · 측정 대장",
+    "body": "",
+    "evidence": "R05",
+    "graphId": "E05",
+    "facts": {},
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false,
+    "availableDay": 1,
+    "audit": false
+  },
+  "checklist_log": {
+    "title": "운영 인계 내역",
+    "source": "운영 업무 게시판",
+    "body": "",
+    "evidence": "R19",
+    "graphId": "E19",
+    "facts": {},
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false,
+    "availableDay": 1,
+    "audit": false
+  },
+  "final_report": {
+    "title": "조사 종결 문서",
+    "source": "관제 · 보고서 보관",
+    "body": "",
+    "evidence": "",
+    "graphId": "",
+    "facts": {},
+    "time": {
+      "dayOffset": 1,
+      "minute": 540
+    },
+    "initial": false,
+    "availableDay": 1,
+    "audit": false
+  },
+  "files_sample": {
+    "title": "원본·검색 상태 표본",
+    "source": "업무 PC · 조회 기록",
+    "body": "",
+    "evidence": "R06",
+    "graphId": "E06",
     "facts": {},
     "time": {
       "dayOffset": 1,

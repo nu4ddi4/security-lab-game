@@ -842,6 +842,35 @@
         },
         {
           "action": {
+            "type": "time.advance"
+          }
+        },
+        {
+          "action": {
+            "type": "time.advance"
+          }
+        },
+        {
+          "action": {
+            "type": "final.report",
+            "deviceId": "control_console",
+            "payload": {
+              "fields": {
+                "scope": "unknown",
+                "collection": "unknown",
+                "submission": "unknown",
+                "authorship": "unknown",
+                "awareness": "unknown",
+                "purpose": "unknown",
+                "transfer": "unknown",
+                "material": "unknown"
+              }
+            }
+          },
+          "code": "FINAL_SAVED"
+        },
+        {
+          "action": {
             "type": "day.end",
             "payload": {
               "expectedDay": 7,

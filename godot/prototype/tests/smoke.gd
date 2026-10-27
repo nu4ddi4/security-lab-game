@@ -348,85 +348,128 @@ func note_and_terminal_checks(game, failures: Array):
 
 func progression_checks(game, failures: Array):
 	var original = game.state.duplicate(true)
-	var checklist = game.engine.step(game.state,game.engine.parse("inspect checklist","briefing_board",game.state))
-	if not checklist.text.contains("모두 마쳤습니다"): failures.append("Completed checklist explains how to finish the day")
 	game.ui.finish_day(1)
-	if game.state.day != 2 or game.ui.mode != "tablet" or game.ui.tabs.current_tab != 1 or game.ui.contact != "han": failures.append("Next day opens the new assignment at its sender")
-	if game.ui.contact_picker.get_item_metadata(game.ui.contact_picker.selected) != "han" or game.ui.latest_message == null: failures.append("Mobile contact picker and new assignment match the displayed conversation")
-	if not game.ui.guide_info().text.contains("logs backups"): failures.append("Service recovery starts by inspecting the backup configuration")
-	game.dispatch(game.engine.parse("logs backups","server_console",game.state))
-	if not game.ui.guide_info().text.contains("backup disable B-05"): failures.append("Service recovery explains how to preserve the primary backup")
-	game.dispatch(game.engine.parse("backup disable B-05","server_console",game.state))
-	if not game.ui.guide_info().text.contains("verify service"): failures.append("Recovered service is verified before ending the day")
-	game.dispatch(game.engine.parse("verify service","server_console",game.state))
+	if game.state.day != 2 or game.ui.tabs.current_tab != 1 or game.ui.contact != "han": failures.append("Next day opens its business message")
+	if game.ui.tabs.is_tab_hidden(2): failures.append("Optional occurrence reporting is available on day two")
+	if game.ui.work.text.contains("미승인"): failures.append("Optional investigation does not appear as unfinished daily work")
+	var daily_guide = game.ui.guide_info().text
+	for word in ["B-05","T-17","staging","서유진","backup disable"]:
+		if daily_guide.contains(word): failures.append("Daily work does not route the player to a case answer: "+word)
+	for command in ["status","logs backups","backup disable B-05","verify service","logs access --task T-17","inspect staging"]:
+		game.dispatch(game.engine.parse(command,"server_console",game.state))
+	game.ui.open_tablet(0)
+	if game.ui.notes.get_child_count() != game.state.known.size(): failures.append("Read originals remain available before the formal day-four assignment")
+	game.ui.open_tablet(2)
+	if not game.ui.claim.disabled: failures.append("Occurrence claim is unavailable before the player attaches independent originals")
+	for slot in ["scope","access","collection"]:
+		var id = {"scope":"approval","access":"access-night-1","collection":"staging-night-1"}[slot]
+		var picker = game.ui.attachments[slot]
+		for i in range(picker.item_count):
+			if picker.get_item_metadata(i) == id: picker.select(i); picker.item_selected.emit(i)
+	if game.ui.claim.disabled: failures.append("Attached originals open the occurrence claim form")
+	game.ui.claim.select(1)
+	game.ui.claim.item_selected.emit(1)
+	game.ui.submit_report()
+	if not game.state.report.approved or not game.ui.report_submit.disabled: failures.append("Early report grants permission without forcing a duplicate report")
+	close_notices(game)
 	game.ui.finish_day(2)
-	if game.state.day != 3 or game.ui.guide_info().target != "project_pc" or not game.ui.guide_info().text.contains("inspect files"): failures.append("Search recovery first distinguishes missing results from missing originals")
 	game.dispatch(game.engine.parse("inspect files","project_pc",game.state))
-	if not game.ui.guide_info().text.contains("logs indexing"): failures.append("Search recovery exposes the actual fault record")
 	game.dispatch(game.engine.parse("logs indexing","project_pc",game.state))
-	if game.ui.guide_info().target != "server_console" or not game.ui.guide_info().text.contains("repair index"): failures.append("Broken search directs the player to the server that can repair it")
-	await capture(game,"08-search-recovery")
+	if game.ui.guide_info().text.contains("T-17") or game.ui.guide_info().text.contains("repair index"): failures.append("Search work does not explain the case or prescribe the fault's solution")
+	await capture(game,"08-search-records")
 	game.dispatch(game.engine.parse("repair index","server_console",game.state))
-	if game.ui.guide_info().target != "project_pc" or not game.ui.guide_info().text.contains("verify search"): failures.append("Repaired search returns the player to the PC for verification")
 	game.dispatch(game.engine.parse("verify search","project_pc",game.state))
 	game.ui.finish_day(3)
-	if game.state.day != 4 or game.ui.contact != "oh" or game.ui.tabs.current_tab != 1: failures.append("Investigation assignment opens the team-lead message")
-	if not game.ui.guide_info().text.contains("verify service"): failures.append("Required operations stay actionable during investigation")
-	await get_tree().process_frame
+	if game.state.day != 4 or game.ui.contact != "oh" or not game.state.report.approved: failures.append("Day-four alternative assignment preserves early approval")
 	await capture(game,"09-investigation-assignment")
-	game.dispatch(game.engine.parse("verify service","server_console",game.state))
-	game.dispatch(game.engine.parse("verify search","project_pc",game.state))
-	for command in ["logs access --task T-17","inspect staging"]:
-		game.dispatch(game.engine.parse(command,"server_console",game.state))
-	game.ui.open_tablet(2)
-	game.ui.claim.select(1)
-	var selected = {"scope":"approval","access":"access-night-1","collection":"staging-night-1"}
-	for slot in selected:
-		var option = game.ui.attachments[slot]
-		for i in range(1,option.item_count):
-			if option.get_item_metadata(i) == selected[slot]: option.select(i)
-	game.ui.submit_report()
-	if not game.state.report.approved or not game.ui.report_submit.disabled or not game.ui.claim.disabled: failures.append("Approved report is displayed as a completed submission")
-	for slot in selected:
-		var option = game.ui.attachments[slot]
-		if not option.disabled or option.get_item_metadata(option.selected) != selected[slot]: failures.append("Approved report preserves its submitted source: "+slot)
-	for child in game.ui.root.get_children():
-		if child is AcceptDialog: child.hide(); child.queue_free()
-	await capture(game,"10-approved-report")
-	game.dispatch(game.engine.parse("logs submissions","control_console",game.state))
-	if not game.ui.guide_info().text.contains("보관 패키지"): failures.append("Approved investigation continues from audit records to the stored package")
-	game.dispatch(game.engine.parse("inspect PKG-218-R2","control_console",game.state))
-	game.dispatch(game.engine.parse("logs deployments","project_pc",game.state))
-	# Exercise a player who has not opened the optional first-day attachment.
-	game.state.evidence.erase("E11")
-	game.state.known.erase("message")
-	game.state.statements.erase("seo_message")
-	if not game.ui.guide_info().text.contains("메신저"): failures.append("Missing submission attachment is discoverable after the audit")
-	game.dispatch({"type":"dialogue","payload":{"id":"seo_message"}})
-	if game.ui.guide_info().target != "seo": failures.append("Matching submission records lead back to the maintenance contact")
-	game.dispatch({"type":"dialogue","payload":{"id":"seo_submission"}})
-	if game.ui.guide_info().target != "server_console" or not game.ui.guide_info().text.contains("inspect T-19"): failures.append("Maintenance follow-up leads to the transfer settings")
-	game.dispatch(game.engine.parse("inspect T-19","server_console",game.state))
-	if not game.ui.guide_info().title.contains("원본 대조 완료") or "E12" not in game.state.evidence: failures.append("Available follow-up ends with a clear investigation summary")
-	if not game.ui.work.text.contains("pause T-17") or not game.engine.missing_work(game.state).is_empty() or game.state.tasks["T-17"].held: failures.append("Running collection is explained while containment stays an optional player decision")
-	game.ui.open_tablet(3)
-	await capture(game,"11-investigation-followthrough")
-	game.state.day = 7
-	game.ui.refresh()
-	if game.ui.end_day_button.disabled or game.ui.end_day_button.text != "이번 점검 종료": failures.append("Last day uses an explicit final action")
-	game.state.ended = true
-	game.ui.refresh()
-	if not game.ui.end_day_button.disabled or not game.ui.report_submit.disabled: failures.append("Finished investigation does not offer further submissions or day endings")
-	game.state = game.engine.create_state()
-	game.ui.reset_session()
-	game.ui.refresh()
-	if game.ui.claim.selected != 0 or game.ui.report_submit.disabled: failures.append("New investigation clears the previous report draft and approval presentation")
-	if not game.ui.terminal_drafts.is_empty() or not game.ui.command_input.text.is_empty(): failures.append("New investigation clears terminal drafts from the previous case")
-	for option in game.ui.attachments.values():
-		if option.selected != 0 or option.disabled: failures.append("New investigation clears previous attachments")
+	for command in ["logs submissions","logs application","inspect PKG-218-R2","inspect metadata","inspect T-19"]:
+		game.dispatch(game.engine.parse(command,"control_console",game.state))
+	var markup = InvestigationUI.terminal_markup([{ "kind":"output","text":"LUMEN | T-17 | INTERNAL\nSUCCESS | HOLD"}])
+	if markup.contains("[color") or markup.contains("[b]"): failures.append("Record rendering does not rank or color case facts")
+	game.ui.case_desk.open(game.ui,false)
+	var desk = game.ui.case_desk
+	if not desk.claim_picker.disabled: failures.append("Claim entry starts closed before originals are selected")
+	desk.picks[0].show_popup()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if not desk.picks[0].get_popup().visible: failures.append("Original record picker opens through the native control")
+	await capture(game,"12-original-picker")
+	desk.picks[0].get_popup().hide()
+	select_record(desk.picks[0],"message")
+	select_record(desk.picks[1],"submissions")
+	if desk.claim_picker.disabled: failures.append("Connecting originals enables the comparison form")
+	select_record(desk.claim_picker,"C05")
+	press_text(desk.body,"대조 기록 접수")
+	if not game.state.casework.links.has("C05"): failures.append("Comparison form records the player's selected independent originals")
+	await capture(game,"12-comparison-form")
+	desk.dialog.hide(); desk.dialog.queue_free()
+	for day in range(4,7):
+		game.dispatch(game.engine.parse("verify service","server_console",game.state))
+		game.dispatch(game.engine.parse("verify search","project_pc",game.state))
+		if day == 5: game.dispatch(game.engine.parse("logs requests","maintenance_terminal",game.state))
+		if day == 6: game.dispatch(game.engine.parse("logs contracts","maintenance_terminal",game.state))
+		game.ui.finish_day(day)
+	var links = {"C06":["submissions","application","package"],"C07":["metadata","message","submissions"],"C08":["request","message","approval"],"C09":["purpose","package","metadata"],"C10":["application","transfer"]}
+	for claim in links: game.dispatch({"type":"inference","payload":{"claim":claim,"records":links[claim]}})
+	game._use("control_console","device",true)
+	game.ui.case_work_button.pressed.emit()
+	desk.view = 1; desk.build()
+	select_record(desk.picks[0],"application")
+	select_record(desk.picks[1],"transfer")
+	press_text(desk.body,"조치 승인 요청")
+	if not game.state.casework.control.approved: failures.append("Console control request uses the originals selected by the player")
+	press_text(desk.body,"승인 조치 실행")
+	confirm_open_dialog(game)
+	if game.state.casework.control.mode != "blocked_pre_run": failures.append("Approved console control records a pre-run hold")
+	desk.dialog.hide(); desk.dialog.queue_free()
+	game.ui.clock_button.pressed.emit()
+	confirm_open_dialog(game)
+	if game.state.casework.dispatch != "not_run" or game.state.casework.minute != 1050: failures.append("Day-seven scheduled work resolves at 17:30")
+	close_notices(game)
+	game.dispatch(game.engine.parse("logs controls","control_console",game.state))
+	game.dispatch(game.engine.parse("logs dispatch","control_console",game.state))
+	game.dispatch(game.engine.parse("logs receipts","control_console",game.state))
+	game._use("control_console","device",true)
+	game.ui.case_work_button.pressed.emit()
+	desk.view = 2; desk.build()
+	for picker in desk.final_picks.values():
+		if picker.get_item_metadata(picker.selected) != "unknown": failures.append("Final findings are never preselected from hidden case truth")
+	var fields = {"scope":"violation","collection":"collected","submission":"seo","authorship":"vendor","awareness":"warning_seen","purpose":"contract_support","transfer":"not_run","material":"unknown"}
+	for key in fields: select_record(desk.final_picks[key],fields[key])
+	press_text(desk.body,"종결 보고 접수")
+	if game.state.casework.final.is_empty(): failures.append("Final form submits the player's findings")
+	await capture(game,"13-final-report")
+	press_text(desk.body,"조사 종결")
+	confirm_open_dialog(game)
+	if not game.state.ended or game.state.casework.ending.get("id") != "A": failures.append("Final report and observed control outcome produce the selected ending")
+	desk.view = 3; desk.build()
+	await capture(game,"14-closing-document")
+	if not game.save_now() or not game.store.load_state(game.content).has("state"): failures.append("Completed case saves and reloads")
+	desk.dialog.hide(); desk.dialog.queue_free()
 	game.state = original
+	game.ui.reset_session()
+	game.ui.sync_memo()
 	game.ui.refresh()
 	game.ui.close()
+
+func select_record(picker: OptionButton, id: String):
+	for i in range(picker.item_count):
+		if picker.get_item_metadata(i) == id:
+			picker.select(i)
+			picker.item_selected.emit(i)
+			return
+
+func press_text(parent: Node, text: String):
+	for node in parent.find_children("*","Button",true,false):
+		if node.text == text: node.pressed.emit(); return
+
+func confirm_open_dialog(game):
+	for child in game.ui.root.find_children("*","ConfirmationDialog",true,false):
+		if child.visible: child.confirmed.emit(); return
+
+func close_notices(game):
+	for child in game.ui.root.get_children():
+		if child is AcceptDialog: child.hide(); child.queue_free()
 
 func settings_checks(game, failures: Array):
 	var original = game.settings.values.duplicate(true)
@@ -579,6 +622,14 @@ func responsive_checks(game, failures: Array):
 		await get_tree().process_frame
 		if game.ui.notes.get_global_rect().end.x > viewport.end.x: failures.append("Long note titles do not push citation buttons or the tablet outside the screen")
 		if dimensions == Vector2i(540,960): await capture(game,"notes-540x960")
+		game._use("control_console","device",true)
+		game.ui.case_work_button.pressed.emit()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var desk = game.ui.case_desk
+		if not viewport.grow(1).encloses(Rect2(Vector2(desk.dialog.position),Vector2(desk.dialog.size))): failures.append("Case forms fit aspect ratio: %s / %s in %s" % [dimensions,Rect2(Vector2(desk.dialog.position),Vector2(desk.dialog.size)),viewport])
+		if desk.body.size.x > desk.dialog.size.x: failures.append("Case form content stays inside its window")
+		desk.dialog.hide(); desk.dialog.queue_free()
 		for panel in [game.ui.modal,game.ui.terminal_panel,game.ui.dialogue_panel,game.ui.briefing_panel]:
 			if panel == game.ui.modal: game.ui.open_tablet(4)
 			elif panel == game.ui.terminal_panel: game._use("server_console","device",true)
@@ -598,6 +649,16 @@ func responsive_checks(game, failures: Array):
 			await capture(game,"08-field-%dx%d" % [dimensions.x,dimensions.y])
 			game._use("server_console","device",true)
 			await capture(game,"09-terminal-%dx%d" % [dimensions.x,dimensions.y])
+	game._use("control_console","device",true)
+	game.ui.case_work_button.pressed.emit()
+	game.get_window().size = Vector2i(960,540)
+	game._fit_screen()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var rotated = game.ui.case_desk.dialog
+	if not get_viewport().get_visible_rect().grow(1).encloses(Rect2(Vector2(rotated.position),Vector2(rotated.size))): failures.append("Open case forms survive a change in orientation")
+	rotated.hide(); rotated.queue_free()
 	game.get_window().size = original
 	game._fit_screen()
 	await get_tree().process_frame

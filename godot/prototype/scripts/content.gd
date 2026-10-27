@@ -3,8 +3,8 @@ extends RefCounted
 
 static func load_case() -> Dictionary:
 	var result = {}
-	for key in ["case", "records", "commands", "dialogue", "rules", "text"]:
-		var filename = "text.ko" if key == "text" else key
+	for key in ["case", "records", "commands", "dialogue", "rules", "text", "legacyRecords"]:
+		var filename = "text.ko" if key == "text" else "legacy_records" if key == "legacyRecords" else key
 		var parser = JSON.new()
 		var path = "res://prototype/content/" + filename + ".json"
 		if parser.parse(FileAccess.get_file_as_string(path)) != OK:
