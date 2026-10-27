@@ -112,6 +112,7 @@ func _initialize():
 	check(not engine.condition(original,{"op":"evidence_known","id":"E07"}),"Unknown evidence cannot unlock question")
 	check(engine.step(original,{"type":"read","deviceId":"project_pc","payload":{"kind":"submissions"}}).code == "WRONG_DEVICE","Direct action still checks device")
 	story_checks(engine,content)
+	review_checks(engine,content)
 	print("INVESTIGATION_UNIT ",JSON.stringify({"scenarios":fixtures.scenarios.size(),"assertions":checks,"passed":failures.is_empty(),"failures":failures}))
 	quit(0 if failures.is_empty() else 1)
 
@@ -268,3 +269,59 @@ func with_open_report(s: Dictionary) -> Dictionary:
 	next.known.erase("final-report")
 	next.records.erase("final-report")
 	return next
+
+func review_checks(engine, content):
+	var base = story_base(engine)
+	var isolated = transition(engine,base,"control.request",{"records":["application","transfer"]})
+	isolated = transition(engine,isolated,"staging.isolate")
+	isolated = transition(engine,isolated,"time.advance")
+	isolated = query(engine,isolated,"logs controls","control_console")
+	isolated = query(engine,isolated,"logs dispatch","control_console")
+	check(not InvestigationResolution.supports(isolated,content,"C11",["control-request","dispatch-7"]),"An authorization alone never proves execution or causes a source-isolation result")
+	check(InvestigationResolution.supports(isolated,content,"C11",["control-request","staging-isolate","dispatch-7"]),"The actual isolation supports the result even when the authorization is selected first")
+	isolated = transition(engine,isolated,"control.execute")
+	isolated = query(engine,isolated,"logs controls","control_console")
+	check(not InvestigationResolution.supports(isolated,content,"C11",["control-execute","dispatch-7"]),"A later hold cannot take credit for an earlier isolation")
+	var sent = transition(engine,base,"time.advance")
+	sent = transition(engine,sent,"time.advance")
+	sent = query(engine,sent,"logs dispatch","control_console")
+	sent = query(engine,sent,"logs receipts","control_console")
+	sent = transition(engine,sent,"final.report",{"fields":report_fields("sent")})
+	var submitted = sent.casework.final.duplicate(true)
+	var later = transition(engine,sent,"time.advance")
+	check(later.casework.final == submitted,"Later business time preserves the accepted findings, citations, and evaluation")
+	check(not InvestigationResolution.final_is_current(later),"A changed business state requires explicit report review")
+	check(engine.step(later,{"type":"day.end","payload":{"expectedDay":7,"confirmed":true}}).code == "FINAL_STALE","An outdated accepted report cannot silently close the new business state")
+	check(InvestigationResolution.evaluate_report(later,content).id == "E","A frozen report retains the physical context it was submitted with")
+	later = query(engine,later,"logs receipts","control_console")
+	later = transition(engine,later,"inference",{"claim":"C12","records":["dispatch-7","receipt-confirmed"]})
+	close_story(engine,later,report_fields("received"),"C")
+	var toggled = engine.create_state()
+	for i in range(200): toggled = engine.step(toggled,engine.parse("backup disable B-05" if i%2 == 0 else "backup enable B-05","server_console",toggled)).state
+	check(toggled.records.size() == 14 and toggled.records["backup-change-history"].facts.entries.size() == 16,"Repeated backup changes use a bounded journal instead of exhausting save records")
+	toggled = query(engine,toggled,"logs backups")
+	check("backup-change-history" in toggled.known,"The backup command exposes its actual configuration change journal")
+	check(InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(toggled,content),content).has("state"),"Two hundred backup changes still reload")
+	var old_raw = FileAccess.get_file_as_string("res://prototype/tests/casework-v1-save.json")
+	var migrated = InvestigationSaveCodec.decode(old_raw,content)
+	check(migrated.has("state"),"A real v1 casework save with an accepted report migrates")
+	if migrated.has("state"):
+		var old = JSON.parse_string(old_raw).state
+		var state = migrated.state
+		check(state.casework.version == 2 and state.day == old.day and state.known == old.known and state.memo == old.memo,"Casework migration preserves progress and observed originals")
+		check(not state.casework.links.has("C11") and not state.casework.final.links.has("C11"),"Migration removes only an approval incorrectly accepted as a successful control")
+		check(state.casework.final.fields == old.casework.final.fields and state.casework.final.evaluation == old.casework.final.evaluation,"Migration preserves accepted findings and evaluation")
+		check(InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(state,content),content).has("state"),"Migrated accepted reports roundtrip in the existing save envelope")
+	var overflow = JSON.parse_string(old_raw)
+	var template = overflow.state.records["backup-change-15"] if overflow.state.records.has("backup-change-15") else {}
+	for id in overflow.state.records:
+		if overflow.state.records[id].template == "backup_change": template = overflow.state.records[id]; break
+	check(not template.is_empty(),"The legacy fixture contains an actual per-change backup record")
+	if not template.is_empty():
+		for i in range(150):
+			var record = template.duplicate(true)
+			record.id = "backup-change-%d" % (i+1000)
+			overflow.state.records[record.id] = record
+		overflow.state.revision = 2000
+		var recovered = InvestigationSaveCodec.decode(JSON.stringify(overflow),content)
+		check(recovered.has("state") and recovered.state.records.size() < 100,"Old saves exhausted only by unread backup changes recover through bounded migration")

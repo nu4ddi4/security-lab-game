@@ -38,6 +38,14 @@ func run():
 	host.store.directory = "user://qa/beta-services/"+nonce
 	check(host.save_now(),"Investigation saves before service checks")
 	var before = FileAccess.get_file_as_string(host.store.directory.path_join("save.json"))
+	var valid_state = host.state.duplicate(true)
+	host.state.casework.receipt = "confirmed"
+	check(not host.save_now(),"An invalid new state is rejected before replacing the save")
+	check(FileAccess.get_file_as_string(host.store.directory.path_join("save.json")) == before,"A failed validation preserves the last readable save")
+	var export_path = host.store.directory.path_join("existing-export.json")
+	write(export_path,"existing export")
+	check(not host.store.export_file(export_path,host.state,host.content) and FileAccess.get_file_as_string(export_path) == "existing export","An invalid export does not overwrite an existing file")
+	host.state = valid_state
 	var diagnostics = TestDiagnostics.new(); host.add_child(diagnostics); diagnostics.setup(host); diagnostics.mark_ready()
 	check(diagnostics.save_validation()["save.json"].status=="valid","Investigation codec validates its own save")
 	check(diagnostics.save_validation()["save.backup.json"].status=="missing","Missing investigation backup is explicit")

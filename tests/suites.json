@@ -3,7 +3,8 @@
     "godot/prototype/tests/unit.gd",
     "godot/prototype/tests/scenarios.json",
     "godot/prototype/tests/save.schema.json",
-    "godot/prototype/tests/legacy-save.json"
+    "godot/prototype/tests/legacy-save.json",
+    "godot/prototype/tests/casework-v1-save.json"
   ],
   "services": [
     "godot/prototype/tests/services.gd",

@@ -6,13 +6,22 @@ const AUDIT_KINDS = ["submissions", "application", "package", "metadata", "task1
 const ENDINGS = {"A":"남겨진 기록","B":"차단된 경로","C":"늦은 확인","D":"도착한 자료","E":"수신 확인 대기","F":"서둘러 쓴 결론"}
 
 static func initial() -> Dictionary:
-	return {"version":1,"phase":"morning","minute":540,"links":{},"control":{"approved":false,"mode":"none"},"stagingIsolated":false,"dispatch":"pending","receipt":"none","final":{},"ending":{}}
+	return {"version":2,"phase":"morning","minute":540,"links":{},"control":{"approved":false,"mode":"none"},"stagingIsolated":false,"dispatch":"pending","receipt":"none","final":{},"ending":{}}
 
-static func supports(s: Dictionary, content: Dictionary, claim: String, ids: Array) -> bool:
+static func supports(s: Dictionary, content: Dictionary, claim: String, ids: Array, legacy = false) -> bool:
 	var rule = {}
 	for row in content.rules.inferences:
 		if row.id == claim: rule = row
 	if rule.is_empty() or ids.size() > 6: return false
+	for id in ids:
+		if not id is String or id not in s.known or not s.records.has(id): return false
+	if claim == "C11" and not legacy:
+		for dispatch_id in ids:
+			var dispatch = s.records[dispatch_id]
+			if dispatch.template != "dispatch_audit": continue
+			for action_id in ids:
+				if effective_control(s.records[action_id],dispatch): return true
+		return false
 	var used = []
 	for group in rule.requires:
 		var found = ""
@@ -38,6 +47,23 @@ static func supports(s: Dictionary, content: Dictionary, claim: String, ids: Arr
 static func linked(s: Dictionary, content: Dictionary, claim: String) -> bool:
 	return supports(s,content,claim,s.casework.links.get(claim,[]))
 
+static func effective_control(action: Dictionary, dispatch: Dictionary) -> bool:
+	if action.template not in ["control_audit","quarantine_audit"]: return false
+	if action.time.dayOffset > dispatch.time.dayOffset or action.time.dayOffset == dispatch.time.dayOffset and action.time.minute > dispatch.time.minute: return false
+	var operation = action.facts.get("operation")
+	if dispatch.facts.get("dispatch") == "not_run":
+		return operation == "HOLD" and dispatch.facts.get("reason") == "HELD" or operation == "ISOLATE" and dispatch.facts.get("reason") == "SOURCE_ISOLATED"
+	if dispatch.facts.get("dispatch") == "blocked":
+		return action.time.minute <= 1050 and operation in ["HOLD","ISOLATE"]
+	return false
+
+static func report_context(s: Dictionary) -> Dictionary:
+	var w = s.casework
+	return {"phase":w.phase,"minute":w.minute,"dispatch":w.dispatch,"receipt":w.receipt,"stagingIsolated":w.stagingIsolated,"controlMode":w.control.mode}
+
+static func final_is_current(s: Dictionary) -> bool:
+	return not s.casework.final.is_empty() and s.casework.final.get("context",{}) == report_context(s)
+
 static func handle(engine, s: Dictionary, kind: String, payload: Dictionary, device: String) -> Dictionary:
 	var w = s.casework
 	if kind == "inference":
@@ -54,7 +80,7 @@ static func handle(engine, s: Dictionary, kind: String, payload: Dictionary, dev
 		if not fields is Dictionary or fields.size() != engine.content.rules.finalFields.size(): return engine._result(s,"INVALID_ACTION")
 		for row in engine.content.rules.finalFields:
 			if not fields.get(row.id) in row.options.map(func(o): return o[0]): return engine._result(s,"INVALID_ACTION")
-		w.final = {"fields":fields.duplicate(true),"known":s.known.duplicate(),"links":w.links.duplicate(true),"evaluation":evaluate(s,engine.content,fields)}
+		w.final = {"fields":fields.duplicate(true),"known":s.known.duplicate(),"links":w.links.duplicate(true),"context":report_context(s),"evaluation":evaluate(s,engine.content,fields)}
 		return engine._result(s,"FINAL_SAVED")
 	if not s.report.approved: return engine._result(s,"PERMISSION_REQUIRED")
 	if kind == "control.request":
@@ -69,7 +95,6 @@ static func handle(engine, s: Dictionary, kind: String, payload: Dictionary, dev
 		if not w.control.approved: return engine._result(s,"CONTROL_REJECTED")
 		if w.control.mode != "none": return engine._result(s,"ALREADY_DONE")
 		w.control.mode = "blocked_pre_run" if w.phase == "morning" else "blocked_during"
-		w.final.clear()
 		s.tasks["T-19"] = {"status":"held","held":true}
 		audit(engine,s,"control_audit","control-execute",{"operation":"HOLD","job":"T-19","mode":w.control.mode})
 		return engine._result(s,"CONTROL_APPLIED")
@@ -77,7 +102,6 @@ static func handle(engine, s: Dictionary, kind: String, payload: Dictionary, dev
 		if s.day != 7 or not linked(s,engine.content,"C02"): return engine._result(s,"CONTROL_REJECTED")
 		if w.stagingIsolated: return engine._result(s,"ALREADY_DONE")
 		w.stagingIsolated = true
-		w.final.clear()
 		audit(engine,s,"quarantine_audit","staging-isolate",{"operation":"ISOLATE","path":"/staging/maintenance/PKG-218-R2"})
 		return engine._result(s,"CONTROL_APPLIED")
 	return engine._result(s,"INVALID_ACTION")
@@ -126,7 +150,6 @@ static func advance(engine, s: Dictionary) -> Dictionary:
 				w.receipt = "confirmed"
 				audit(engine,s,"receipt_audit","receipt-confirmed",{"job":"T-19","transaction":"TX-19","receipt":"confirmed","response":"202 ACCEPTED"})
 		"replies": return engine._result(s,"ALREADY_DONE")
-	w.final.clear() # a later observation invalidates an unclosed report snapshot
 	return engine._result(s,"TIME_ADVANCED")
 
 static func evaluate(s: Dictionary, content: Dictionary, fields: Dictionary) -> Dictionary:
@@ -166,6 +189,7 @@ static func evaluate(s: Dictionary, content: Dictionary, fields: Dictionary) -> 
 static func close_case(engine, s: Dictionary) -> Dictionary:
 	if s.casework.phase in ["morning","dispatching"]: return engine._result(s,"TIME_REQUIRED")
 	if s.casework.final.is_empty(): return engine._result(s,"FINAL_REQUIRED")
+	if not final_is_current(s): return engine._result(s,"FINAL_STALE")
 	var evaluation = evaluate_report(s,engine.content)
 	s.casework.final.evaluation = evaluation
 	s.casework.ending = evaluation.duplicate(true)
@@ -194,6 +218,9 @@ static func evaluate_report(s: Dictionary, content: Dictionary) -> Dictionary:
 	var snapshot = s.duplicate(true)
 	snapshot.known = s.casework.final.known
 	snapshot.casework.links = s.casework.final.links
+	var context = s.casework.final.get("context",report_context(s))
+	for key in ["phase","minute","dispatch","receipt","stagingIsolated"]: snapshot.casework[key] = context[key]
+	snapshot.casework.control.mode = context.controlMode
 	return evaluate(snapshot,content,s.casework.final.fields)
 
 static func public_ending(s: Dictionary) -> String:
@@ -204,10 +231,10 @@ static func public_ending(s: Dictionary) -> String:
 	var receipt_seen = observed.any(func(id): return s.records[id].template == "receipt_audit" and s.records[id].facts.get("receipt") == s.casework.receipt)
 	return s.casework.ending.name if dispatch_seen and (s.casework.receipt == "none" or receipt_seen) else "조사 종결"
 
-static func valid(s: Dictionary, content: Dictionary) -> bool:
+static func valid(s: Dictionary, content: Dictionary, legacy = false) -> bool:
 	var w = s.get("casework")
 	if not w is Dictionary or w.keys().size() != initial().size(): return false
-	if w.get("version") != 1 or w.get("phase") not in ["morning","dispatching","after","replies"]: return false
+	if w.get("version") != (1 if legacy else 2) or w.get("phase") not in ["morning","dispatching","after","replies"]: return false
 	if not w.get("stagingIsolated") is bool or not w.get("links") is Dictionary or not w.get("final") is Dictionary or not w.get("ending") is Dictionary: return false
 	if not w.get("control") is Dictionary or w.control.keys().size() != 2 or not w.control.get("approved") is bool or w.control.get("mode") not in ["none","blocked_pre_run","blocked_during"]: return false
 	if w.get("dispatch") not in ["pending","not_run","blocked","sent"] or w.get("receipt") not in ["none","unconfirmed","confirmed"]: return false
@@ -229,7 +256,7 @@ static func valid(s: Dictionary, content: Dictionary) -> bool:
 	if w.stagingIsolated and (s.day != 7 or not linked(s,content,"C02")): return false
 	if w.links.size() > content.rules.inferences.size(): return false
 	for claim in w.links:
-		if not w.links[claim] is Array or not supports(s,content,claim,w.links[claim]): return false
+		if not w.links[claim] is Array or not supports(s,content,claim,w.links[claim],legacy): return false
 	for id in s.records:
 		var r = s.records[id]
 		var f = r.facts
@@ -267,16 +294,34 @@ static func valid(s: Dictionary, content: Dictionary) -> bool:
 		if r.template in ["control_audit","quarantine_audit","dispatch_audit","receipt_audit"]:
 			if r.body != audit_body(f): return false
 	if not w.final.is_empty():
-		if w.final.keys().size() != 4 or not w.final.get("fields") is Dictionary or not w.final.get("links") is Dictionary or not w.final.get("evaluation") is Dictionary or not InvestigationSaveCodec.unique_ids(w.final.get("known"),s.known): return false
+		if w.final.keys().size() != (4 if legacy else 5) or not w.final.get("fields") is Dictionary or not w.final.get("links") is Dictionary or not w.final.get("evaluation") is Dictionary or not InvestigationSaveCodec.unique_ids(w.final.get("known"),s.known): return false
+		if not legacy and not valid_context(s,w.final.get("context")): return false
 		if w.final.fields.size() != content.rules.finalFields.size(): return false
 		for row in content.rules.finalFields:
 			if w.final.fields.get(row.id) not in row.options.map(func(o): return o[0]): return false
 		var snapshot = s.duplicate(true)
 		snapshot.known = w.final.known
 		for claim in w.final.links:
-			if not w.final.links[claim] is Array or not supports(snapshot,content,claim,w.final.links[claim]): return false
+			if not w.final.links[claim] is Array or not supports(snapshot,content,claim,w.final.links[claim],legacy): return false
 		if evaluate_report(s,content) != w.final.evaluation: return false
 	if s.ended:
 		if w.final.is_empty() or w.ending != w.final.evaluation or not s.records.has("final-report"): return false
+		if not legacy and not final_is_current(s): return false
 	elif not w.ending.is_empty() or s.records.has("final-report"): return false
+	return true
+
+static func valid_context(s: Dictionary, context) -> bool:
+	if not context is Dictionary or context.size() != 6: return false
+	var w = s.casework
+	if context.get("phase") not in ["after","replies"] or context.get("dispatch") != w.dispatch or not context.get("stagingIsolated") is bool: return false
+	var minute = 1055 if context.phase == "replies" else 1050 if w.dispatch == "not_run" else 1051
+	if context.get("minute") != minute or minute > w.minute: return false
+	if context.get("receipt") != ("none" if w.dispatch != "sent" else "confirmed" if context.phase == "replies" else "unconfirmed"): return false
+	if context.get("controlMode") not in ["none",w.control.mode]: return false
+	if context.controlMode != w.control.mode and s.records["control-execute"].time.minute < minute: return false
+	if context.stagingIsolated and not w.stagingIsolated: return false
+	if context.stagingIsolated != w.stagingIsolated and s.records["staging-isolate"].time.minute < minute: return false
+	for id in w.final.known:
+		var record = s.records[id]
+		if record.time.dayOffset == 7 and record.time.minute > minute: return false
 	return true
