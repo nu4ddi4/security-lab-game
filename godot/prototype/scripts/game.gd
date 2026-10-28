@@ -321,23 +321,28 @@ func command(text: String):
 		ui.print_output(text,result.text,"error" if result.code in InvestigationUI.ERROR_CODES else "output")
 
 func save_now() -> bool:
-	if blocked_save or saving: return false
+	if blocked_save: return false
+	return save_state(state)
+
+func save_state(candidate: Dictionary) -> bool:
+	if saving: return false
 	saving = true
-	var saved = store.save(state,content)
+	var saved = store.save(candidate,content)
 	if not saved: ui.notice(store.error)
 	saving = false
 	return saved
 
 func new_game():
 	if not preserve_current(): return
-	state = engine.create_state()
+	var candidate = engine.create_state()
+	if not save_state(candidate): return
+	state = candidate
 	if investigation_environment != null: investigation_environment.sync(state)
 	blocked_save = false
 	context = ""
 	ui.reset_session()
 	ui.sync_memo()
 	ui.refresh()
-	save_now()
 
 func quit_game():
 	if updater != null and updater.state == "preparing": return
@@ -376,13 +381,13 @@ func transfer_file(path: String, exporting: bool):
 	var candidate = store.import_file(path,content)
 	if candidate.has("error"): ui.notice(candidate.error); return
 	if not preserve_current(): return
+	if not save_state(candidate.state): return
 	state = candidate.state
 	if investigation_environment != null: investigation_environment.sync(state)
 	blocked_save = false
 	ui.reset_session()
 	ui.sync_memo()
 	ui.refresh()
-	save_now()
 	ui.notice("사건 진행을 가져왔습니다.")
 
 func _unhandled_input(event):

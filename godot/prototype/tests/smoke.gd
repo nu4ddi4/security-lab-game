@@ -11,6 +11,14 @@ class FailedStore extends InvestigationStore:
 		preserved = true
 		return true
 
+class ReplacementFailedStore extends InvestigationStore:
+	var writes = 0
+	func save(value: Dictionary, content: Dictionary) -> bool:
+		writes += 1
+		if writes == 1: return super.save(value,content)
+		error = "교체 저장 실패"
+		return false
+
 func capture(game: InvestigationPrototype, name: String):
 	if capture_directory.is_empty() or DisplayServer.get_name() == "headless": return
 	await get_tree().process_frame
@@ -747,6 +755,22 @@ func save_failure_checks(game, failures: Array):
 	if not game.ui.case_desk.dialog.visible: failures.append("A failed exit keeps console work open")
 	game.ui.toggle() # dismiss the save error before closing the case desk
 	game.ui.toggle()
+	game.store = store
+	# The old save succeeds; only persisting the replacement fails.
+	for action in ["new","import"]:
+		var replacement = ReplacementFailedStore.new()
+		replacement.directory = store.directory
+		game.store = replacement
+		game.state.memo = "keep-current-"+action
+		var before = game.state.duplicate(true)
+		var mode = game.ui.mode
+		if action == "new": game.new_game()
+		else: game.transfer_file(source,false)
+		if game.state != before or game.ui.mode != mode: failures.append("Failed replacement keeps the current session: "+action)
+		if game.ui.message.text == "사건 진행을 가져왔습니다.": failures.append("Failed replacement never reports a successful import")
+		var saved = store.load_state(game.content)
+		if not saved.has("state") or saved.state.memo != before.memo: failures.append("Failed replacement keeps the saved current progress: "+action)
+		close_notices(game)
 	game.store = store
 	var memo = "unsaved-"+str(Time.get_ticks_usec())
 	game.state.memo = memo
