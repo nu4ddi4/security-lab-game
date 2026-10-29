@@ -158,6 +158,7 @@ func run(game: InvestigationPrototype):
 	if not game.player.enabled: failures.append("Closing the UI restores movement")
 	var original_touch = game.controls.touch_enabled
 	game.ui.open_tablet(4)
+	await settings_dialog_checks(game,failures)
 	game.ui.touch_setting.button_pressed = true
 	if not game.controls.touch_enabled: failures.append("Settings enable touch without disabling keyboard")
 	await capture(game,"07-settings")
@@ -321,7 +322,11 @@ func run(game: InvestigationPrototype):
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png(argument.trim_prefix("--prototype-capture="))
 	game.dispatch({"type":"memo","payload":{"text":"temporary note"}})
-	game.reset_all_data()
+	game.ui.open_tablet(4)
+	InvestigationDataReset.confirm(game)
+	await get_tree().create_timer(3.1).timeout
+	confirm_open_dialog(game)
+	await get_tree().process_frame
 	if game.state.memo != "" or game.state.day != 1 or game.blocked_save or game.ui.memo.text != "": failures.append("Full data reset returns to a fresh investigation")
 	if game.ui.mode != "briefing": failures.append("A fresh investigation starts with the assignment briefing")
 	game.ui.close()
@@ -354,6 +359,9 @@ func note_and_terminal_checks(game, failures: Array):
 	game.ui.command_input.text = "inspect files"
 	game._use("server_console","device",true)
 	if game.ui.command_input.text != "inspect account": failures.append("Returning to a device restores its pending command")
+	game.ui.command_input.text = "new command draft"
+	game.ui.recall_command(1)
+	if game.ui.command_input.text != "new command draft": failures.append("Down at the end of command history preserves the current draft")
 	game.ui.command_input.text = "logs t"
 	game.ui.recall_command(-1)
 	game.ui.recall_command(1)
@@ -361,6 +369,14 @@ func note_and_terminal_checks(game, failures: Array):
 	game.ui.close()
 	game._use("server_console","device",true)
 	if game.ui.command_input.text != "logs t": failures.append("Closing and reopening a terminal preserves its pending input")
+	game.ui.command_input.clear()
+	var saved_history = game.ui.command_history.get(game.context,[])
+	game.ui.command_history[game.context] = []
+	game.ui.history_index = 0
+	game.ui.command_input.text = "first command draft"
+	game.ui.recall_command(1)
+	if game.ui.command_input.text != "first command draft": failures.append("Down with empty command history preserves the current draft")
+	game.ui.command_history[game.context] = saved_history
 	game.ui.command_input.clear()
 	game.ui.close()
 
@@ -551,6 +567,32 @@ func settings_checks(game, failures: Array):
 	if not game.settings.save_values(original).ok: failures.append("Original settings can be restored after the review")
 	viewport.scaling_3d_scale = original_scale
 	viewport.msaa_3d = original_msaa
+
+func settings_dialog_checks(game, failures: Array):
+	var editor = game.ui.settings_screen
+	var before = game.state.duplicate(true)
+	press_text(editor,"게임 종료…")
+	var confirmation: ConfirmationDialog
+	for item in editor.get_children():
+		if item is ConfirmationDialog and item.visible: confirmation = item
+	if confirmation == null: failures.append("Settings exit confirmation is a child of the active settings window"); return
+	game.ui.notice("확인 중인 업무 알림")
+	var nested_notice = confirmation.find_children("*","AcceptDialog",true,false)
+	if nested_notice.is_empty(): failures.append("Notices stay above an active settings confirmation")
+	game.ui.toggle()
+	game.ui.toggle()
+	if not editor.visible or game.player.enabled: failures.append("Canceling a settings confirmation returns to settings without enabling movement")
+	game.ui.notice("설정 업무 알림")
+	if not editor.get_children().any(func(item): return item is AcceptDialog and item.visible): failures.append("A settings notice belongs to the active settings window")
+	game.ui.toggle()
+	InvestigationDataReset.confirm(game)
+	var reset_dialog: ConfirmationDialog
+	for item in editor.get_children():
+		if item is ConfirmationDialog and item.visible: reset_dialog = item
+	if reset_dialog == null or not reset_dialog.get_ok_button().disabled: failures.append("Settings data reset opens above settings and retains its countdown")
+	game.ui.toggle()
+	await get_tree().process_frame
+	if game.state != before or not editor.visible: failures.append("Canceling data reset leaves investigation and settings intact")
 
 func _dummy_server_pose(game):
 	game.player.global_position = Vector3(0,.01,-2)
