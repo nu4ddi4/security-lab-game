@@ -300,6 +300,7 @@ func run(game: InvestigationPrototype):
 	game.state = previous_state
 	game.ui.refresh()
 	await progression_checks(game,failures)
+	operational_final_checks(game,failures)
 	await focus_checks(game,failures)
 	await interaction_checks(game,failures)
 	await responsive_checks(game,failures)
@@ -531,6 +532,71 @@ func select_record(picker: OptionButton, id: String):
 			picker.select(i)
 			picker.item_selected.emit(i)
 			return
+
+func option_disabled(picker: OptionButton, id: String) -> bool:
+	for i in range(picker.item_count):
+		if picker.get_item_metadata(i) == id: return picker.is_item_disabled(i)
+	return true
+
+func unaudited_day_seven(game, empty: bool) -> Dictionary:
+	var engine = game.engine
+	var s = engine.create_state()
+	# This case configuration is the existing no-source scenario, with ordinary daily actions.
+	if empty: s.maintenanceAllowed = false
+	for command in ["status","inspect account","logs tasks","logs backups"]: s = engine.step(s,engine.parse(command,"server_console",s)).state
+	s = engine.step(s,engine.parse("inspect files","project_pc",s)).state
+	s = engine.step(s,engine.parse("inspect W-218","approval_archive",s)).state
+	for id in ["oh_intro","park_intro","han_intro","seo_intro"]: s = engine.step(s,{"type":"dialogue","payload":{"id":id}}).state
+	for day in range(1,7):
+		if day == 2:
+			for command in ["backup disable B-05","verify service"]: s = engine.step(s,engine.parse(command,"server_console",s)).state
+		if day == 3:
+			s = engine.step(s,engine.parse("inspect files","project_pc",s)).state
+			if not s.ops.indexHealthy: s = engine.step(s,engine.parse("repair index","server_console",s)).state
+			s = engine.step(s,engine.parse("verify search","project_pc",s)).state
+		if day >= 4:
+			s = engine.step(s,engine.parse("verify service","server_console",s)).state
+			s = engine.step(s,engine.parse("verify search","project_pc",s)).state
+		s = engine.step(s,{"type":"day.end","payload":{"expectedDay":day,"confirmed":true}}).state
+	return s
+
+func operational_final_checks(game, failures: Array):
+	var original = game.state.duplicate(true)
+	var desk = game.ui.case_desk
+	for empty in [false,true]:
+		var s = unaudited_day_seven(game,empty)
+		if s.day != 7 or s.report.approved or not s.casework.links.is_empty(): failures.append("Operational final fixture reaches day seven without audit permission or inferred case claims")
+		s = game.engine.step(s,{"type":"time.advance"}).state
+		if not empty: s = game.engine.step(s,{"type":"time.advance"}).state
+		game.state = s
+		game._use("control_console","device",true)
+		desk.reset()
+		desk.open(game.ui,true)
+		desk.view = 2; desk.build()
+		if not option_disabled(desk.final_picks.transfer,"sent") or not option_disabled(desk.final_picks.material,"empty"): failures.append("Unqueried operational originals never unlock final findings")
+		game.dispatch(game.engine.parse("logs dispatch","control_console",game.state))
+		desk.build()
+		for choice in ["scheduled","not_run","blocked","sent"]:
+			if option_disabled(desk.final_picks.transfer,choice): failures.append("An observed dispatch original opens the operational category without audit permission: "+choice)
+		if not option_disabled(desk.final_picks.transfer,"received"): failures.append("A dispatch original alone does not open an external-receipt claim")
+		if empty:
+			for choice in ["isolated","present","empty"]:
+				if option_disabled(desk.final_picks.material,choice): failures.append("The observed no-source record opens the material category without selecting a matching answer: "+choice)
+		elif not option_disabled(desk.final_picks.material,"empty"): failures.append("A sent dispatch does not invent a material-state observation")
+		for picker in desk.final_picks.values():
+			if picker.get_item_metadata(picker.selected) != "unknown": failures.append("Observed operational categories still start with the player's judgment deferred")
+		select_record(desk.final_picks.transfer,"not_run" if empty else "sent")
+		if empty: select_record(desk.final_picks.material,"empty")
+		press_text(desk.body,"종결 보고 접수")
+		var report = game.state.casework.final
+		if report.is_empty() or report.evaluation.unsupported.has("transfer") or empty and report.evaluation.unsupported.has("material"): failures.append("An unaudited final report accepts the player's observed operational findings")
+		if not InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(game.state,game.content),game.content).has("state"): failures.append("Unaudited operational reports remain valid saved progress")
+		desk.reset()
+	game.state = original
+	game.ui.reset_session()
+	game.ui.sync_memo()
+	game.ui.refresh()
+	game.ui.close()
 
 func press_text(parent: Node, text: String):
 	for node in parent.find_children("*","Button",true,false):
