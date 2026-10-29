@@ -21,9 +21,9 @@ function Start-TestUpdateHelper([string]$TransactionPath) {
     # Drain both pipes asynchronously so diagnostic output cannot block the helper.
     @{process=$process;stdout=$process.StandardOutput.ReadToEndAsync();stderr=$process.StandardError.ReadToEndAsync()}
 }
-function Get-HelperFailure($Helper,[string]$Stage) {
+function Get-HelperFailure($Helper,[string]$Stage,[int]$TimeoutSeconds) {
     $details=[Collections.Generic.List[string]]::new()
-    $details.Add($(if ($Helper.process.HasExited) {'exit='+$Helper.process.ExitCode} else {'still running after 10s'}))
+    $details.Add($(if ($Helper.process.HasExited) {'exit='+$Helper.process.ExitCode} else {'still running after '+$TimeoutSeconds+'s'}))
     $resultPath=Join-Path $Stage 'result.json'
     if (Test-Path -LiteralPath $resultPath) {
         try {
@@ -150,7 +150,10 @@ try {
     $transactionPath=Join-Path $stage 'transaction.json'; Write-UpdateJson $transactionPath $transaction
     $helperRun=Start-TestUpdateHelper $transactionPath
     $helper=$helperRun.process;$owned+=,$helper
-    for ($attempt=0;$attempt -lt 100;$attempt++){if((Test-Path -LiteralPath (Join-Path $stage 'ready.json')) -or $helper.HasExited){break};Start-Sleep -Milliseconds 100}
+    # Match the application's 30-second helper preparation window. Cold Windows
+    # PowerShell startup can exceed 10 seconds on hosted runners.
+    $preflightTimeoutSeconds=30
+    for ($attempt=0;$attempt -lt ($preflightTimeoutSeconds*10);$attempt++){if((Test-Path -LiteralPath (Join-Path $stage 'ready.json')) -or $helper.HasExited){break};Start-Sleep -Milliseconds 100}
     if ($case -in @('wrong-hash','wrong-channel','installed-mismatch','junction','second-instance')) {
         Expect ($helper.WaitForExit(5000)) ($case+' rejected promptly')
         Expect (-not (Test-Path -LiteralPath (Join-Path $stage 'ready.json'))) ($case+' rejected before game exit')
@@ -158,7 +161,7 @@ try {
         if ($case -eq 'junction'){[IO.Directory]::Delete((Join-Path $installRoot 'link'))}
         $parent.Kill();$null=$parent.WaitForExit(5000)
     } else {
-        if (-not (Test-Path -LiteralPath (Join-Path $stage 'ready.json'))) { throw ($case+' preflight handshake: '+(Get-HelperFailure $helperRun $stage)) }
+        if (-not (Test-Path -LiteralPath (Join-Path $stage 'ready.json'))) { throw ($case+' preflight handshake: '+(Get-HelperFailure $helperRun $stage $preflightTimeoutSeconds)) }
         Expect $true ($case+' preflight handshake')
         Expect-Reject { [IO.File]::WriteAllText((Join-Path $stage 'SecurityLabSetup.exe'),'tamper') } ($case+' installer file pinned against replacement')
         $parent.Kill();$null=$parent.WaitForExit(5000)
