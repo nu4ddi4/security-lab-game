@@ -200,24 +200,30 @@ func request_install():
 	consent_dialog.confirmed.connect(confirm_update)
 	consent_dialog.canceled.connect(defer_update)
 	consent_dialog.close_requested.connect(defer_update)
-	var parent = ui.root
-	var settings = game.get("settings")
-	if settings!=null and settings.panel!=null and settings.panel.visible: parent = settings.panel
-	parent.add_child(consent_dialog)
+	update_dialog_parent(ui).add_child(consent_dialog)
 	var player = game.get("player")
 	consent_player_enabled = player!=null and player.enabled
 	if player!=null: player.set_enabled(false)
 	consent_dialog.popup_centered(Vector2i(650,220))
 	consent_dialog.get_cancel_button().grab_focus()
 
+func legacy_settings_panel():
+	var settings = game.get("settings") if game!=null else null
+	return settings.get("panel") if settings!=null else null
+
+func update_dialog_parent(ui: Node) -> Node:
+	if ui.has_method("dialog_parent"): return ui.dialog_parent()
+	var panel = legacy_settings_panel()
+	return panel if panel!=null and panel.visible else ui.root
+
 func close_consent():
 	if consent_dialog==null: return
 	consent_dialog.hide(); consent_dialog.queue_free(); consent_dialog = null
 	var player = game.get("player") if game!=null else null
 	var ui = game.get("ui") if game!=null else null
-	var settings = game.get("settings") if game!=null else null
+	var panel = legacy_settings_panel()
 	if player!=null:
-		var blocked = (ui!=null and ui.modal_open) or (settings!=null and settings.panel!=null and settings.panel.visible)
+		var blocked = (ui!=null and ui.modal_open) or (panel!=null and panel.visible)
 		player.set_enabled(consent_player_enabled and not blocked)
 
 func defer_update():
@@ -289,7 +295,8 @@ func install():
 	var ui = game.get("ui")
 	if ui!=null:
 		var settings = game.get("settings")
-		if settings!=null and settings.panel!=null: settings.panel.hide(); settings.panel.queue_free(); settings.panel = null
+		var panel = legacy_settings_panel()
+		if panel!=null: panel.hide(); panel.queue_free(); settings.set("panel",null)
 		pause_for_install()
 		preparing_dialog = AcceptDialog.new()
 		preparing_dialog.title = "Security Lab 업데이트"
@@ -299,7 +306,7 @@ func install():
 		preparing_dialog.theme = ui.root.theme
 		preparing_dialog.get_ok_button().hide()
 		preparing_dialog.get_ok_button().disabled = true
-		ui.root.add_child(preparing_dialog)
+		update_dialog_parent(ui).add_child(preparing_dialog)
 		preparing_dialog.popup_centered(Vector2i(580,160))
 	var request_data = {"schema":1,"token":token,"parent_pid":OS.get_process_id(),"install_directory":executable_path().get_base_dir(),"data_directory":ProjectSettings.globalize_path(data_directory()),"current":info,"installed":installed_identity(),"target":manifest}
 	for entry in [["transaction.json",JSON.stringify(request_data)], ["SecurityLabUpdater.ps1",FileAccess.get_file_as_string("res://resources/native_update_helper.ps1")]]:
@@ -336,7 +343,7 @@ func _process(_delta):
 func fail(message: String):
 	state = "failed"; consent_granted = false
 	close_consent()
-	if preparing_dialog!=null: preparing_dialog.queue_free(); preparing_dialog = null
+	if preparing_dialog!=null: preparing_dialog.hide(); preparing_dialog.queue_free(); preparing_dialog = null
 	status_changed.emit(message)
 
 func health_acknowledgement():

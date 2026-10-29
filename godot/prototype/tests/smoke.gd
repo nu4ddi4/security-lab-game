@@ -19,6 +19,17 @@ class ReplacementFailedStore extends InvestigationStore:
 		error = "교체 저장 실패"
 		return false
 
+class DialogTestUpdater extends InvestigationInstallerUpdates:
+	var preparing_parent: Node
+	var preparing_visible = false
+	func installed_identity_valid() -> bool: return true
+	func installer_verified() -> bool: return true
+	func fail(message: String):
+		if is_instance_valid(preparing_dialog):
+			preparing_parent = preparing_dialog.get_parent()
+			preparing_visible = preparing_dialog.visible
+		super.fail(message)
+
 func capture(game: InvestigationPrototype, name: String):
 	if capture_directory.is_empty() or DisplayServer.get_name() == "headless": return
 	await get_tree().process_frame
@@ -659,6 +670,29 @@ func settings_dialog_checks(game, failures: Array):
 	game.ui.toggle()
 	await get_tree().process_frame
 	if game.state != before or not editor.visible: failures.append("Canceling data reset leaves investigation and settings intact")
+	await updater_dialog_checks(game,failures)
+
+func updater_dialog_checks(game, failures: Array):
+	var updater = DialogTestUpdater.new()
+	game.add_child(updater)
+	updater.game = game
+	updater.enabled = true
+	updater.info = {"version":"0.0.1","channel":"beta"}
+	updater.manifest = {"version":"0.0.2","channel":"beta"}
+	updater.state = "available"
+	updater.request_install()
+	if not is_instance_valid(updater.consent_dialog) or updater.consent_dialog.get_parent() != game.ui.settings_screen: failures.append("Updater consent opens above the investigation settings window")
+	updater.defer_update()
+	if game.player.enabled or not game.ui.settings_screen.visible or updater.consent_granted: failures.append("Deferring an update keeps settings active and never authorizes installation")
+	# Missing transaction directory stops preparation before any helper process can launch.
+	updater.stage = ProjectSettings.globalize_path(game.store.directory.path_join("not-created-"+str(Time.get_ticks_usec())))
+	updater.state = "ready"
+	updater.consent_granted = true
+	await updater.install()
+	if updater.preparing_parent != game.ui.settings_screen or not updater.preparing_visible: failures.append("Verified installer preparation opens above the investigation settings window")
+	if updater.state != "failed" or updater.helper_pid != -1 or updater.preparing_dialog != null: failures.append("A preparation write failure closes its dialog before any process starts")
+	if game.player.enabled or not game.ui.settings_screen.visible: failures.append("Failed update preparation leaves investigation settings usable")
+	updater.queue_free()
 
 func _dummy_server_pose(game):
 	game.player.global_position = Vector3(0,.01,-2)
