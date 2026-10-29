@@ -684,14 +684,32 @@ func updater_dialog_checks(game, failures: Array):
 	if not is_instance_valid(updater.consent_dialog) or updater.consent_dialog.get_parent() != game.ui.settings_screen: failures.append("Updater consent opens above the investigation settings window")
 	updater.defer_update()
 	if game.player.enabled or not game.ui.settings_screen.visible or updater.consent_granted: failures.append("Deferring an update keeps settings active and never authorizes installation")
-	# Missing transaction directory stops preparation before any helper process can launch.
-	updater.stage = ProjectSettings.globalize_path(game.store.directory.path_join("not-created-"+str(Time.get_ticks_usec())))
+	# An existing regular file cannot contain a transaction file on any platform.
+	updater.stage = ProjectSettings.globalize_path(game.store.directory.path_join("stage-blocker-"+str(Time.get_ticks_usec())))
+	var blocker = FileAccess.open(updater.stage,FileAccess.WRITE)
+	if blocker == null:
+		failures.append("Updater preparation fixture creates its regular-file blocker")
+		updater.queue_free()
+		return
+	blocker.store_string("regular file, not a preparation directory")
+	blocker.close()
+	if not FileAccess.file_exists(updater.stage) or DirAccess.dir_exists_absolute(updater.stage):
+		failures.append("Updater preparation fixture is a file rather than a directory")
+		updater.queue_free()
+		return
+	var transaction = FileAccess.open(updater.stage.path_join("transaction.json"),FileAccess.WRITE)
+	if transaction != null:
+		transaction.close()
+		failures.append("Updater preparation fixture rejects transaction writes before exercising installation")
+		updater.queue_free()
+		return
 	updater.state = "ready"
 	updater.consent_granted = true
 	await updater.install()
 	if updater.preparing_parent != game.ui.settings_screen or not updater.preparing_visible: failures.append("Verified installer preparation opens above the investigation settings window")
-	if updater.state != "failed" or updater.helper_pid != -1 or updater.preparing_dialog != null: failures.append("A preparation write failure closes its dialog before any process starts")
+	if updater.state != "failed" or updater.helper_pid != -1 or updater.preparing_dialog != null: failures.append("A preparation write failure closes its dialog before any process starts: "+JSON.stringify({"state":updater.state,"helper_pid":updater.helper_pid,"dialog":is_instance_valid(updater.preparing_dialog),"stage_is_file":FileAccess.file_exists(updater.stage),"stage_is_directory":DirAccess.dir_exists_absolute(updater.stage)}))
 	if game.player.enabled or not game.ui.settings_screen.visible: failures.append("Failed update preparation leaves investigation settings usable")
+	DirAccess.remove_absolute(updater.stage)
 	updater.queue_free()
 
 func _dummy_server_pose(game):
