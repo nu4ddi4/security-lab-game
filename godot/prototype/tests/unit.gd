@@ -46,6 +46,7 @@ func _initialize():
 	check(not content.has("error"),"Content loads")
 	if content.has("error"): quit(1); return
 	var engine = InvestigationEngine.new(content)
+	stage_checks(content)
 	var fixtures = JSON.parse_string(FileAccess.get_file_as_string("res://prototype/tests/scenarios.json"))
 	var last: Dictionary
 	for scenario in fixtures.scenarios:
@@ -368,3 +369,44 @@ func review_checks(engine, content):
 		overflow.state.revision = 2000
 		var recovered = InvestigationSaveCodec.decode(JSON.stringify(overflow),content)
 		check(recovered.has("state") and recovered.state.records.size() < 100,"Old saves exhausted only by unread backup changes recover through bounded migration")
+
+func stage_checks(content: Dictionary):
+	var engine = TerminalStagesEngine.new(content)
+	var state = engine.create_state()
+	check(InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(state,content),content).has("state"),"A fresh stage session uses the existing save envelope")
+	for index in range(1,7):
+		var before = state.duplicate(true)
+		var wrong = engine.step(state,engine.parse("oops", "",state))
+		check(state == before,"Stage commands do not mutate the input state")
+		check(wrong.state.stage.phase == ("playing" if index < 3 else "exploded"),"Practice ends and one-hit failures start at stage three")
+		state = wrong.state
+		if index >= 3:
+			var rejects = engine.step(state,engine.parse("help","",state))
+			check(rejects.state == state,"An exploded PC cannot execute further commands")
+			state = engine.step(state,{"type":"stage.retry"}).state
+			check(state.stage.index == index and state.stage.cleared.size() == index-1,"Retry preserves prior clears without skipping the active stage")
+		var stage = content.stages[index-1]
+		var help = engine.step(state,engine.parse("help","",state))
+		check(help.code == "STAGE_OUTPUT" and help.state == state,"Help is always a safe read-only command")
+		var command = stage.solutions.keys()[0]
+		state = engine.step(state,engine.parse(command,"",state)).state
+		check(state.stage.phase == "clear" and state.stage.cleared.size() == index,"The intended puzzle solution clears its stage")
+		var loaded = InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(state,content),content)
+		check(loaded.has("state"),"Stage clears roundtrip through save validation")
+		if loaded.has("state"): state = loaded.state
+		state = engine.step(state,{"type":"stage.next"}).state
+	check(state.stage.phase == "complete" and state.stage.blasts == 4,"All six stages finish with their explosion count intact")
+	var loaded = InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(state,content),content)
+	check(loaded.has("state") and loaded.state.stage == state.stage,"Stage save normalizes numeric IDs for replay")
+	if loaded.has("state"):
+		var replay = engine.step(loaded.state,{"type":"stage.select","payload":{"index":1}}).state
+		replay = engine.step(replay,engine.parse("status","",replay)).state
+		check(replay.stage.cleared.size() == 6 and replay.stage.unlocked == 6,"Replaying a loaded stage does not duplicate numeric clear IDs or relock later stages")
+	var fresh = engine.create_state()
+	check(engine.step(fresh,{"type":"stage.select","payload":{"index":6}}).state == fresh,"A locked stage cannot be selected through an action")
+	var tampered = JSON.parse_string(InvestigationSaveCodec.encode(fresh,content))
+	tampered.state.stage.unlocked = 6
+	check(InvestigationSaveCodec.decode(JSON.stringify(tampered),content).has("error"),"Save validation rejects forged stage unlocks")
+	tampered = JSON.parse_string(InvestigationSaveCodec.encode(fresh,content))
+	tampered.state.stage.phase = "exploded"
+	check(InvestigationSaveCodec.decode(JSON.stringify(tampered),content).has("error"),"A practice-stage explosion cannot be forged into a save")

@@ -19,6 +19,9 @@ var investigation_environment: InvestigationEnvironment
 var detailed_world = false
 var context = ""
 var blocked_save = false
+var session_available = false
+var stage_mode = true
+var legacy_progress = false
 var save_timer: Timer
 var saving = false
 var targets = {}
@@ -51,11 +54,16 @@ func _ready():
 		push_error(content.error)
 		loading_text.text = "업무 자료를 읽지 못했습니다. 게임을 다시 시작해 주세요."
 		return
-	engine = InvestigationEngine.new(content)
+	stage_mode = "--legacy-investigation" not in OS.get_cmdline_user_args() and "--prototype-input-review" not in OS.get_cmdline_user_args()
+	engine = TerminalStagesEngine.new(content) if stage_mode else InvestigationEngine.new(content)
 	var testing = "--prototype-smoke" in OS.get_cmdline_user_args()
 	qa_mode = testing
 	if testing: store.directory = "user://investigation-qa"
 	var loaded = {"new":true} if testing else store.load_state(content)
+	if stage_mode and loaded.has("state") and not loaded.state.has("stage"):
+		legacy_progress = true
+		loaded = {"error":"이전 진행은 새 게임을 시작할 때 보관됩니다."}
+	session_available = loaded.has("state")
 	blocked_save = loaded.has("error")
 	state = loaded.get("state",engine.create_state())
 	_setup_input()
@@ -83,13 +91,13 @@ func _ready():
 	_build_world()
 	office_scene = null
 	load_timings.world_ms = Time.get_ticks_msec()-world_started
-	_build_marker()
+	if not stage_mode: _build_marker()
 	await _loading_step("화면과 조작을 준비하고 있습니다",90)
 	controls = InvestigationControls.new()
 	add_child(controls)
 	updates = InvestigationUpdates.new()
 	add_child(updates)
-	ui = InvestigationUI.new()
+	ui = TerminalStagesUI.new() if stage_mode else InvestigationUI.new()
 	add_child(ui)
 	ui.setup(self)
 	controls.setup(self)
@@ -124,7 +132,7 @@ func _ready():
 	get_window().focus_exited.connect(save_now)
 	# Persist a fresh investigation before Android can suspend its render loop.
 	if not loaded.has("state") and not blocked_save: save_now()
-	if blocked_save: ui.notice(loaded.error + "\n새 조사를 시작하기 전 원본을 보존합니다.")
+	if blocked_save and not legacy_progress: ui.notice(loaded.error + "\n새 게임을 시작하기 전 원본을 보존합니다.")
 	await _loading_step("준비 완료",100)
 	load_timings.ready_ms = Time.get_ticks_msec()-load_started
 	print("PROTOTYPE_LOADING ",JSON.stringify(load_timings))
@@ -132,7 +140,8 @@ func _ready():
 	print("PROTOTYPE_READY ",JSON.stringify({"day":state.day,"dummy":not detailed_world,"devices":content.case.devices.size(),"npcs":content.case.npcs.size(),"isolatedSave":store.directory,"renderer":RenderingServer.get_current_rendering_method()}))
 	if DisplayServer.get_name() != "headless": _report_first_frame.call_deferred()
 	if testing:
-		var smoke = load("res://tests/input_review.gd" if "--prototype-input-review" in OS.get_cmdline_user_args() else "res://prototype/tests/smoke.gd").new()
+		var smoke_path = "res://tests/input_review.gd" if "--prototype-input-review" in OS.get_cmdline_user_args() else "res://prototype/tests/stages_smoke.gd" if stage_mode else "res://prototype/tests/smoke.gd"
+		var smoke = load(smoke_path).new()
 		add_child(smoke)
 		smoke.run.call_deferred(self)
 	elif controls.automatic_updates and updater==null: check_updates.call_deferred()
@@ -257,6 +266,9 @@ func _setup_input():
 	if qa_mode: bindings.bindings = LabInputBindings.defaults(); bindings.apply()
 
 func _use(id: String, kind: String, tool: bool):
+	if stage_mode:
+		if tool and kind == "device": ui.open_terminal()
+		return
 	if kind == "npc": ui.open_dialogue(id); return
 	if tool:
 		context = id
@@ -309,6 +321,11 @@ func dispatch(action: Dictionary) -> Dictionary:
 
 func command(text: String):
 	var action = engine.parse(text,context,state)
+	if stage_mode:
+		var result = dispatch(action)
+		ui.print_output(text,result.text,"error" if result.code in ["STAGE_PRACTICE","STAGE_EXPLODED"] else "output")
+		ui.call("command_result",result)
+		return
 	if action.type == "pause":
 		var preview = engine.step(state,action)
 		if preview.code != "CONFIRM_PAUSE": ui.print_output(text,preview.text,"error" if preview.code in InvestigationUI.ERROR_CODES else "output"); return
@@ -337,8 +354,11 @@ func new_game():
 	var candidate = engine.create_state()
 	if not save_state(candidate): return
 	state = candidate
+	session_available = true
+	reset_player_pose()
 	if investigation_environment != null: investigation_environment.sync(state)
 	blocked_save = false
+	legacy_progress = false
 	context = ""
 	ui.reset_session()
 	ui.sync_memo()
@@ -349,6 +369,14 @@ func quit_game():
 	if not blocked_save and not save_now(): return
 	get_tree().quit()
 
+func reset_player_pose():
+	release_speaker()
+	player.velocity = Vector3.ZERO
+	player.rotation = Vector3.ZERO
+	player.camera.rotation = Vector3.ZERO
+	if investigation_environment != null: investigation_environment.spawn(player)
+	else: player.global_position = Vector3(-6,.01,5.6)
+
 func preserve_current() -> bool:
 	if not blocked_save and not save_now(): return false
 	if not store.preserve(): ui.notice(store.error); return false
@@ -358,7 +386,10 @@ func preserve_current() -> bool:
 func reset_all_data() -> int:
 	var removed = InvestigationDataReset.wipe(InvestigationDataReset.targets(self))
 	state = engine.create_state()
+	session_available = true
+	reset_player_pose()
 	blocked_save = false
+	legacy_progress = false
 	context = ""
 	controls.reset()
 	bindings.bindings = LabInputBindings.defaults()
@@ -380,9 +411,12 @@ func transfer_file(path: String, exporting: bool):
 		return
 	var candidate = store.import_file(path,content)
 	if candidate.has("error"): ui.notice(candidate.error); return
+	if stage_mode and not candidate.state.has("stage"): ui.notice("이 파일은 이전 조사 게임의 진행입니다."); return
 	if not preserve_current(): return
 	if not save_state(candidate.state): return
 	state = candidate.state
+	session_available = true
+	legacy_progress = false
 	if investigation_environment != null: investigation_environment.sync(state)
 	blocked_save = false
 	ui.reset_session()

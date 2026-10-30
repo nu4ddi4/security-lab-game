@@ -16,7 +16,8 @@
   "scene": [
     "godot/tests/input_bindings_test.gd",
     "godot/tests/input_review.gd",
-    "godot/prototype/tests/smoke.gd"
+    "godot/prototype/tests/smoke.gd",
+    "godot/prototype/tests/stages_smoke.gd"
   ],
   "assets": [
     "godot/tests/fixtures/office-geometry.json"

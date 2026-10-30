@@ -87,7 +87,7 @@ application/modify_resources=true
 application/file_version="0.1.0.0"
 application/product_version="0.1.0.0"
 application/product_name="Security Lab"
-application/file_description="Offline security investigation"
+application/file_description="Terminal comedy puzzle"
 '''.replace('0.1.0.0', '.'.join(map(str, parts(version))))
     (target / 'export_presets.cfg').write_text(executable_preset + '\n' + content_pack.pack_preset(executable_preset), encoding='utf-8')
     # Compat key: which installed executables may run this build's data pack.
@@ -221,7 +221,7 @@ def main():
             # portrait captures can exceed three minutes with the furnished map.
             run([str(executable), '--audio-driver', 'Dummy', '--', '--prototype-smoke',
                  '--prototype-capture-dir=' + str(captures)], directory, 'INVESTIGATION_SMOKE', timeout=300)
-            expected = ['01-briefing', '02-dialogue', '03-terminal', '04-messenger', '05-notes', '06-field', '07-settings']
+            expected = ['00-main-menu', '01-intro', '02-practice', '03-terminal', '04-clear', '05-explosion', '06-stages', '07-settings', '08-finish']
             if any(not (captures / (name + '.png')).is_file() for name in expected):
                 raise SystemExit('Exported Windows UI captures are incomplete.')
             print('Rendered Windows EXE UI and interaction passed.')

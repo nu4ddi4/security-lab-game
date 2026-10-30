@@ -12,7 +12,7 @@
     "action": "help",
     "args": {},
     "category": "기본",
-    "description": "장비 명령어 책 열기"
+    "description": "현재 장비의 명령 도움말"
   },
   {
     "text": "status",

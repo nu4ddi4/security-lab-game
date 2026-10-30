@@ -9,6 +9,7 @@ var targets: Dictionary = {}
 var displays: Dictionary = {}
 var last_visual_state = ""
 var world: LabWorld
+var stage_definitions: Array = []
 
 const GOOD = Color(.25,.72,.63)
 const WARNING = Color(.9,.6,.25)
@@ -48,6 +49,7 @@ class EquipmentDisplay extends Control:
 
 func setup(office: LabWorld, content: Dictionary):
 	world = office
+	stage_definitions = content.get("stages",[])
 	model = load("res://assets/models/Investigation_Environment.glb").instantiate()
 	add_child(model)
 	_collect(model)
@@ -182,6 +184,9 @@ func _display(id: String, mesh: MeshInstance3D):
 		if additional is MeshInstance3D: additional.material_override = material
 
 func sync(state: Dictionary):
+	if state.has("stage"):
+		sync_stage(state.stage)
+		return
 	# Only public operational state. Hidden access/collection evidence and the
 	# responsible person are never exposed by a screen or by advancing the day.
 	var visual = {"day":state.day,"ended":state.ended,"delay":state.ops.backupDelay,"index":state.ops.indexHealthy,"approved":state.report.approved,"serviceChecked":state.ops.serviceVerifiedDay==state.day,"searchChecked":state.ops.searchVerifiedDay==state.day}
@@ -203,6 +208,21 @@ func sync(state: Dictionary):
 		display.canvas.heading = data[id][0]
 		display.canvas.rows = data[id][1]
 		display.canvas.tone = WARNING if (id in ["server_console","control_console","briefing_board"] and visual.delay or id in ["project_pc","control_console","briefing_board"] and not visual.index) else GOOD
+		display.canvas.queue_redraw()
+		display.viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+func sync_stage(stage: Dictionary):
+	var signature = "stage:"+JSON.stringify(stage)
+	if signature == last_visual_state: return
+	last_visual_state = signature
+	var definition = stage_definitions[int(stage.index)-1]
+	for id in displays:
+		var display = displays[id]
+		var active = id == definition.device
+		var broken = active and stage.phase == "exploded"
+		display.canvas.heading = "NO SIGNAL" if broken else "PC-%02d / OFFICE OS" % stage.index if active else "사내 컴퓨터 관리"
+		display.canvas.rows = ["보증 기간 종료","담당자: 부재중","상태: 부품으로 전환"] if broken else [definition.title,"키보드 입력 대기","연습용 PC" if stage.index < 3 else "오타 감지 장치 가동"] if active else ["컴퓨터 6대를 고치면 퇴근","첫 두 대는 연습용","3번부터 오타 주의"]
+		display.canvas.tone = Color(.95,.25,.1) if broken else GOOD
 		display.canvas.queue_redraw()
 		display.viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 

@@ -1,0 +1,102 @@
+[
+  {
+    "title": "일단 켜 보기",
+    "goal": "터미널의 상태를 확인하세요.",
+    "device": "server_console",
+    "help": "help          명령 목록\nstatus        상태 확인\nls            파일 목록\ncat <file>    파일 읽기",
+    "files": {
+      "welcome.txt": "신입사원용 PC / 파손 면책 기간: 2대\n담당자: 오늘은 아무것도 누르지 마세요.\n추신: 상태 확인은 해도 됩니다."
+    },
+    "outputs": {},
+    "solutions": {
+      "status": "POWER=ON\nDIAGNOSTICS=PASS\n업무 적응도: 전원을 켤 수 있음"
+    },
+    "clear": "당신은 전원을 켰습니다. 채용이 유지됩니다.",
+    "failure": ""
+  },
+  {
+    "title": "서류 찾기의 달인",
+    "goal": "오늘 마지막으로 출력한 서류를 찾아 여세요.",
+    "device": "project_pc",
+    "help": "help          명령 목록\nls            파일 목록\ncat <file>    파일 읽기",
+    "files": {
+      "print.log": "09:12  lunch.txt    COMPLETED\n09:48  memo.txt     COMPLETED\n09:31  budget.txt   COMPLETED",
+      "lunch.txt": "금일 점심: 미정\n결재 상태: 전원 반대",
+      "budget.txt": "소모품 예산: 300원\n희망 구매: 데이터센터",
+      "memo.txt": "인수인계 메모\n첫 두 대는 연습용입니다.\n세 번째 컴퓨터부터는 인사팀도 책임지지 않습니다."
+    },
+    "outputs": {},
+    "solutions": {
+      "cat memo.txt": "인수인계 메모\n첫 두 대는 연습용입니다.\n세 번째 컴퓨터부터는 인사팀도 책임지지 않습니다."
+    },
+    "clear": "종이를 읽었습니다. 이제 경력직입니다.",
+    "failure": ""
+  },
+  {
+    "title": "야근은 프린터가 한다",
+    "goal": "야근 신청서를 무한 출력하는 프로세스를 멈추세요.",
+    "device": "server_console",
+    "help": "help          명령 목록\nls            파일 목록\ncat <file>    파일 읽기\nps            프로세스 목록\nkill <pid>    프로세스 종료",
+    "files": {
+      "print.log": "16:02 pid=37 file=overtime-form copies=9999\n16:03 pid=21 file=printer-health copies=1\n16:04 pid=84 file=payroll copies=1"
+    },
+    "outputs": {
+      "ps": "PID  NAME\n21   printd\n37   office-bot\n84   finance-db"
+    },
+    "solutions": {
+      "kill 37": "PID=37\nSTATE=STOPPED\nPRINT_QUEUE=0"
+    },
+    "clear": "프린터는 퇴근했습니다. 당신은 아직입니다.",
+    "failure": "프린터보다 먼저 컴퓨터가 퇴근했습니다."
+  },
+  {
+    "title": "사무실 웰던",
+    "goal": "사무실 난방을 해당 구역의 기준 온도로 돌리세요.",
+    "device": "maintenance_terminal",
+    "help": "help             명령 목록\nls               파일 목록\ncat <file>       파일 읽기\nstatus           장치 상태\nset temp <value> 목표 온도 설정",
+    "files": {
+      "device.cfg": "model=WARMBOX-2\nzone=office\nsetpoint=180\nunit=C",
+      "profiles.txt": "zone       target_C\nkitchen    180\nserver     18\noffice     24"
+    },
+    "outputs": {
+      "status": "ZONE=office\nTEMPERATURE=180 C\nCARPET=MEDIUM_RARE"
+    },
+    "solutions": {
+      "set temp 24": "SETPOINT=24 C\nCARPET=NOT_FOOD"
+    },
+    "clear": "카펫을 가구로 되돌렸습니다.",
+    "failure": "수리는 실패했고 노릇함은 성공했습니다."
+  },
+  {
+    "title": "진짜 최종 최최종",
+    "goal": "승인 대장에 등록된 급여 파일 하나를 금고에 보관하세요.",
+    "device": "control_console",
+    "help": "help              명령 목록\nls                파일 목록\ncat <file>        파일 읽기\narchive <file>    금고 보관",
+    "files": {
+      "approvals.log": "DOC-07  sha256=ac91  decision=APPROVED\nDOC-08  sha256=be52  decision=REJECTED",
+      "inventory.log": "payroll.xlsx              sha256=ef20\npayroll_final.xlsx        sha256=ac91\npayroll_final_real.xlsx   sha256=be52"
+    },
+    "outputs": {},
+    "solutions": {
+      "archive payroll_final.xlsx": "ARCHIVE=SEALED\nsha256=ac91\nFILES=1"
+    },
+    "clear": "최종 파일이 정말 최종인 드문 날입니다.",
+    "failure": "금고는 멀쩡합니다. 컴퓨터만 퇴사했습니다."
+  },
+  {
+    "title": "퇴근.exe",
+    "goal": "최종 승인된 두 요청의 코드를 슬롯 순서로 연결해 게이트를 여세요.",
+    "device": "project_pc",
+    "help": "help             명령 목록\nls               파일 목록\ncat <file>       파일 읽기\nunlock <code>    퇴근 게이트",
+    "files": {
+      "requests.log": "id=R17 slot=1 code=73\nid=R18 slot=2 code=26\nid=R19 slot=1 code=41",
+      "receipts.log": "id=R17 result=DENIED\nid=R18 result=ACCEPTED\nid=R19 result=ACCEPTED"
+    },
+    "outputs": {},
+    "solutions": {
+      "unlock 4126": "ACCESS=GRANTED\nCLOCK_OUT=APPROVED\n오늘도 회사의 자산 가치를 낮추셨습니다."
+    },
+    "clear": "퇴근 성공. 내일은 계산기를 드립니다.",
+    "failure": "게이트는 잠겼고 케이스만 활짝 열렸습니다."
+  }
+]
