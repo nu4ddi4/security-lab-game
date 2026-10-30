@@ -14,7 +14,7 @@ def unchanged_game(source_sha):
 
 
 def android_assets(version):
-    return {tag(version) + '.apk', tag(version) + '.apk.sha256', 'android-build-info.json'}
+    return {tag(version) + '.apk'}
 
 
 def select_backfill(releases, base, branch, pipeline_sha):
