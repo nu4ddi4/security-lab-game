@@ -1,0 +1,40 @@
+name: Tidy release downloads
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply cleanup (otherwise only back up and preview)
+        type: boolean
+        default: false
+permissions:
+  contents: write
+concurrency:
+  group: prototype-windows-refs/heads/main
+  cancel-in-progress: false
+jobs:
+  tidy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Preserve playable files and prune redundant downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLY: ${{ inputs.apply }}
+        run: |
+          args=(--output release-assets-backup)
+          if [ "$APPLY" = true ]; then args+=(--apply); fi
+          python scripts/clean-release-assets.py "${args[@]}"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: release-assets-backup-${{ github.run_id }}
+          path: release-assets-backup
+          retention-days: 14
+          if-no-files-found: warn
