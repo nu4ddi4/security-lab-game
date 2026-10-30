@@ -124,11 +124,13 @@ def main():
     # the production APK to exercise certificate compatibility and save retention.
     adb('install', '-r', str(qa))
     launch()
-    # The software-rendered emulator needs about three minutes for the full detailed-office smoke run.
-    result = wait_for('INVESTIGATION_SMOKE', timeout=300)
+    # Menu/intro transitions and their aspect-ratio captures extend the detailed
+    # office review on the software-rendered emulator. Keep a bounded deadline.
+    result = wait_for('INVESTIGATION_SMOKE', timeout=360)
     captures = directory / 'ui'
     captures.mkdir(exist_ok=True)
-    for name in ['01-briefing','02-dialogue','03-terminal','04-messenger','05-notes','06-field','07-settings']:
+    for name in ['00-main-menu','00-intro-1','00-intro-2','00-intro-3','00-pause-menu',
+                 '01-briefing','02-dialogue','03-terminal','04-messenger','05-notes','06-field','07-settings']:
         data = app_file('files/qa-ui/' + name + '.png', binary=True)
         if not data.startswith(b'\x89PNG\r\n\x1a\n'):
             raise ValueError('Missing Android rendered UI capture: ' + name)
