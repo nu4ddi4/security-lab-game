@@ -12,6 +12,9 @@ spec.loader.exec_module(release)
 spec = importlib.util.spec_from_file_location('prototype_android', SCRIPTS / 'prototype-android-build.py')
 android = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(android)
+spec = importlib.util.spec_from_file_location('release_assets', SCRIPTS / 'clean-release-assets.py')
+assets = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(assets)
 
 
 class PrototypeReleaseTests(unittest.TestCase):
@@ -278,6 +281,34 @@ class PrototypeReleaseTests(unittest.TestCase):
             (directory / 'SHA256SUMS.txt').write_text(''.join('b'*64 + '  ' + a['name'] + '\n' for a in published['assets']))
             with patch.object(release.subprocess, 'run'), self.assertRaises(ValueError):
                 release.published_manifest(published, self.repo, self.version, self.sha, directory)
+
+    def test_cleanup_preserves_binaries_and_merges_android_checksums(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory/'SHA256SUMS.txt').write_text('b'*64 + '  game.exe\n' + 'c'*64 + '  game.zip\n')
+            (directory/'game.apk.sha256').write_text('d'*64 + '  game.apk\n')
+            files = [{'name': name, 'digest': digest} for name, digest in
+                     [('game.exe', 'sha256:' + 'b'*64), ('game.apk', 'sha256:' + 'd'*64), ('game.zip', None),
+                      ('game.apk.sha256', None), ('build_info.json', None), ('SecurityLabContent.pck', None), ('SHA256SUMS.txt', None)]]
+            published = {'id': 42, 'tag_name': 'v1', 'draft': False, 'assets': files}
+            plan = assets.cleanup_plan(published, directory)
+            self.assertEqual(plan['keep'], ['SHA256SUMS.txt', 'game.apk', 'game.exe'])
+            self.assertEqual(plan['checksums'], 'b'*64 + '  game.exe\n' + 'd'*64 + '  game.apk\n')
+            self.assertEqual(plan['binaries'], files[:2])
+            files[0]['digest'] = 'sha256:' + 'f'*64
+            with self.assertRaises(ValueError):
+                assets.cleanup_plan(published, directory)
+
+    def test_cleanup_leaves_zip_only_and_draft_releases_untouched(self):
+        published = {'draft': False, 'assets': [{'name': 'game.zip'}]}
+        self.assertIsNone(assets.cleanup_plan(published, Path('/unused')))
+        self.assertIsNone(assets.cleanup_plan(dict(published, draft=True, assets=[{'name': 'game.exe'}]), Path('/unused')))
+
+    def test_cleanup_compares_payload_identity_without_download_counters(self):
+        item = {'name': 'game.exe', 'id': 42, 'size': 2048, 'digest': 'sha256:' + 'b'*64, 'state': 'uploaded', 'download_count': 0}
+        self.assertEqual(assets.asset_identities([item]), assets.asset_identities([dict(item, download_count=100)]))
+        self.assertNotEqual(assets.asset_identities([item]), assets.asset_identities([dict(item, size=4096)]))
 
     def test_beta_channel_version_order(self):
         self.assertLess(release.version_key('0.3.0-beta.1'), release.version_key('0.3.1-beta.1'))

@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import tempfile
 
-from github_release import github
+from github_release import github, installer_manifest
 from release_version import PRODUCT, REPOSITORY, channel, parts, tag
 from release_backfill import unchanged_game
 
@@ -49,12 +49,6 @@ def verified_file(directory, name):
 
 def version_key(version):
     return parts(version)[:3] + (0 if parts(version)[3] else 1, parts(version)[3])
-
-
-def installer_manifest(manifest):
-    """Public updates use the self-contained installer, without a separate pack."""
-    return {key: value for key, value in manifest.items()
-            if key not in {'compat', 'content_url', 'content_size', 'content_sha256'}}
 
 
 def published_manifest(release, repository, version, sha, directory):
