@@ -121,7 +121,8 @@ func refresh_input_hints(): refresh()
 
 func _unhandled_key_input(event: InputEvent):
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
-		toggle()
+		if mode == "terminal": open_pause()
+		else: toggle()
 		get_viewport().set_input_as_handled()
 
 func _terminal_input(event: InputEvent):
