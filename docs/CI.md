@@ -30,4 +30,6 @@ CI 설정 변경은 `python -m unittest discover -s tests/ci`와 actionlint로 �
 
 main과 beta는 같은 패키지 ID와 핀으로 고정한 AOSP 공용 테스트 키를 사용한다. APK와 QA APK의 인증서를 확인하고, 같은 키로 서명된 파일의 덮어 설치·저장 유지·재실행을 검사한다. 비디버그 APK의 저장 검사는 테스트용 AOSP 에뮬레이터에서 root로 확인한다. 서명 비밀값 등록은 필요하지 않으며 전용 서명 전환은 정식 출시 준비 때 진행한다.
 
-검증용 묶음 아티팩트(`SecurityLab-<버전>-Windows-x64`·`-Android`: 실행 파일, 설치 프로그램, 게임 데이터 팩 `SecurityLabContent.pck`, 매니페스트, 체크섬)는 릴리스 작업이 쓰고, 사람이 받는 `SecurityLab-<버전>.exe`·`SecurityLabSetup.exe`·`SecurityLab-<버전>.apk`는 zip 없이 별도 아티팩트(`archive: false`)로 올린다. 아티팩트는 14일 보관한다. 버전 릴리스 파일은 검사된 EXE·설치 파일·게임 데이터 팩·APK·체크섬·빌드 기록이며, 게시 완료 후 업데이트 채널을 반영한다. Windows 빌드 작업은 내보낸 EXE가 데이터 팩을 마운트하고, 확인되지 않은 팩을 되돌리는지도 검사한다.
+검증용 묶음 아티팩트(`SecurityLab-<버전>-Windows-x64`·`-Android`: 실행 파일, 설치 프로그램, 게임 데이터 팩 `SecurityLabContent.pck`, 매니페스트, 체크섬)는 릴리스 작업이 쓰고, 사람이 받는 `SecurityLab-<버전>.exe`·`SecurityLabSetup.exe`·`SecurityLab-<버전>.apk`는 zip 없이 별도 아티팩트(`archive: false`)로 올린다. 아티팩트는 14일 보관한다. **버전 릴리스에는 포터블 EXE·설치용 EXE·APK·SHA256SUMS.txt만 게시한다.** 빌드 기록·검증 보고서·데이터 팩은 Actions 내부 아티팩트에 남긴다. 게시 완료 후 별도 업데이트 채널에 설치용 매니페스트만 반영한다. 게시 재시도는 공개 체크섬과 EXE 식별자로 채널을 복구하므로 버전 릴리스에 메타데이터 파일이 필요하지 않다. Windows 빌드 작업은 기존 데이터 팩 적용·복구 호환성도 계속 검사한다.
+
+기존 릴리스 파일 정리는 수동 작업 `Tidy release downloads`로 실행한다. 기본은 백업·계획 확인만 하고 `apply=true`일 때 실행 파일·태그를 보존한 채 중복 ZIP·데이터 팩·메타데이터를 지우고 체크섬 목록을 갱신한다. ZIP만 제공하던 오래된 릴리스와 별도 업데이트 채널은 보존한다. 원래 메타데이터와 체크섬은 Actions 아티팩트에 14일 보관한다.

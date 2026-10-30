@@ -12,6 +12,9 @@ spec.loader.exec_module(release)
 spec = importlib.util.spec_from_file_location('prototype_android', SCRIPTS / 'prototype-android-build.py')
 android = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(android)
+spec = importlib.util.spec_from_file_location('release_assets', SCRIPTS / 'clean-release-assets.py')
+assets = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(assets)
 
 
 class PrototypeReleaseTests(unittest.TestCase):
@@ -135,7 +138,7 @@ class PrototypeReleaseTests(unittest.TestCase):
                     patch.object(release.subprocess, 'run') as mutate:
                 release.append_android({'assets': [{'name': 'SecurityLab-0.2.0.exe'}]}, directory, self.repo, '0.2.0', self.sha, self.sha, '42')
             uploads = [call.args[0] for call in mutate.call_args_list if call.args[0][1:3] == ['release', 'upload']]
-            self.assertEqual(len(uploads), 3)
+            self.assertEqual(len(uploads), 2)
             self.assertTrue(any('.apk#Codex pipeline ' in command[-1] for command in uploads))
             self.assertTrue(all('--clobber' not in command and '.exe' not in command[-1] for command in uploads))
 
@@ -164,11 +167,14 @@ class PrototypeReleaseTests(unittest.TestCase):
         env = {'GITHUB_REPOSITORY': release.REPOSITORY, 'GITHUB_SHA': self.sha,
                'GITHUB_REF':'refs/heads/beta', 'GITHUB_RUN_ID':'42',
                'SECURITY_LAB_RELEASE_VERSION':self.version}
-        published = {'target_commitish':self.sha,'prerelease':True,'draft':False,'html_url':'https://example.test/release'}
+        published = {'target_commitish':self.sha,'prerelease':True,'draft':False,'html_url':'https://example.test/release',
+                     'assets': [{'name': name, 'state': 'uploaded', 'size': 2048, 'digest': 'sha256:' + 'b'*64}
+                                for name in ['SecurityLabSetup.exe', release.tag(self.version) + '.exe']]}
         def download(command, **kwargs):
             self.assertEqual(command[:3], ['gh','release','download'])
             directory = Path(command[command.index('--dir') + 1])
-            (directory / 'update.json').write_text(json.dumps({'commit':self.sha,'version':self.version,'app_id':release.PRODUCT}))
+            self.assertEqual(command[command.index('--pattern') + 1], 'SHA256SUMS.txt')
+            (directory / 'SHA256SUMS.txt').write_text(''.join('b'*64 + '  ' + a['name'] + '\n' for a in published['assets']))
         with patch.dict(os.environ, env), patch.object(release, 'find_release', return_value=published), \
                 patch.object(release, 'github', return_value=None), \
                 patch.object(release.subprocess, 'check_output', return_value=self.sha), \
@@ -177,6 +183,132 @@ class PrototypeReleaseTests(unittest.TestCase):
             release.main()
         commands.assert_called_once()
         recover.assert_called_once()
+
+    def test_installer_updates_remove_only_optional_pack_metadata(self):
+        manifest = {'app_id': release.PRODUCT, 'version': self.version, 'installer_url': 'installer.exe',
+                    'sha256': 'b'*64, 'exe_sha256': 'c'*64, 'size': 2048}
+        with_pack = dict(manifest, compat='d'*64, content_url='content.pck', content_size=42, content_sha256='e'*64)
+        self.assertEqual(release.installer_manifest(with_pack), manifest)
+        self.assertEqual(release.installer_manifest(manifest), manifest)
+
+    def test_public_release_contains_only_executables_apk_and_checksums(self):
+        import hashlib
+        import json
+        import os
+        import tempfile
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            env = {'GITHUB_REPOSITORY': release.REPOSITORY, 'GITHUB_SHA': self.sha,
+                   'GITHUB_REF': 'refs/heads/beta', 'GITHUB_RUN_ID': '42',
+                   'GITHUB_STEP_SUMMARY': str(directory / 'summary'), 'SECURITY_LAB_RELEASE_VERSION': self.version}
+            identity = {'schema': 1, 'app_id': release.PRODUCT, 'platform': 'windows-x86_64', 'install_layout': 1,
+                        'channel': 'beta', 'version': self.version, 'commit': self.sha, 'compat': 'c'*64}
+            manifest = dict(identity)
+            uploads = {}
+            def command(args, **kwargs):
+                if args[1:3] == ['run', 'download']:
+                    output = Path(args[args.index('--dir') + 1])
+                    output.mkdir()
+                    platform = args[args.index('--name') + 1].rsplit('-', 1)[-1]
+                    names = ([release.tag(self.version) + '.apk'] if platform == 'Android' else
+                             [release.tag(self.version) + '.exe', 'SecurityLabSetup.exe', 'SecurityLabContent.pck'])
+                    for name in names:
+                        path = output / name
+                        path.write_bytes(name.encode())
+                        path.with_suffix('.sha256').write_text(hashlib.sha256(path.read_bytes()).hexdigest() + '  ' + name + '\n')
+                    if platform == 'Android':
+                        (output / 'android-smoke.json').write_text(json.dumps({field: True for field in ['passed', 'mobile', 'touchDefault', 'keyboardDetected']}))
+                        (output / 'android-build-info.json').write_text(json.dumps(dict(identity, platform='android', pipeline_commit=self.sha, signing='public-aosp-test')))
+                    else:
+                        manifest.update(installer_url='https://github.com/' + release.REPOSITORY + '/releases/download/' + release.tag(self.version) + '/SecurityLabSetup.exe',
+                                        size=(output / names[1]).stat().st_size, sha256=hashlib.sha256((output / names[1]).read_bytes()).hexdigest(),
+                                        exe_sha256=hashlib.sha256((output / names[0]).read_bytes()).hexdigest(),
+                                        content_url='https://github.com/' + release.REPOSITORY + '/releases/download/' + release.tag(self.version) + '/SecurityLabContent.pck',
+                                        content_size=(output / names[2]).stat().st_size, content_sha256=hashlib.sha256((output / names[2]).read_bytes()).hexdigest())
+                        (output / 'update.json').write_text(json.dumps(manifest))
+                        (output / 'build_info.json').write_text(json.dumps(identity))
+                        (output / 'beta-windows-updater.json').write_text(json.dumps({'product': release.PRODUCT, 'passed': True}))
+                elif args[1:3] == ['release', 'upload']:
+                    for name in args[4:args.index('--repo')]:
+                        path = Path(name)
+                        uploads[path.name] = path.read_bytes()
+            published = {'assets': [], 'html_url': 'https://example.test/release'}
+            def find(*args):
+                published['assets'] = [{'name': name, 'size': len(data), 'state': 'uploaded'} for name, data in uploads.items()]
+                return published if uploads else None
+            def api(path, **kwargs):
+                if path.endswith('/actions/runs/42'): return dict(self.run, head_repository={'full_name': release.REPOSITORY})
+                if '/jobs?' in path: return {'jobs': self.jobs}
+                if '/artifacts?' in path: return {'artifacts': self.artifacts}
+                return published if '/releases/tags/' in path else None
+            with patch.dict(os.environ, env), patch.object(release, 'find_release', side_effect=find), \
+                    patch.object(release, 'github', side_effect=api), patch.object(release.subprocess, 'run', side_effect=command), \
+                    patch.object(release.subprocess, 'check_output', return_value=self.sha), patch.object(release, 'publish_channel') as publish:
+                publish.side_effect = lambda repo, sha, path: self.assertEqual(json.loads(path.read_text()), release.installer_manifest(manifest))
+                release.main()
+            self.assertEqual(set(uploads), {release.tag(self.version) + '.exe', release.tag(self.version) + '.apk', 'SecurityLabSetup.exe', 'SHA256SUMS.txt'})
+            self.assertEqual({line.split('  ')[1] for line in uploads['SHA256SUMS.txt'].decode().splitlines()}, set(uploads) - {'SHA256SUMS.txt'})
+
+    def test_channel_cleanup_preserves_same_version_payload_and_rejects_replacement(self):
+        import json
+        import tempfile
+        from unittest.mock import patch
+        manifest = {'app_id': release.PRODUCT, 'channel': 'beta', 'version': self.version,
+                    'sha256': 'b'*64, 'exe_sha256': 'c'*64}
+        previous = dict(manifest, compat='d'*64, content_url='old.pck', content_size=42, content_sha256='e'*64)
+        def download(command, **kwargs):
+            if command[1:3] == ['release', 'download']:
+                (Path(command[command.index('--dir') + 1]) / 'update.json').write_text(json.dumps(previous))
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'update.json'
+            path.write_text(json.dumps(manifest))
+            with patch.object(release, 'github', return_value={'assets': [{'name': 'update.json'}]}), \
+                    patch.object(release.subprocess, 'run', side_effect=download) as commands:
+                release.publish_channel(self.repo, self.sha, path)
+                self.assertEqual(commands.call_args_list[-1].args[0][1:3], ['release', 'upload'])
+                path.write_text(json.dumps(dict(manifest, sha256='f'*64)))
+                with self.assertRaises(ValueError):
+                    release.publish_channel(self.repo, self.sha, path)
+
+    def test_published_recovery_rejects_mismatched_asset_digest(self):
+        import tempfile
+        from unittest.mock import patch
+        published = {'assets': [{'name': name, 'state': 'uploaded', 'size': 2048, 'digest': 'sha256:' + 'f'*64}
+                               for name in ['SecurityLabSetup.exe', release.tag(self.version) + '.exe']]}
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / 'SHA256SUMS.txt').write_text(''.join('b'*64 + '  ' + a['name'] + '\n' for a in published['assets']))
+            with patch.object(release.subprocess, 'run'), self.assertRaises(ValueError):
+                release.published_manifest(published, self.repo, self.version, self.sha, directory)
+
+    def test_cleanup_preserves_binaries_and_merges_android_checksums(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory/'SHA256SUMS.txt').write_text('b'*64 + '  game.exe\n' + 'c'*64 + '  game.zip\n')
+            (directory/'game.apk.sha256').write_text('d'*64 + '  game.apk\n')
+            files = [{'name': name, 'digest': digest} for name, digest in
+                     [('game.exe', 'sha256:' + 'b'*64), ('game.apk', 'sha256:' + 'd'*64), ('game.zip', None),
+                      ('game.apk.sha256', None), ('build_info.json', None), ('SecurityLabContent.pck', None), ('SHA256SUMS.txt', None)]]
+            published = {'id': 42, 'tag_name': 'v1', 'draft': False, 'assets': files}
+            plan = assets.cleanup_plan(published, directory)
+            self.assertEqual(plan['keep'], ['SHA256SUMS.txt', 'game.apk', 'game.exe'])
+            self.assertEqual(plan['checksums'], 'b'*64 + '  game.exe\n' + 'd'*64 + '  game.apk\n')
+            self.assertEqual(plan['binaries'], files[:2])
+            files[0]['digest'] = 'sha256:' + 'f'*64
+            with self.assertRaises(ValueError):
+                assets.cleanup_plan(published, directory)
+
+    def test_cleanup_leaves_zip_only_and_draft_releases_untouched(self):
+        published = {'draft': False, 'assets': [{'name': 'game.zip'}]}
+        self.assertIsNone(assets.cleanup_plan(published, Path('/unused')))
+        self.assertIsNone(assets.cleanup_plan(dict(published, draft=True, assets=[{'name': 'game.exe'}]), Path('/unused')))
+
+    def test_cleanup_compares_payload_identity_without_download_counters(self):
+        item = {'name': 'game.exe', 'id': 42, 'size': 2048, 'digest': 'sha256:' + 'b'*64, 'state': 'uploaded', 'download_count': 0}
+        self.assertEqual(assets.asset_identities([item]), assets.asset_identities([dict(item, download_count=100)]))
+        self.assertNotEqual(assets.asset_identities([item]), assets.asset_identities([dict(item, size=4096)]))
 
     def test_beta_channel_version_order(self):
         self.assertLess(release.version_key('0.3.0-beta.1'), release.version_key('0.3.1-beta.1'))

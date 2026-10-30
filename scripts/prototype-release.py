@@ -3,11 +3,12 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
 
-from github_release import github
+from github_release import github, installer_manifest
 from release_version import PRODUCT, REPOSITORY, channel, parts, tag
 from release_backfill import unchanged_game
 
@@ -50,6 +51,29 @@ def version_key(version):
     return parts(version)[:3] + (0 if parts(version)[3] else 1, parts(version)[3])
 
 
+def published_manifest(release, repository, version, sha, directory):
+    """Recover channel publication using the immutable payloads and checksums."""
+    subprocess.run(['gh', 'release', 'download', tag(version), '--repo', repository,
+                    '--pattern', 'SHA256SUMS.txt', '--dir', str(directory)], check=True)
+    sums = {}
+    for line in (directory / 'SHA256SUMS.txt').read_text(encoding='utf-8').splitlines():
+        match = re.fullmatch(r'([0-9a-f]{64})  (.+)', line)
+        if not match or match[2] in sums:
+            raise ValueError('Invalid published checksums')
+        sums[match[2]] = match[1]
+    assets = {asset['name']: asset for asset in release['assets']}
+    for name in ['SecurityLabSetup.exe', tag(version) + '.exe']:
+        asset = assets.get(name, {})
+        if (name not in sums or asset.get('state') != 'uploaded' or asset.get('size', 0) <= 0
+                or asset.get('digest') not in {None, 'sha256:' + sums[name]}):
+            raise ValueError('Published Windows payload differs from its checksums: ' + name)
+    return {'schema': 1, 'app_id': PRODUCT, 'platform': 'windows-x86_64', 'install_layout': 1,
+            'channel': channel(version), 'version': version, 'commit': sha,
+            'installer_url': 'https://github.com/' + repository + '/releases/download/' + tag(version) + '/SecurityLabSetup.exe',
+            'size': assets['SecurityLabSetup.exe']['size'], 'sha256': sums['SecurityLabSetup.exe'],
+            'exe_sha256': sums[tag(version) + '.exe']}
+
+
 def publish_channel(repository, sha, manifest_file):
     manifest = json.loads(manifest_file.read_text(encoding='utf-8'))
     release_channel = channel(manifest['version'])
@@ -65,7 +89,9 @@ def publish_channel(repository, sha, manifest_file):
             raise ValueError('Foreign update channel metadata')
         if previous == manifest:
             return
-        if version_key(previous['version']) >= version_key(manifest['version']):
+        # Permit only removal of optional pack metadata at the same version.
+        if (installer_manifest(previous) != manifest
+                and version_key(previous['version']) >= version_key(manifest['version'])):
             raise ValueError('Update channel cannot replace or move behind its current version')
     elif not previous_release:
         subprocess.run(['gh', 'release', 'create', alias, '--repo', repository,
@@ -112,7 +138,7 @@ def append_android(release, directory, repository, version, source_sha, pipeline
     checksum = apk.with_name(apk.name + '.sha256')
     shutil.copyfile(apk.with_suffix('.sha256'), checksum)
     # Append only. Existing Windows files, tags and aggregate checksums stay intact.
-    for path in [apk, checksum, download / 'android-build-info.json']:
+    for path in [apk, checksum]:
         existing = next((asset for asset in release['assets'] if asset['name'] == path.name), None)
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         if existing:
@@ -159,11 +185,8 @@ def main():
             if add_android:
                 append_android(release, directory, repository, version, source_sha, sha, run_id)
             # Recover a failed channel update without rebuilding or replacing a published payload.
-            subprocess.run(['gh', 'release', 'download', release_tag, '--repo', repository,
-                            '--pattern', 'update.json', '--dir', temporary], check=True)
-            manifest = json.loads((directory/'update.json').read_text())
-            if manifest.get('commit') != source_sha or manifest.get('version') != version or manifest.get('app_id') != PRODUCT:
-                raise ValueError('Published update manifest differs from the verified commit')
+            manifest = published_manifest(release, repository, version, source_sha, directory)
+            (directory/'update.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
             publish_channel(repository, source_sha, directory/'update.json')
             print(release['html_url'])
             return
@@ -205,10 +228,12 @@ def main():
                 or identity.get('channel') != channel(version) or identity.get('app_id') != PRODUCT
                 or manifest.get('installer_url') != 'https://github.com/'+repository+'/releases/download/'+release_tag+'/SecurityLabSetup.exe'):
             raise ValueError('Installer and manifest differ from the verified Windows build')
-        for name in ['SecurityLabSetup.exe', 'SecurityLabContent.pck', 'update.json', 'build_info.json']:
-            destination = directory/name
-            shutil.copyfile(windows/name, destination)
-            files.append(destination)
+        destination = directory/'SecurityLabSetup.exe'
+        shutil.copyfile(installer, destination)
+        files.append(destination)
+        # Keep validation records in Actions artifacts; only the update channel
+        # needs metadata. The release download list contains playable files.
+        (directory/'update.json').write_text(json.dumps(installer_manifest(manifest), indent=2), encoding='utf-8')
         sums = directory / 'SHA256SUMS.txt'
         sums.write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.name+'\n' for path in files))
         files.append(sums)
@@ -220,8 +245,8 @@ def main():
         uploaded = find_release(prefix, release_tag)
         expected = {path.name: path.stat().st_size for path in files}
         actual = {asset['name']:asset['size'] for asset in uploaded['assets'] if asset.get('state')=='uploaded'}
-        if any(actual.get(name) != size for name,size in expected.items()):
-            raise ValueError('Upload is incomplete; release remains draft and channel unchanged')
+        if actual != expected:
+            raise ValueError('Uploaded files differ from the public download list; release remains draft and channel unchanged')
         subprocess.run(['gh','release','edit',release_tag,'--repo',repository,'--draft=false',
                         '--prerelease='+str(branch=='beta').lower(),'--latest='+str(branch=='main').lower()], check=True)
         publish_channel(repository, sha, directory/'update.json')
