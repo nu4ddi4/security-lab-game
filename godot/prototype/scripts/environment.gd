@@ -221,7 +221,7 @@ func sync_stage(stage: Dictionary):
 		var active = id == definition.device
 		var broken = active and stage.phase == "exploded"
 		display.canvas.heading = "NO SIGNAL" if broken else "PC-%02d / OFFICE OS" % stage.index if active else "사내 컴퓨터 관리"
-		display.canvas.rows = ["보증 기간 종료","담당자: 부재중","상태: 부품으로 전환"] if broken else [definition.title,"키보드 입력 대기","연습용 PC" if stage.index < 3 else "오타 감지 장치 가동"] if active else ["컴퓨터 6대를 고치면 퇴근","첫 두 대는 연습용","3번부터 오타 주의"]
+		display.canvas.rows = ["보증 기간 종료","담당자: 부재중","상태: 부품으로 전환"] if broken else [definition.title,"키보드 입력 대기","업무 처리 대기"] if active else ["오늘의 업무 6건","동료에게 인사를 합시다","퇴근까지 힘내세요"]
 		display.canvas.tone = Color(.95,.25,.1) if broken else GOOD
 		display.canvas.queue_redraw()
 		display.viewport.render_target_update_mode = SubViewport.UPDATE_ONCE

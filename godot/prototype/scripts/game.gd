@@ -21,6 +21,7 @@ var context = ""
 var blocked_save = false
 var session_available = false
 var stage_mode = true
+var stage_world: OfficeStageWorld
 var legacy_progress = false
 var save_timer: Timer
 var saving = false
@@ -91,7 +92,7 @@ func _ready():
 	_build_world()
 	office_scene = null
 	load_timings.world_ms = Time.get_ticks_msec()-world_started
-	if not stage_mode: _build_marker()
+	_build_marker()
 	await _loading_step("화면과 조작을 준비하고 있습니다",90)
 	controls = InvestigationControls.new()
 	add_child(controls)
@@ -99,6 +100,10 @@ func _ready():
 	add_child(updates)
 	ui = TerminalStagesUI.new() if stage_mode else InvestigationUI.new()
 	add_child(ui)
+	if stage_mode:
+		stage_world = OfficeStageWorld.new()
+		add_child(stage_world)
+		stage_world.setup(self)
 	ui.setup(self)
 	controls.setup(self)
 	settings = LabSettings.new()
@@ -267,7 +272,14 @@ func _setup_input():
 
 func _use(id: String, kind: String, tool: bool):
 	if stage_mode:
-		if tool and kind == "device": ui.open_terminal()
+		if state.stage.phase != "playing": return
+		if kind == "npc": ui.talk_to(id)
+		elif id == "shutdown_pc" and state.stage.index == 6:
+			if stage_world.at_finish():
+				ui.command_result(dispatch({"type":"stage.power","payload":{"arrived":true}}))
+		elif id == content.stages[int(state.stage.index)-1].device and state.stage.index < 5:
+			ui.open_terminal()
+		else: ui.notice("이건 지금 할 일이 아니다.")
 		return
 	if kind == "npc": ui.open_dialogue(id); return
 	if tool:

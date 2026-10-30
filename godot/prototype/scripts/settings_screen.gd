@@ -141,7 +141,7 @@ func _ready():
 	footer_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reset_button = action_button(footer,"기본값",restore_defaults)
 	cancel_button = action_button(footer,"입력 대기 취소",cancel_capture)
-	cancel_button.visible = not game.stage_mode
+	cancel_button.visible = true
 	action_button(footer,"취소",close_editor)
 	save_button = action_button(footer,"✓  저장하기",save_changes,true)
 	select_category("controls")
@@ -149,9 +149,6 @@ func _ready():
 	refresh_buttons()
 
 func build_controls(page: VBoxContainer):
-	if game.stage_mode:
-		build_terminal_controls(page)
-		return
 	controls_intro = text(page,"키보드와 마우스 등 입력 장치를 설정합니다.",14,InvestigationTheme.TEXT_DIM)
 	var modes = HBoxContainer.new()
 	page.add_child(modes)
@@ -355,7 +352,7 @@ func fit():
 	compact_navigation.visible = narrow
 	subtitle.visible = not narrow
 	for caption in [controls_intro,keys_heading,keys_intro]: caption.visible = size.y >= 640
-	preview_column.visible = not game.stage_mode and size.x >= 1200
+	preview_column.visible = size.x >= 1200
 	sidebar.custom_minimum_size.x = 180 if size.x < 1100 else 218
 	for key in buttons:
 		buttons[key].custom_minimum_size.x = 90 if narrow else 132
@@ -397,7 +394,7 @@ func refresh_preview():
 	preview_title.text = "상호작용\n장비 조사 · 대화 · 문 열기" if current_action == "tool" else LabInputBindings.label_for(current_action)
 
 func restore_defaults():
-	if not game.stage_mode: super.restore_defaults()
+	super.restore_defaults()
 	var defaults = LabSettings.DEFAULT_VALUES.duplicate()
 	defaults.quality = 2
 	for id in fields:

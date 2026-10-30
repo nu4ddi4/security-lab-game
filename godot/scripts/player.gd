@@ -4,6 +4,8 @@ extends CharacterBody3D
 signal inspect_requested(target: Node)
 signal tool_requested(target: Node)
 signal pause_requested
+var third_person = false
+var camera_arm: SpringArm3D
 var camera: Camera3D
 var ray: RayCast3D
 var shape: CollisionShape3D
@@ -99,7 +101,8 @@ func set_enabled(value: bool):
 func look(relative: Vector2):
 	if not enabled or input_blocked(): return
 	rotate_y(-relative.x * sensitivity)
-	camera.rotation.x = clampf(camera.rotation.x - relative.y * sensitivity, -1.42, 1.42)
+	if third_person: camera_arm.rotation.x = clampf(camera_arm.rotation.x-relative.y*sensitivity,-.8,.55)
+	else: camera.rotation.x = clampf(camera.rotation.x - relative.y * sensitivity, -1.42, 1.42)
 
 func interact():
 	if not enabled or input_blocked() or target == null: return
@@ -153,7 +156,7 @@ func _physics_process(delta):
 	body_height = 1.1 if crouched else 1.8
 	shape.shape.height = body_height
 	shape.position.y = body_height / 2.0
-	camera.position.y = lerpf(camera.position.y, 0.95 if crouched else 1.65, 1.0 - exp(-delta * 18.0))
+	if not third_person: camera.position.y = lerpf(camera.position.y, 0.95 if crouched else 1.65, 1.0 - exp(-delta * 18.0))
 	var axes = (Input.get_vector("left", "right", "forward", "back") + touch_axes).limit_length()
 	var direction = global_basis * Vector3(axes.x, 0, axes.y)
 	var speed = 1.35 if crouched else 4.2 if Input.is_action_pressed("sprint") else 2.6
@@ -177,3 +180,15 @@ func respawn():
 func input_blocked() -> bool:
 	release_keys = release_keys.filter(func(key): return Input.is_physical_key_pressed(key))
 	return settings_input_blocked or not release_keys.is_empty() or not application_focused or capture_suspended
+
+func enable_third_person():
+	third_person = true
+	camera_arm = SpringArm3D.new()
+	camera_arm.position = Vector3(.55,1.7,0)
+	camera_arm.spring_length = 3.2
+	camera_arm.collision_mask = 1
+	camera_arm.add_excluded_object(get_rid())
+	add_child(camera_arm)
+	camera.reparent(camera_arm)
+	camera.transform = Transform3D.IDENTITY
+	interaction_reach = 6.2
