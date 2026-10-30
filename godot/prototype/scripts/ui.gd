@@ -791,7 +791,7 @@ func execute_command():
 			for i in range(history.size()): rows.append("%d  %s" % [i+1,history[i]])
 			print_output(text,"\n".join(rows))
 		_: game.command(text)
-	if not game.controls.mobile: command_input.grab_focus()
+	if mode == "terminal" and not game.controls.mobile: command_input.grab_focus()
 
 func _terminal_input(event: InputEvent):
 	if not event is InputEventKey or not event.pressed: return

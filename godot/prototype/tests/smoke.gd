@@ -134,6 +134,10 @@ func run(game: InvestigationPrototype):
 	var server_output = game.ui.terminal.get_parsed_text()
 	if not server_output.contains("sec.ops $ status"): failures.append("Terminal shows the session transcript")
 	await capture(game,"03-terminal")
+	game.ui.command_input.text = "exit"
+	game.ui.command_input.text_submitted.emit("exit")
+	if game.ui.mode != "field" or not game.player.enabled or game.ui.command_input.has_focus(): failures.append("Terminal exit releases input focus back to gameplay")
+	game._use("server_console","device",true)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var output_scroll = game.ui.terminal.get_v_scroll_bar()
