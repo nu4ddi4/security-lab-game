@@ -9,17 +9,25 @@ function Expect([bool]$Condition,[string]$Label) { if (-not $Condition) { throw 
 function Expect-Reject([scriptblock]$Code,[string]$Label) { $rejected=$false; try { & $Code | Out-Null } catch { $rejected=$true }; Expect $rejected $Label }
 function Start-TestUpdateHelper([string]$TransactionPath) {
     $helperPath=Join-Path $repoRoot 'godot/resources/native_update_helper.ps1'
+    $tracePath=Join-Path (Split-Path -Parent $TransactionPath) 'helper-trace.txt'
+    $wrapperPath=Join-Path $fixtureRoot 'trace-helper.ps1'
+    [IO.File]::WriteAllText($wrapperPath,@'
+param([string]$HelperPath,[string]$RequestPath,[string]$TracePath)
+Set-PSDebug -Trace 1
+& $HelperPath -RequestPath $RequestPath *> $TracePath
+exit $LASTEXITCODE
+'@,[Text.UTF8Encoding]::new($false))
     $start=[Diagnostics.ProcessStartInfo]::new()
     $start.FileName=Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
     $start.WorkingDirectory=Split-Path -Parent $helperPath
     $start.UseShellExecute=$false
     $start.RedirectStandardOutput=$true
     $start.RedirectStandardError=$true
-    $parameters=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$helperPath,'-RequestPath',$TransactionPath)
+    $parameters=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$wrapperPath,'-HelperPath',$helperPath,'-RequestPath',$TransactionPath,'-TracePath',$tracePath)
     $start.Arguments=($parameters | ForEach-Object { ConvertTo-ProcessArgument $_ }) -join ' '
     $process=[Diagnostics.Process]::Start($start)
     # Drain both pipes asynchronously so diagnostic output cannot block the helper.
-    @{process=$process;stdout=$process.StandardOutput.ReadToEndAsync();stderr=$process.StandardError.ReadToEndAsync()}
+    @{process=$process;stdout=$process.StandardOutput.ReadToEndAsync();stderr=$process.StandardError.ReadToEndAsync();trace=$tracePath}
 }
 function Get-HelperFailure($Helper,[string]$Stage,[int]$TimeoutSeconds) {
     $details=[Collections.Generic.List[string]]::new()
@@ -43,6 +51,10 @@ function Get-HelperFailure($Helper,[string]$Stage,[int]$TimeoutSeconds) {
             $value=[string]$Helper[$key].GetAwaiter().GetResult()
             if ($value.Length) { $details.Add($key+'='+$value.Substring(0,[Math]::Min($value.Length,2048))) }
         }
+    }
+    if (Test-Path -LiteralPath $Helper.trace) {
+        $tail=(Get-Content -LiteralPath $Helper.trace -Tail 12) -join ' | '
+        if ($tail.Length) { $details.Add('trace='+$tail.Substring(0,[Math]::Min($tail.Length,4096))) }
     }
     $details -join '; '
 }
