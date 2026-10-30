@@ -3,8 +3,8 @@ extends RefCounted
 
 static func load_case() -> Dictionary:
 	var result = {}
-	for key in ["case", "records", "commands", "dialogue", "rules", "text"]:
-		var filename = "text.ko" if key == "text" else key
+	for key in ["case", "records", "commands", "dialogue", "rules", "text", "legacyRecords", "stages"]:
+		var filename = "text.ko" if key == "text" else "legacy_records" if key == "legacyRecords" else key
 		var parser = JSON.new()
 		var path = "res://prototype/content/" + filename + ".json"
 		if parser.parse(FileAccess.get_file_as_string(path)) != OK:
@@ -17,4 +17,5 @@ static func load_case() -> Dictionary:
 			if not result.case.devices.has(id): return {"error": "알 수 없는 장비 ID"}
 	for question in result.dialogue:
 		if not result.case.npcs.has(question.npc) or question.record != "" and not result.records.has(question.record): return {"error": "대화 자료 참조 오류"}
+	if not result.stages is Array or result.stages.size() != 6: return {"error":"스테이지 자료 형식 오류"}
 	return result

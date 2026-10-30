@@ -59,13 +59,20 @@ static func backdrop_material() -> ShaderMaterial:
 # One header for the tablet pages and the settings page: brand, page links, version.
 # entries are [label, id, visible]; returns {"row","buttons","version"}.
 static func shell_header(parent: Node, entries: Array, active, on_select: Callable, version := "", mobile := false, trailing: Array = []) -> Dictionary:
-	var row = HBoxContainer.new()
-	row.add_theme_constant_override("separation",16)
+	var row = GridContainer.new()
+	row.columns = 1
+	row.add_theme_constant_override("h_separation",16)
+	row.add_theme_constant_override("v_separation",8)
 	parent.add_child(row)
-	row.add_child(brand_mark())
+	var identity = HBoxContainer.new()
+	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_theme_constant_override("separation",12)
+	row.add_child(identity)
+	identity.add_child(brand_mark())
 	var brand = VBoxContainer.new()
 	brand.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_child(brand)
+	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_child(brand)
 	var title = Label.new()
 	title.text = "SECURITY LAB  ·  BETA"
 	title.theme_type_variation = "TitleLabel"
@@ -76,6 +83,9 @@ static func shell_header(parent: Node, entries: Array, active, on_select: Callab
 	tagline.theme_type_variation = "CaptionLabel"
 	tagline.autowrap_mode = TextServer.AUTOWRAP_OFF
 	brand.add_child(tagline)
+	for node in trailing:
+		node.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		identity.add_child(node)
 	var flow = HFlowContainer.new()
 	flow.alignment = FlowContainer.ALIGNMENT_END
 	flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -83,6 +93,10 @@ static func shell_header(parent: Node, entries: Array, active, on_select: Callab
 	flow.add_theme_constant_override("h_separation",8)
 	flow.add_theme_constant_override("v_separation",8)
 	row.add_child(flow)
+	row.resized.connect(func():
+		var compact = row.size.x < 1000
+		row.columns = 1 if compact else 2
+		flow.alignment = FlowContainer.ALIGNMENT_BEGIN if compact else FlowContainer.ALIGNMENT_END)
 	var buttons = {}
 	for entry in entries:
 		var node = Button.new()
@@ -94,7 +108,6 @@ static func shell_header(parent: Node, entries: Array, active, on_select: Callab
 		flow.add_child(node)
 		buttons[entry[1]] = node
 	var result = {"row":row,"buttons":buttons,"version":null}
-	for node in trailing: flow.add_child(node)
 	if not version.is_empty():
 		var tag = Label.new()
 		tag.text = version
@@ -181,6 +194,16 @@ static func build(mobile: bool) -> Theme:
 
 	theme.set_stylebox("panel","PanelContainer",box(RAISED))
 	_variation(theme,"ModalPanel","PanelContainer",box(SURFACE,BORDER_STRONG,14,22))
+	var dialogue = box(Color(.02,.04,.058,.93),ACCENT.darkened(.35),18,18,1)
+	dialogue.border_width_top = 3
+	dialogue.border_color = ACCENT.darkened(.1)
+	dialogue.shadow_color = Color(0,0,0,.5)
+	dialogue.shadow_size = 18
+	dialogue.content_margin_left = 26
+	dialogue.content_margin_right = 26
+	_variation(theme,"DialoguePanel","PanelContainer",dialogue)
+	var portrait = box(ACCENT_FILL,ACCENT,23,0,2)
+	_variation(theme,"PortraitPanel","PanelContainer",portrait)
 	_variation(theme,"ShellRoot","PanelContainer",box(Color(0,0,0,0),Color(0,0,0,0),0,24,0))
 	_variation(theme,"ShellPanel","PanelContainer",box(Color(.06,.1,.125,.8),BORDER_STRONG,14,20))
 	_variation(theme,"CardPanel","PanelContainer",box(Color(.035,.065,.085,.74),BORDER,10,14))

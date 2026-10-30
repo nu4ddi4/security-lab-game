@@ -48,6 +48,9 @@ Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 [Tasks]
 Name: "desktopicon"; Description: "바탕 화면 바로가기 만들기"; Flags: unchecked
 
+[UninstallDelete]
+Type: files; Name: "{app}\override.cfg"
+
 [Files]
 Source: "{#SourceDirectory}\SecurityLab.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDirectory}\build_info.json"; DestDir: "{app}"; Flags: ignoreversion

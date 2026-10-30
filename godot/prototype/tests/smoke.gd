@@ -2,6 +2,34 @@ extends Node
 
 var capture_directory = ""
 
+class FailedStore extends InvestigationStore:
+	var preserved = false
+	func save(_state: Dictionary, _content: Dictionary) -> bool:
+		error = "저장 장치 쓰기 실패"
+		return false
+	func preserve() -> bool:
+		preserved = true
+		return true
+
+class ReplacementFailedStore extends InvestigationStore:
+	var writes = 0
+	func save(value: Dictionary, content: Dictionary) -> bool:
+		writes += 1
+		if writes == 1: return super.save(value,content)
+		error = "교체 저장 실패"
+		return false
+
+class DialogTestUpdater extends InvestigationInstallerUpdates:
+	var preparing_parent: Node
+	var preparing_visible = false
+	func installed_identity_valid() -> bool: return true
+	func installer_verified() -> bool: return true
+	func fail(message: String):
+		if is_instance_valid(preparing_dialog):
+			preparing_parent = preparing_dialog.get_parent()
+			preparing_visible = preparing_dialog.visible
+		super.fail(message)
+
 func capture(game: InvestigationPrototype, name: String):
 	if capture_directory.is_empty() or DisplayServer.get_name() == "headless": return
 	await get_tree().process_frame
@@ -18,7 +46,8 @@ func run(game: InvestigationPrototype):
 			DirAccess.make_dir_recursive_absolute(capture_directory)
 	await get_tree().physics_frame
 	var failures = []
-	if game.player.enabled or game.ui.mode != "briefing": failures.append("New investigation starts with assignment briefing")
+	await entry_checks(game,failures)
+	if game.player.enabled or game.ui.mode != "briefing": failures.append("Introduction leads to the assignment briefing")
 	if game.content.case.briefing.assignment.is_empty(): failures.append("Assignment explains the player's job")
 	if not game.ui.tabs.is_tab_hidden(2) or game.ui.work.text.contains("발생 보고") or game.ui.work.text.contains("수집 문서"):
 		failures.append("Investigation UI stays absent before the team-lead assignment")
@@ -59,6 +88,7 @@ func run(game: InvestigationPrototype):
 	if not is_equal_approx(game.player.camera.fov,68.0): failures.append("Conversation gently adjusts the camera")
 	game.ui.dialogue_questions.get_child(0).pressed.emit()
 	if "oh_intro" not in game.state.statements or not game.ui.guide_info().title.begins_with("2 / 8"): failures.append("Actual conversation advances the tutorial")
+	if not game.ui.dialogue_questions.get_child(0).text.contains("확인함"): failures.append("Previously asked questions stay available and are marked as read")
 	await capture(game,"02-dialogue")
 	var framed_pose = game.player.camera.global_transform
 	game.ui.close()
@@ -74,11 +104,11 @@ func run(game: InvestigationPrototype):
 	if game.state.known != initial: failures.append("External inspection never awards evidence")
 	game._use("server_console","device",true)
 	if game.context != "server_console" or game.player.enabled or game.ui.mode != "terminal": failures.append("F opens only the current device terminal")
-	if game.ui.command_sidebar.visible or game.ui.command_list.get_child_count() != 0 or game.ui.terminal.text.contains("pwd / ls"):
+	if game.ui.terminal.text.contains("pwd / ls") or game.ui.terminal_panel.find_children("*","Button",true,false).size() != 1:
 		failures.append("Device opening does not reveal command lists")
 	game.ui.command_input.text = "help"
 	game.ui.execute_command()
-	if not game.ui.terminal.text.contains("inspect account") or game.ui.command_list.get_child_count() == 0: failures.append("Typing help reveals current-device commands")
+	if not game.ui.terminal.text.contains("inspect account") or game.ui.terminal_panel.find_children("*","Button",true,false).size() != 1: failures.append("Typing help prints commands without expanding a command book")
 	if game.ui.terminal.text.contains("inspect staging"): failures.append("Help does not expose unassigned investigation work")
 	game.ui.command_input.text = "status"
 	game.ui.execute_command()
@@ -102,8 +132,16 @@ func run(game: InvestigationPrototype):
 	game.ui.execute_command()
 	if not game.ui.guide_info().title.begins_with("4 / 8"): failures.append("Server baseline advances the tutorial")
 	var server_output = game.ui.terminal.get_parsed_text()
-	if not server_output.contains("sec.ops > status"): failures.append("Terminal shows the session transcript")
+	if not server_output.contains("sec.ops $ status"): failures.append("Terminal shows the session transcript")
 	await capture(game,"03-terminal")
+	game.ui.command_input.text = "exit"
+	game.ui.command_input.text_submitted.emit("exit")
+	if game.ui.mode != "field" or not game.player.enabled or game.ui.command_input.has_focus(): failures.append("Terminal exit releases input focus back to gameplay")
+	game._use("server_console","device",true)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var output_scroll = game.ui.terminal.get_v_scroll_bar()
+	if output_scroll.value+output_scroll.page < output_scroll.max_value-1: failures.append("Terminal keeps the latest command result in view after layout")
 	game._use("project_pc","device",true)
 	var bad = game.dispatch(game.engine.parse("logs access --task T-17",game.context,game.state))
 	if bad.code != "WRONG_DEVICE": failures.append("Device command guard remains enforced")
@@ -131,10 +169,12 @@ func run(game: InvestigationPrototype):
 	if not game.ui.guide_info().title.begins_with("8 / 8") or not game.engine.missing_work(game.state).is_empty(): failures.append("First-day tutorial finishes only after required work")
 	game.ui.open_tablet(0)
 	await capture(game,"05-notes")
+	await note_and_terminal_checks(game,failures)
 	game.ui.close()
 	if not game.player.enabled: failures.append("Closing the UI restores movement")
 	var original_touch = game.controls.touch_enabled
 	game.ui.open_tablet(4)
+	await settings_dialog_checks(game,failures)
 	game.ui.touch_setting.button_pressed = true
 	if not game.controls.touch_enabled: failures.append("Settings enable touch without disabling keyboard")
 	await capture(game,"07-settings")
@@ -275,9 +315,12 @@ func run(game: InvestigationPrototype):
 	if game.ui.tabs.is_tab_hidden(2) or not game.ui.work.text.contains("발생 보고"): failures.append("Investigation UI appears at the day-four assignment")
 	game.state = previous_state
 	game.ui.refresh()
+	await progression_checks(game,failures)
+	operational_final_checks(game,failures)
 	await focus_checks(game,failures)
 	await interaction_checks(game,failures)
 	await responsive_checks(game,failures)
+	await save_failure_checks(game,failures)
 	if not game.store.load_state(game.content).has("state"): failures.append("Existing save format accepts the new UI flow")
 	var path = game.store.directory.path_join("save.json")
 	var broken = "{broken-prototype-save"
@@ -296,15 +339,337 @@ func run(game: InvestigationPrototype):
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png(argument.trim_prefix("--prototype-capture="))
 	game.dispatch({"type":"memo","payload":{"text":"temporary note"}})
-	game.reset_all_data()
+	game.ui.open_tablet(4)
+	InvestigationDataReset.confirm(game)
+	await get_tree().create_timer(3.1).timeout
+	confirm_open_dialog(game)
+	await get_tree().process_frame
 	if game.state.memo != "" or game.state.day != 1 or game.blocked_save or game.ui.memo.text != "": failures.append("Full data reset returns to a fresh investigation")
-	if game.ui.mode != "briefing": failures.append("A fresh investigation starts with the assignment briefing")
+	if game.ui.mode != "intro": failures.append("A fresh investigation starts with the background introduction")
+	game.ui.entry.finish_intro()
 	game.ui.close()
 	var summary = {"passed":failures.is_empty(),"failures":failures,"platform":OS.get_name(),"mobile":game.controls.mobile,"touchDefault":original_touch,"keyboardDetected":game.controls.keyboard_seen}
 	var report = FileAccess.open("user://prototype-smoke-result.json",FileAccess.WRITE)
 	if report != null: report.store_string(JSON.stringify(summary))
 	print("INVESTIGATION_SMOKE ",JSON.stringify(summary))
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+func entry_checks(game, failures: Array):
+	var entry = game.ui.entry
+	if game.ui.mode != "main_menu" or game.player.enabled or not entry.resume.disabled:
+		failures.append("First launch shows a main menu with no unavailable Continue action")
+	await capture(game,"00-main-menu")
+	game.ui.toggle()
+	if game.ui.mode != "main_menu" or game.player.enabled: failures.append("Back cannot drop a new player directly into the office")
+	press_text(entry.menu,"설정")
+	await get_tree().process_frame
+	game.ui.settings_screen.close_editor()
+	if game.ui.mode != "main_menu" or game.player.enabled: failures.append("Settings return to the main menu before a game starts")
+	entry.new_game.pressed.emit()
+	if game.ui.mode != "intro" or game.player.enabled: failures.append("New game introduces the background before entering the office")
+	for i in range(game.content.case.introduction.size()):
+		if entry.intro_index != i or entry.intro_body.text.is_empty(): failures.append("Introduction pages show their background in order")
+		await capture(game,"00-intro-%d" % (i+1))
+		entry.intro_next.pressed.emit()
+	if game.ui.mode != "briefing" or game.player.enabled or not entry.intro_seen: failures.append("Introduction finishes at the first assignment with movement blocked")
+	game.ui.close()
+	game.ui.toggle()
+	if game.ui.mode != "pause" or game.player.enabled: failures.append("Pause opens a menu with accessible exit and resume actions")
+	await capture(game,"00-pause-menu")
+	press_text(entry.menu,"게임 종료")
+	if not game.ui.root.get_children().any(func(node): return node is ConfirmationDialog and node.visible): failures.append("Game exit is directly available from the pause menu")
+	game.ui.toggle()
+	press_text(entry.menu,"설정")
+	await get_tree().process_frame
+	game.ui.settings_screen.close_editor()
+	if game.ui.mode != "pause" or game.player.enabled: failures.append("Closing settings returns to the pause menu")
+	var before = game.state.duplicate(true)
+	var original_store = game.store
+	game.store = FailedStore.new()
+	game.ui.return_to_main_menu()
+	if game.ui.mode != "pause" or game.state != before: failures.append("Failed save keeps the active session at the pause menu")
+	game.ui.toggle()
+	game.store = original_store
+	entry.main_menu.pressed.emit()
+	if game.ui.mode != "main_menu" or entry.resume.disabled or game.state != before: failures.append("Returning to the main menu preserves the active session")
+	entry.resume.pressed.emit()
+	if game.ui.mode != "field" or not game.player.enabled or game.state != before: failures.append("Continue restores the session without replaying the introduction")
+	game.ui.open_briefing()
+
+func note_and_terminal_checks(game, failures: Array):
+	var original_memo = game.state.memo
+	game.ui.notes.get_child(0).get_child(1).pressed.emit()
+	if game.state.memo == original_memo or game.ui.memo.text != game.state.memo: failures.append("Quoting a note updates the persisted memo as well as the editor")
+	game.save_now()
+	var saved = game.store.load_state(game.content)
+	if not saved.has("state") or saved.state.memo != game.ui.memo.text: failures.append("Quoted note survives a save reload")
+	await capture(game,"05-notes-quoted")
+	game.dispatch({"type":"memo","payload":{"text":original_memo}})
+	game.ui.sync_memo()
+	game.ui.memo.text = "x".repeat(int(game.content.rules.maxMemoLength)+1)
+	game.ui.memo.text_changed.emit()
+	if game.state.memo != original_memo or not game.ui.memo_status.text.contains("저장되지 않습니다"): failures.append("Oversized memo keeps the last accepted text and explains why the draft is not saved")
+	game.ui.memo.text = original_memo
+	game.ui.memo.text_changed.emit()
+	if game.ui.memo_status.text.contains("저장되지 않습니다"): failures.append("Reducing the memo length clears the unsaved draft warning")
+	game._use("server_console","device",true)
+	game.ui.command_input.text = "inspect account"
+	game._use("project_pc","device",true)
+	if game.ui.command_input.text != "": failures.append("Pending server commands do not follow the player to another device")
+	game.ui.command_input.text = "inspect files"
+	game._use("server_console","device",true)
+	if game.ui.command_input.text != "inspect account": failures.append("Returning to a device restores its pending command")
+	game.ui.command_input.text = "new command draft"
+	game.ui.recall_command(1)
+	if game.ui.command_input.text != "new command draft": failures.append("Down at the end of command history preserves the current draft")
+	game.ui.command_input.text = "logs t"
+	game.ui.recall_command(-1)
+	game.ui.recall_command(1)
+	if game.ui.command_input.text != "logs t": failures.append("Leaving command history restores the command being written")
+	game.ui.close()
+	game._use("server_console","device",true)
+	if game.ui.command_input.text != "logs t": failures.append("Closing and reopening a terminal preserves its pending input")
+	game.ui.command_input.clear()
+	var saved_history = game.ui.command_history.get(game.context,[])
+	game.ui.command_history[game.context] = []
+	game.ui.history_index = 0
+	game.ui.command_input.text = "first command draft"
+	game.ui.recall_command(1)
+	if game.ui.command_input.text != "first command draft": failures.append("Down with empty command history preserves the current draft")
+	game.ui.command_history[game.context] = saved_history
+	game.ui.command_input.clear()
+	game.ui.close()
+
+func progression_checks(game, failures: Array):
+	var original = game.state.duplicate(true)
+	game.ui.finish_day(1)
+	if game.state.day != 2 or game.ui.tabs.current_tab != 1 or game.ui.contact != "han": failures.append("Next day opens its business message")
+	if game.ui.tabs.is_tab_hidden(2): failures.append("Optional occurrence reporting is available on day two")
+	if game.ui.work.text.contains("미승인"): failures.append("Optional investigation does not appear as unfinished daily work")
+	var daily_guide = game.ui.guide_info().text
+	for word in ["B-05","T-17","staging","서유진","backup disable"]:
+		if daily_guide.contains(word): failures.append("Daily work does not route the player to a case answer: "+word)
+	for command in ["status","logs backups","backup disable B-05","verify service","logs access --task T-17","inspect staging"]:
+		game.dispatch(game.engine.parse(command,"server_console",game.state))
+	game.ui.open_tablet(0)
+	if game.ui.notes.get_child_count() != game.state.known.size(): failures.append("Read originals remain available before the formal day-four assignment")
+	game.ui.open_tablet(2)
+	if not game.ui.claim.disabled: failures.append("Occurrence claim is unavailable before the player attaches independent originals")
+	for slot in ["scope","access","collection"]:
+		var id = {"scope":"approval","access":"access-night-1","collection":"staging-night-1"}[slot]
+		var picker = game.ui.attachments[slot]
+		for i in range(picker.item_count):
+			if picker.get_item_metadata(i) == id: picker.select(i); picker.item_selected.emit(i)
+	if game.ui.claim.disabled: failures.append("Attached originals open the occurrence claim form")
+	game.ui.claim.select(1)
+	game.ui.claim.item_selected.emit(1)
+	game.ui.submit_report()
+	if not game.state.report.approved or not game.ui.report_submit.disabled: failures.append("Early report grants permission without forcing a duplicate report")
+	close_notices(game)
+	game.ui.finish_day(2)
+	game.dispatch(game.engine.parse("inspect files","project_pc",game.state))
+	game.dispatch(game.engine.parse("logs indexing","project_pc",game.state))
+	if game.ui.guide_info().text.contains("T-17") or game.ui.guide_info().text.contains("repair index"): failures.append("Search work does not explain the case or prescribe the fault's solution")
+	await capture(game,"08-search-records")
+	game.dispatch(game.engine.parse("repair index","server_console",game.state))
+	game.dispatch(game.engine.parse("verify search","project_pc",game.state))
+	game.ui.finish_day(3)
+	if game.state.day != 4 or game.ui.contact != "oh" or not game.state.report.approved: failures.append("Day-four alternative assignment preserves early approval")
+	await capture(game,"09-investigation-assignment")
+	for command in ["logs submissions","logs application","inspect PKG-218-R2","inspect metadata","inspect T-19"]:
+		game.dispatch(game.engine.parse(command,"control_console",game.state))
+	var markup = InvestigationUI.terminal_markup([{ "kind":"output","text":"LUMEN | T-17 | INTERNAL\nSUCCESS | HOLD"}])
+	if markup.contains("[color") or markup.contains("[b]"): failures.append("Record rendering does not rank or color case facts")
+	game.ui.case_desk.open(game.ui,false)
+	var desk = game.ui.case_desk
+	if not desk.claim_picker.disabled: failures.append("Claim entry starts closed before originals are selected")
+	desk.picks[0].show_popup()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if not desk.picks[0].get_popup().visible: failures.append("Original record picker opens through the native control")
+	await capture(game,"12-original-picker")
+	desk.picks[0].get_popup().hide()
+	select_record(desk.picks[0],"message")
+	select_record(desk.picks[1],"submissions")
+	if desk.claim_picker.disabled: failures.append("Connecting originals enables the comparison form")
+	select_record(desk.claim_picker,"C12")
+	press_text(desk.body,"대조 기록 접수")
+	if desk.selected_records() != ["message","submissions"] or desk.claim_picker.get_item_metadata(desk.claim_picker.selected) != "C12": failures.append("Rejected comparisons retain the player's originals and selected claim")
+	desk.view = 1; desk.build()
+	desk.view = 0; desk.build()
+	if desk.selected_records() != ["message","submissions"]: failures.append("Comparison originals survive changing work views")
+	desk.open(game.ui,false)
+	if desk.selected_records() != ["message","submissions"]: failures.append("Closing and reopening comparison work preserves its draft")
+	select_record(desk.claim_picker,"C05")
+	press_text(desk.body,"대조 기록 접수")
+	if not game.state.casework.links.has("C05"): failures.append("Comparison form records the player's selected independent originals")
+	await capture(game,"12-comparison-form")
+	desk.dialog.hide(); desk.dialog.queue_free()
+	for day in range(4,7):
+		game.dispatch(game.engine.parse("verify service","server_console",game.state))
+		game.dispatch(game.engine.parse("verify search","project_pc",game.state))
+		if day == 5: game.dispatch(game.engine.parse("logs requests","maintenance_terminal",game.state))
+		if day == 6: game.dispatch(game.engine.parse("logs contracts","maintenance_terminal",game.state))
+		game.ui.finish_day(day)
+	var links = {"C06":["submissions","application","package"],"C07":["metadata","message","submissions"],"C08":["request","message","approval"],"C09":["purpose","package","metadata"],"C10":["application","transfer"]}
+	for claim in links: game.dispatch({"type":"inference","payload":{"claim":claim,"records":links[claim]}})
+	game._use("control_console","device",true)
+	game.ui.command_input.text = "desk"
+	game.ui.execute_command()
+	desk.view = 2; desk.build()
+	if not desk.final_submit.disabled: failures.append("Final submission is unavailable while the scheduled job is still pending")
+	select_record(desk.final_picks.scope,"violation")
+	desk.submit("final.report",{"fields":desk.selected_fields()})
+	if desk.final_picks.scope.get_item_metadata(desk.final_picks.scope.selected) != "violation": failures.append("A rejected early report retains its selected findings")
+	desk.view = 0; desk.build()
+	desk.view = 2; desk.build()
+	if desk.final_picks.scope.get_item_metadata(desk.final_picks.scope.selected) != "violation": failures.append("Unsubmitted final findings survive changing work views")
+	desk.open(game.ui,true)
+	if desk.final_picks.scope.get_item_metadata(desk.final_picks.scope.selected) != "violation": failures.append("Reopening console work preserves unsubmitted final findings")
+	desk.confirm("조치 확인",func(): failures.append("Back must not execute an unconfirmed action"))
+	game._notification(NOTIFICATION_WM_GO_BACK_REQUEST)
+	if not desk.dialog.visible or game.ui.mode != "terminal" or game.player.enabled: failures.append("Android Back dismisses the nested confirmation without closing console work or enabling movement")
+	game._notification(NOTIFICATION_WM_GO_BACK_REQUEST)
+	if desk.dialog.visible or game.ui.mode != "terminal" or game.player.enabled: failures.append("Android Back dismisses console work before returning to the field")
+	desk.open(game.ui,true)
+	if desk.final_picks.scope.get_item_metadata(desk.final_picks.scope.selected) != "violation": failures.append("Back navigation preserves unsubmitted report findings")
+	desk.view = 1; desk.build()
+	select_record(desk.picks[0],"application")
+	select_record(desk.picks[1],"transfer")
+	press_text(desk.body,"조치 승인 요청")
+	if not game.state.casework.control.approved: failures.append("Console control request uses the originals selected by the player")
+	press_text(desk.body,"승인 조치 실행")
+	confirm_open_dialog(game)
+	if game.state.casework.control.mode != "blocked_pre_run": failures.append("Approved console control records a pre-run hold")
+	desk.dialog.hide(); desk.dialog.queue_free()
+	game.ui.clock_button.pressed.emit()
+	confirm_open_dialog(game)
+	if game.state.casework.dispatch != "not_run" or game.state.casework.minute != 1050: failures.append("Day-seven scheduled work resolves at 17:30")
+	close_notices(game)
+	game.dispatch(game.engine.parse("logs controls","control_console",game.state))
+	game.dispatch(game.engine.parse("logs dispatch","control_console",game.state))
+	game.dispatch(game.engine.parse("logs receipts","control_console",game.state))
+	game._use("control_console","device",true)
+	game.ui.command_input.text = "desk"
+	game.ui.execute_command()
+	desk.view = 2; desk.build()
+	for key in desk.final_picks:
+		var picker = desk.final_picks[key]
+		if picker.get_item_metadata(picker.selected) != ("violation" if key == "scope" else "unknown"): failures.append("Final findings retain only the player's own earlier choices")
+	var fields = {"scope":"violation","collection":"collected","submission":"seo","authorship":"vendor","awareness":"warning_seen","purpose":"contract_support","transfer":"not_run","material":"unknown"}
+	for key in fields: select_record(desk.final_picks[key],fields[key])
+	press_text(desk.body,"종결 보고 접수")
+	if game.state.casework.final.is_empty(): failures.append("Final form submits the player's findings")
+	select_record(desk.final_picks.purpose,"unknown")
+	if not desk.final_close.disabled: failures.append("Edited findings must be submitted before closing the case")
+	select_record(desk.final_picks.purpose,"contract_support")
+	var submitted = game.state.casework.final.duplicate(true)
+	desk.view = 1; desk.build()
+	press_text(desk.body,"업무 시각 갱신")
+	confirm_open_dialog(game)
+	if game.state.casework.final != submitted: failures.append("Advancing business time preserves the accepted report")
+	desk.view = 2; desk.build()
+	if not desk.final_close.disabled or desk.selected_fields() != fields: failures.append("A changed business state preserves findings and requires review before closure")
+	press_text(desk.body,"종결 보고 접수")
+	if desk.final_close.disabled: failures.append("Explicit resubmission accepts the reviewed business state")
+	await capture(game,"13-final-report")
+	press_text(desk.body,"조사 종결")
+	confirm_open_dialog(game)
+	if not game.state.ended or game.state.casework.ending.get("id") != "A": failures.append("Final report and observed control outcome produce the selected ending")
+	desk.view = 3; desk.build()
+	await capture(game,"14-closing-document")
+	if not game.save_now() or not game.store.load_state(game.content).has("state"): failures.append("Completed case saves and reloads")
+	desk.dialog.hide(); desk.dialog.queue_free()
+	game.state = original
+	game.ui.reset_session()
+	if not desk.final_draft.is_empty() or not desk.original_drafts.is_empty() or desk.claim_draft != "": failures.append("Starting another session clears the previous case's unsubmitted drafts")
+	game.ui.sync_memo()
+	game.ui.refresh()
+	game.ui.close()
+
+func select_record(picker: OptionButton, id: String):
+	for i in range(picker.item_count):
+		if picker.get_item_metadata(i) == id:
+			picker.select(i)
+			picker.item_selected.emit(i)
+			return
+
+func option_disabled(picker: OptionButton, id: String) -> bool:
+	for i in range(picker.item_count):
+		if picker.get_item_metadata(i) == id: return picker.is_item_disabled(i)
+	return true
+
+func unaudited_day_seven(game, empty: bool) -> Dictionary:
+	var engine = game.engine
+	var s = engine.create_state()
+	# This case configuration is the existing no-source scenario, with ordinary daily actions.
+	if empty: s.maintenanceAllowed = false
+	for command in ["status","inspect account","logs tasks","logs backups"]: s = engine.step(s,engine.parse(command,"server_console",s)).state
+	s = engine.step(s,engine.parse("inspect files","project_pc",s)).state
+	s = engine.step(s,engine.parse("inspect W-218","approval_archive",s)).state
+	for id in ["oh_intro","park_intro","han_intro","seo_intro"]: s = engine.step(s,{"type":"dialogue","payload":{"id":id}}).state
+	for day in range(1,7):
+		if day == 2:
+			for command in ["backup disable B-05","verify service"]: s = engine.step(s,engine.parse(command,"server_console",s)).state
+		if day == 3:
+			s = engine.step(s,engine.parse("inspect files","project_pc",s)).state
+			if not s.ops.indexHealthy: s = engine.step(s,engine.parse("repair index","server_console",s)).state
+			s = engine.step(s,engine.parse("verify search","project_pc",s)).state
+		if day >= 4:
+			s = engine.step(s,engine.parse("verify service","server_console",s)).state
+			s = engine.step(s,engine.parse("verify search","project_pc",s)).state
+		s = engine.step(s,{"type":"day.end","payload":{"expectedDay":day,"confirmed":true}}).state
+	return s
+
+func operational_final_checks(game, failures: Array):
+	var original = game.state.duplicate(true)
+	var desk = game.ui.case_desk
+	for empty in [false,true]:
+		var s = unaudited_day_seven(game,empty)
+		if s.day != 7 or s.report.approved or not s.casework.links.is_empty(): failures.append("Operational final fixture reaches day seven without audit permission or inferred case claims")
+		s = game.engine.step(s,{"type":"time.advance"}).state
+		if not empty: s = game.engine.step(s,{"type":"time.advance"}).state
+		game.state = s
+		game._use("control_console","device",true)
+		desk.reset()
+		desk.open(game.ui,true)
+		desk.view = 2; desk.build()
+		if not option_disabled(desk.final_picks.transfer,"sent") or not option_disabled(desk.final_picks.material,"empty"): failures.append("Unqueried operational originals never unlock final findings")
+		game.dispatch(game.engine.parse("logs dispatch","control_console",game.state))
+		desk.build()
+		for choice in ["scheduled","not_run","blocked","sent"]:
+			if option_disabled(desk.final_picks.transfer,choice): failures.append("An observed dispatch original opens the operational category without audit permission: "+choice)
+		if not option_disabled(desk.final_picks.transfer,"received"): failures.append("A dispatch original alone does not open an external-receipt claim")
+		if empty:
+			for choice in ["isolated","present","empty"]:
+				if option_disabled(desk.final_picks.material,choice): failures.append("The observed no-source record opens the material category without selecting a matching answer: "+choice)
+		elif not option_disabled(desk.final_picks.material,"empty"): failures.append("A sent dispatch does not invent a material-state observation")
+		for picker in desk.final_picks.values():
+			if picker.get_item_metadata(picker.selected) != "unknown": failures.append("Observed operational categories still start with the player's judgment deferred")
+		select_record(desk.final_picks.transfer,"not_run" if empty else "sent")
+		if empty: select_record(desk.final_picks.material,"empty")
+		press_text(desk.body,"종결 보고 접수")
+		var report = game.state.casework.final
+		if report.is_empty() or report.evaluation.unsupported.has("transfer") or empty and report.evaluation.unsupported.has("material"): failures.append("An unaudited final report accepts the player's observed operational findings")
+		if not InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(game.state,game.content),game.content).has("state"): failures.append("Unaudited operational reports remain valid saved progress")
+		desk.reset()
+	game.state = original
+	game.ui.reset_session()
+	game.ui.sync_memo()
+	game.ui.refresh()
+	game.ui.close()
+
+func press_text(parent: Node, text: String):
+	for node in parent.find_children("*","Button",true,false):
+		if node.text == text: node.pressed.emit(); return
+
+func confirm_open_dialog(game):
+	for child in game.ui.root.find_children("*","ConfirmationDialog",true,false):
+		if child.visible: child.confirmed.emit(); return
+
+func close_notices(game):
+	for child in game.ui.root.get_children():
+		if child is AcceptDialog: child.hide(); child.queue_free()
 
 func settings_checks(game, failures: Array):
 	var original = game.settings.values.duplicate(true)
@@ -329,6 +694,73 @@ func settings_checks(game, failures: Array):
 	if not game.settings.save_values(original).ok: failures.append("Original settings can be restored after the review")
 	viewport.scaling_3d_scale = original_scale
 	viewport.msaa_3d = original_msaa
+
+func settings_dialog_checks(game, failures: Array):
+	var editor = game.ui.settings_screen
+	var before = game.state.duplicate(true)
+	game.ui.confirm("설정 확인",func(): pass)
+	var confirmation: ConfirmationDialog
+	for item in editor.get_children():
+		if item is ConfirmationDialog and item.visible: confirmation = item
+	if confirmation == null: failures.append("Settings exit confirmation is a child of the active settings window"); return
+	game.ui.notice("확인 중인 업무 알림")
+	var nested_notice = confirmation.find_children("*","AcceptDialog",true,false)
+	if nested_notice.is_empty(): failures.append("Notices stay above an active settings confirmation")
+	game.ui.toggle()
+	game.ui.toggle()
+	if not editor.visible or game.player.enabled: failures.append("Canceling a settings confirmation returns to settings without enabling movement")
+	game.ui.notice("설정 업무 알림")
+	if not editor.get_children().any(func(item): return item is AcceptDialog and item.visible): failures.append("A settings notice belongs to the active settings window")
+	game.ui.toggle()
+	InvestigationDataReset.confirm(game)
+	var reset_dialog: ConfirmationDialog
+	for item in editor.get_children():
+		if item is ConfirmationDialog and item.visible: reset_dialog = item
+	if reset_dialog == null or not reset_dialog.get_ok_button().disabled: failures.append("Settings data reset opens above settings and retains its countdown")
+	game.ui.toggle()
+	await get_tree().process_frame
+	if game.state != before or not editor.visible: failures.append("Canceling data reset leaves investigation and settings intact")
+	await updater_dialog_checks(game,failures)
+
+func updater_dialog_checks(game, failures: Array):
+	var updater = DialogTestUpdater.new()
+	game.add_child(updater)
+	updater.game = game
+	updater.enabled = true
+	updater.info = {"version":"0.0.1","channel":"beta"}
+	updater.manifest = {"version":"0.0.2","channel":"beta"}
+	updater.state = "available"
+	updater.request_install()
+	if not is_instance_valid(updater.consent_dialog) or updater.consent_dialog.get_parent() != game.ui.settings_screen: failures.append("Updater consent opens above the investigation settings window")
+	updater.defer_update()
+	if game.player.enabled or not game.ui.settings_screen.visible or updater.consent_granted: failures.append("Deferring an update keeps settings active and never authorizes installation")
+	# An existing regular file cannot contain a transaction file on any platform.
+	updater.stage = ProjectSettings.globalize_path(game.store.directory.path_join("stage-blocker-"+str(Time.get_ticks_usec())))
+	var blocker = FileAccess.open(updater.stage,FileAccess.WRITE)
+	if blocker == null:
+		failures.append("Updater preparation fixture creates its regular-file blocker")
+		updater.queue_free()
+		return
+	blocker.store_string("regular file, not a preparation directory")
+	blocker.close()
+	if not FileAccess.file_exists(updater.stage) or DirAccess.dir_exists_absolute(updater.stage):
+		failures.append("Updater preparation fixture is a file rather than a directory")
+		updater.queue_free()
+		return
+	var transaction = FileAccess.open(updater.stage.path_join("transaction.json"),FileAccess.WRITE)
+	if transaction != null:
+		transaction.close()
+		failures.append("Updater preparation fixture rejects transaction writes before exercising installation")
+		updater.queue_free()
+		return
+	updater.state = "ready"
+	updater.consent_granted = true
+	await updater.install()
+	if updater.preparing_parent != game.ui.settings_screen or not updater.preparing_visible: failures.append("Verified installer preparation opens above the investigation settings window")
+	if updater.state != "failed" or updater.helper_pid != -1 or updater.preparing_dialog != null: failures.append("A preparation write failure closes its dialog before any process starts: "+JSON.stringify({"state":updater.state,"helper_pid":updater.helper_pid,"dialog":is_instance_valid(updater.preparing_dialog),"stage_is_file":FileAccess.file_exists(updater.stage),"stage_is_directory":DirAccess.dir_exists_absolute(updater.stage)}))
+	if game.player.enabled or not game.ui.settings_screen.visible: failures.append("Failed update preparation leaves investigation settings usable")
+	DirAccess.remove_absolute(updater.stage)
+	updater.queue_free()
 
 func _dummy_server_pose(game):
 	game.player.global_position = Vector3(0,.01,-2)
@@ -440,13 +872,59 @@ func responsive_checks(game, failures: Array):
 		game._fit_screen()
 		await get_tree().process_frame
 		game.ui.fit_screen()
+		game.ui.entry.show_menu(false)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var entry = game.ui.entry
+		var entry_viewport = get_viewport().get_visible_rect().grow(1)
+		if not entry_viewport.encloses(entry.quit.get_global_rect()): failures.append("Main menu keeps game exit visible at "+str(dimensions))
+		await capture(game,"menu-%dx%d" % [dimensions.x,dimensions.y])
+		entry.show_intro()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		if entry.intro_body.get_global_rect().end.x > entry_viewport.end.x or entry.intro_next.get_global_rect().end.x > entry_viewport.end.x: failures.append("Introduction text and navigation fit the screen width at "+str(dimensions))
+		await capture(game,"intro-%dx%d" % [dimensions.x,dimensions.y])
 		game.ui.open_tablet(4)
 		await get_tree().process_frame
 		await get_tree().process_frame
 		var viewport = get_viewport().get_visible_rect()
 		var settings = game.ui.settings_screen
 		if not is_instance_valid(settings) or not settings.visible or not viewport.grow(1).encloses(Rect2(Vector2(settings.position),Vector2(settings.size))): failures.append("Embedded settings fit the viewport at "+str(dimensions))
+		if viewport.size.x < viewport.size.y and settings.layout.get_global_rect().position.y > viewport.size.y*.3: failures.append("Portrait settings leave room for the content below navigation")
+		var inner = settings.get_visible_rect().grow(1)
+		if not inner.encloses(settings.save_button.get_global_rect()) or not inner.encloses(settings.layout.get_global_rect()): failures.append("Settings content and save action fit inside the window at "+str(dimensions))
+		if settings.buttons.forward.get_parent().get_child(0).size.y > 60: failures.append("Settings action names keep a readable row instead of wrapping vertically")
 		await capture(game,"settings-%dx%d" % [dimensions.x,dimensions.y])
+		game.ui.open_tablet(1)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		if viewport.size.x < viewport.size.y and game.ui.tabs.get_global_rect().position.y > viewport.size.y*.3: failures.append("Portrait tablet navigation does not consume the conversation area")
+		game.ui.open_tablet(0)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		if game.ui.notes.get_global_rect().end.x > viewport.end.x: failures.append("Long note titles do not push citation buttons or the tablet outside the screen")
+		if dimensions == Vector2i(540,960): await capture(game,"notes-540x960")
+		game.ui.notice("업무 원문\n".repeat(80))
+		await get_tree().process_frame
+		await get_tree().process_frame
+		for popup in game.ui.root.find_children("*","AcceptDialog",true,false):
+			if not popup.visible or not popup.has_meta("scroll_notice"): continue
+			if not viewport.grow(1).encloses(Rect2(Vector2(popup.position),Vector2(popup.size))): failures.append("Long original notices stay inside the screen: "+str(dimensions))
+			var documents = popup.find_children("*","RichTextLabel",true,false)
+			if documents.is_empty() or documents[0].text != "업무 원문\n".repeat(80): failures.append("Long notices retain the complete original document")
+			var scrolls = popup.find_children("*","ScrollContainer",true,false)
+			if scrolls.is_empty() or scrolls[0].get_v_scroll_bar().max_value <= scrolls[0].size.y: failures.append("Long original notices can be scrolled to their end")
+			if dimensions == Vector2i(540,960): await capture(game,"long-record-540x960")
+		close_notices(game)
+		game._use("control_console","device",true)
+		game.ui.command_input.text = "desk"
+		game.ui.execute_command()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var desk = game.ui.case_desk
+		if not viewport.grow(1).encloses(Rect2(Vector2(desk.dialog.position),Vector2(desk.dialog.size))): failures.append("Case forms fit aspect ratio: %s / %s in %s" % [dimensions,Rect2(Vector2(desk.dialog.position),Vector2(desk.dialog.size)),viewport])
+		if desk.body.size.x > desk.dialog.size.x: failures.append("Case form content stays inside its window")
+		desk.dialog.hide(); desk.dialog.queue_free()
 		for panel in [game.ui.modal,game.ui.terminal_panel,game.ui.dialogue_panel,game.ui.briefing_panel]:
 			if panel == game.ui.modal: game.ui.open_tablet(4)
 			elif panel == game.ui.terminal_panel: game._use("server_console","device",true)
@@ -466,8 +944,80 @@ func responsive_checks(game, failures: Array):
 			await capture(game,"08-field-%dx%d" % [dimensions.x,dimensions.y])
 			game._use("server_console","device",true)
 			await capture(game,"09-terminal-%dx%d" % [dimensions.x,dimensions.y])
+	game._use("control_console","device",true)
+	game.ui.command_input.text = "desk"
+	game.ui.execute_command()
+	game.get_window().size = Vector2i(960,540)
+	game._fit_screen()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var rotated = game.ui.case_desk.dialog
+	if not get_viewport().get_visible_rect().grow(1).encloses(Rect2(Vector2(rotated.position),Vector2(rotated.size))): failures.append("Open case forms survive a change in orientation")
+	rotated.hide(); rotated.queue_free()
 	game.get_window().size = original
 	game._fit_screen()
 	await get_tree().process_frame
 	game.ui.fit_screen()
 	game.controls.set_touch(original_touch)
+
+func save_failure_checks(game, failures: Array):
+	var original = game.state.duplicate(true)
+	var store = game.store
+	var source = store.directory.path_join("qa-import.json")
+	store.export_file(source,original,game.content)
+	var failed = FailedStore.new()
+	failed.directory = store.directory
+	game.store = failed
+	game.ui.open_tablet(0)
+	game.new_game()
+	if game.state != original or failed.preserved: failures.append("New game aborts when current progress cannot be saved")
+	close_notices(game)
+	game.transfer_file(source,false)
+	if game.state != original or failed.preserved: failures.append("Import aborts when current progress cannot be saved")
+	close_notices(game)
+	game.ui.case_desk.open(game.ui,true)
+	game.quit_game()
+	if get_tree().auto_accept_quit: failures.append("Window close waits for the game's save result")
+	if not game.ui.case_desk.dialog.visible: failures.append("A failed exit keeps console work open")
+	game.ui.toggle() # dismiss the save error before closing the case desk
+	game.ui.toggle()
+	game.store = store
+	# The old save succeeds; only persisting the replacement fails.
+	for action in ["new","import"]:
+		var replacement = ReplacementFailedStore.new()
+		replacement.directory = store.directory
+		game.store = replacement
+		game.state.memo = "keep-current-"+action
+		var before = game.state.duplicate(true)
+		var mode = game.ui.mode
+		if action == "new": game.new_game()
+		else: game.transfer_file(source,false)
+		if game.state != before or game.ui.mode != mode: failures.append("Failed replacement keeps the current session: "+action)
+		if game.ui.message.text == "사건 진행을 가져왔습니다.": failures.append("Failed replacement never reports a successful import")
+		var saved = store.load_state(game.content)
+		if not saved.has("state") or saved.state.memo != before.memo: failures.append("Failed replacement keeps the saved current progress: "+action)
+		close_notices(game)
+	game.store = store
+	var memo = "unsaved-"+str(Time.get_ticks_usec())
+	game.state.memo = memo
+	game.new_game()
+	var copies = Array(DirAccess.get_files_at(store.directory))
+	if not copies.any(func(name):
+		if not name.begins_with("save.preserved."): return false
+		var decoded = InvestigationSaveCodec.decode(FileAccess.get_file_as_string(store.directory.path_join(name)),game.content)
+		return decoded.has("state") and decoded.state.memo == memo): failures.append("Starting a new game preserves the latest unsaved changes")
+	game.state.memo = memo+"-import"
+	game.transfer_file(source,false)
+	close_notices(game)
+	copies = Array(DirAccess.get_files_at(store.directory))
+	if not copies.any(func(name):
+		if not name.begins_with("save.preserved."): return false
+		var decoded = InvestigationSaveCodec.decode(FileAccess.get_file_as_string(store.directory.path_join(name)),game.content)
+		return decoded.has("state") and decoded.state.memo == memo+"-import"): failures.append("Import preserves the latest unsaved changes before replacing progress")
+	game.state = original
+	game.ui.reset_session()
+	game.ui.sync_memo()
+	game.ui.refresh()
+	game.ui.close()
+	game.save_now()

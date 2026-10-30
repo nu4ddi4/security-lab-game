@@ -7,6 +7,57 @@ if (-not (Test-Path -LiteralPath $Iscc)) { throw 'Inno Setup compiler required f
 $checks=[Collections.Generic.List[string]]::new()
 function Expect([bool]$Condition,[string]$Label) { if (-not $Condition) { throw $Label }; $checks.Add($Label) }
 function Expect-Reject([scriptblock]$Code,[string]$Label) { $rejected=$false; try { & $Code | Out-Null } catch { $rejected=$true }; Expect $rejected $Label }
+function Start-TestUpdateHelper([string]$TransactionPath) {
+    $helperPath=Join-Path $repoRoot 'godot/resources/native_update_helper.ps1'
+    $tracePath=Join-Path (Split-Path -Parent $TransactionPath) 'helper-trace.txt'
+    $wrapperPath=Join-Path $fixtureRoot 'trace-helper.ps1'
+    [IO.File]::WriteAllText($wrapperPath,@'
+param([string]$HelperPath,[string]$RequestPath,[string]$TracePath)
+Set-PSDebug -Trace 1
+& $HelperPath -RequestPath $RequestPath *> $TracePath
+exit $LASTEXITCODE
+'@,[Text.UTF8Encoding]::new($false))
+    $start=[Diagnostics.ProcessStartInfo]::new()
+    $start.FileName=Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    $start.WorkingDirectory=Split-Path -Parent $helperPath
+    $start.UseShellExecute=$false
+    $start.RedirectStandardOutput=$true
+    $start.RedirectStandardError=$true
+    $parameters=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$wrapperPath,'-HelperPath',$helperPath,'-RequestPath',$TransactionPath,'-TracePath',$tracePath)
+    $start.Arguments=($parameters | ForEach-Object { ConvertTo-ProcessArgument $_ }) -join ' '
+    $process=[Diagnostics.Process]::Start($start)
+    # Drain both pipes asynchronously so diagnostic output cannot block the helper.
+    @{process=$process;stdout=$process.StandardOutput.ReadToEndAsync();stderr=$process.StandardError.ReadToEndAsync();trace=$tracePath}
+}
+function Get-HelperFailure($Helper,[string]$Stage,[int]$TimeoutSeconds) {
+    $details=[Collections.Generic.List[string]]::new()
+    $details.Add($(if ($Helper.process.HasExited) {'exit='+$Helper.process.ExitCode} else {'still running after '+$TimeoutSeconds+'s'}))
+    $resultPath=Join-Path $Stage 'result.json'
+    if (Test-Path -LiteralPath $resultPath) {
+        try {
+            if ((Get-Item -LiteralPath $resultPath).Length -le 32768) {
+                $result=Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                foreach ($key in @('state','error')) {
+                    if ($result.PSObject.Properties[$key]) {
+                        $value=[string]$result.$key
+                        $details.Add($key+'='+$value.Substring(0,[Math]::Min($value.Length,2048)))
+                    }
+                }
+            } else { $details.Add('result.json exceeds diagnostic limit') }
+        } catch { $details.Add('result.json could not be read: '+$_.Exception.Message) }
+    } else { $details.Add('result.json missing') }
+    foreach ($key in @('stdout','stderr')) {
+        if ($Helper[$key].IsCompleted) {
+            $value=[string]$Helper[$key].GetAwaiter().GetResult()
+            if ($value.Length) { $details.Add($key+'='+$value.Substring(0,[Math]::Min($value.Length,2048))) }
+        }
+    }
+    if (Test-Path -LiteralPath $Helper.trace) {
+        $tail=(Get-Content -LiteralPath $Helper.trace -Tail 12) -join ' | '
+        if ($tail.Length) { $details.Add('trace='+$tail.Substring(0,[Math]::Min($tail.Length,4096))) }
+    }
+    $details -join '; '
+}
 # Channel switching (opt-in beta preview and the way back) is limited to the beta product.
 foreach ($pair in @(@('stable','beta'),@('beta','stable'),@('beta','beta'))) { Expect (Test-UpdateChannelTransition $true $pair[0] $pair[1]) ('beta product may move '+$pair[0]+' to '+$pair[1]) }
 foreach ($pair in @(@('dev','beta'),@('beta','dev'),@('stable','dev'),@('dev','stable'))) { Expect (-not (Test-UpdateChannelTransition $true $pair[0] $pair[1])) ('dev never switches: '+$pair[0]+' to '+$pair[1]) }
@@ -109,8 +160,12 @@ try {
     if ($case -eq 'data-pack') { $transaction.current=(Build-Info '0.7.0-dev.5' ('c'*40)); $transaction.installed=$oldBuild }
     if ($case -eq 'installed-mismatch') { $transaction.installed=(Build-Info '0.6.9-dev.1' ('d'*40)) }
     $transactionPath=Join-Path $stage 'transaction.json'; Write-UpdateJson $transactionPath $transaction
-    $helper=Start-UpdateProcess ($env:SystemRoot+'\System32\WindowsPowerShell\v1.0\powershell.exe') @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',(Join-Path $repoRoot 'godot/resources/native_update_helper.ps1'),'-RequestPath',$transactionPath);$owned+=,$helper
-    for ($attempt=0;$attempt -lt 100;$attempt++){if((Test-Path -LiteralPath (Join-Path $stage 'ready.json')) -or $helper.HasExited){break};Start-Sleep -Milliseconds 100}
+    $helperRun=Start-TestUpdateHelper $transactionPath
+    $helper=$helperRun.process;$owned+=,$helper
+    # Match the application's 30-second helper preparation window. Cold Windows
+    # PowerShell startup can exceed 10 seconds on hosted runners.
+    $preflightTimeoutSeconds=30
+    for ($attempt=0;$attempt -lt ($preflightTimeoutSeconds*10);$attempt++){if((Test-Path -LiteralPath (Join-Path $stage 'ready.json')) -or $helper.HasExited){break};Start-Sleep -Milliseconds 100}
     if ($case -in @('wrong-hash','wrong-channel','installed-mismatch','junction','second-instance')) {
         Expect ($helper.WaitForExit(5000)) ($case+' rejected promptly')
         Expect (-not (Test-Path -LiteralPath (Join-Path $stage 'ready.json'))) ($case+' rejected before game exit')
@@ -118,7 +173,8 @@ try {
         if ($case -eq 'junction'){[IO.Directory]::Delete((Join-Path $installRoot 'link'))}
         $parent.Kill();$null=$parent.WaitForExit(5000)
     } else {
-        Expect (Test-Path -LiteralPath (Join-Path $stage 'ready.json')) ($case+' preflight handshake')
+        if (-not (Test-Path -LiteralPath (Join-Path $stage 'ready.json'))) { throw ($case+' preflight handshake: '+(Get-HelperFailure $helperRun $stage $preflightTimeoutSeconds)) }
+        Expect $true ($case+' preflight handshake')
         Expect-Reject { [IO.File]::WriteAllText((Join-Path $stage 'SecurityLabSetup.exe'),'tamper') } ($case+' installer file pinned against replacement')
         $parent.Kill();$null=$parent.WaitForExit(5000)
         Expect ($helper.WaitForExit(45000)) ($case+' helper completed')

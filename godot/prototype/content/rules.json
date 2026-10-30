@@ -20,5 +20,337 @@
       "id": "account_owner",
       "label": "계정 담당자를 행위자로 판단"
     }
+  ],
+  "inferences": [
+    {
+      "id": "C01",
+      "label": "승인 범위 대조",
+      "requires": [
+        [
+          "approval"
+        ],
+        [
+          "access"
+        ]
+      ]
+    },
+    {
+      "id": "C02",
+      "label": "문서 처리 대조",
+      "requires": [
+        [
+          "access"
+        ],
+        [
+          "staging"
+        ]
+      ]
+    },
+    {
+      "id": "C03",
+      "label": "서비스 응답 대조",
+      "requires": [
+        [
+          "backup"
+        ],
+        [
+          "status_sample"
+        ]
+      ]
+    },
+    {
+      "id": "C04",
+      "label": "검색 처리 대조",
+      "requires": [
+        [
+          "run"
+        ],
+        [
+          "index_damage"
+        ],
+        [
+          "files_sample"
+        ]
+      ]
+    },
+    {
+      "id": "C05",
+      "label": "채널·접수 대조",
+      "requires": [
+        [
+          "message"
+        ],
+        [
+          "submissions"
+        ]
+      ]
+    },
+    {
+      "id": "C06",
+      "label": "접수·적용 대조",
+      "requires": [
+        [
+          "submissions"
+        ],
+        [
+          "application"
+        ],
+        [
+          "package"
+        ]
+      ]
+    },
+    {
+      "id": "C07",
+      "label": "패키지 등록 대조",
+      "requires": [
+        [
+          "metadata"
+        ],
+        [
+          "message"
+        ],
+        [
+          "submissions"
+        ]
+      ]
+    },
+    {
+      "id": "C08",
+      "label": "요청·수신 대조",
+      "requires": [
+        [
+          "request"
+        ],
+        [
+          "message"
+        ],
+        [
+          "approval"
+        ]
+      ]
+    },
+    {
+      "id": "C09",
+      "label": "업무 목적 대조",
+      "requires": [
+        [
+          "purpose"
+        ],
+        [
+          "package"
+        ],
+        [
+          "metadata"
+        ]
+      ]
+    },
+    {
+      "id": "C10",
+      "label": "작업 예약 대조",
+      "requires": [
+        [
+          "application"
+        ],
+        [
+          "transfer"
+        ]
+      ]
+    },
+    {
+      "id": "C11",
+      "label": "조치·처리 대조",
+      "requires": [
+        [
+          "control_audit",
+          "quarantine_audit"
+        ],
+        [
+          "dispatch_audit"
+        ]
+      ]
+    },
+    {
+      "id": "C12",
+      "label": "발송·응답 대조",
+      "requires": [
+        [
+          "dispatch_audit"
+        ],
+        [
+          "receipt_audit"
+        ]
+      ]
+    }
+  ],
+  "finalFields": [
+    {
+      "id": "scope",
+      "label": "작업 범위",
+      "options": [
+        [
+          "unknown",
+          "판단 보류"
+        ],
+        [
+          "violation",
+          "승인 범위 밖 접근"
+        ],
+        [
+          "within",
+          "승인 범위 안의 접근"
+        ]
+      ]
+    },
+    {
+      "id": "collection",
+      "label": "문서 처리",
+      "options": [
+        [
+          "unknown",
+          "판단 보류"
+        ],
+        [
+          "collected",
+          "내부 보관 확인"
+        ],
+        [
+          "access_only",
+          "열람만 확인"
+        ]
+      ]
+    },
+    {
+      "id": "submission",
+      "label": "패키지 제출",
+      "options": [
+        [
+          "unknown",
+          "판단 보류"
+        ],
+        [
+          "seo",
+          "서유진 제출"
+        ],
+        [
+          "han",
+          "한지우 제출"
+        ]
+      ]
+    },
+    {
+      "id": "authorship",
+      "label": "패키지 작성",
+      "options": [
+        [
+          "unknown",
+          "판단 보류"
+        ],
+        [
+          "vendor",
+          "VENDOR-OPS 작성"
+        ],
+        [
+          "seo",
+          "서유진 작성"
+        ],
+        [
+          "han",
+          "한지우 작성"
+        ]
+      ]
+    },
+    {
+      "id": "awareness",
+      "label": "제출자의 인식 범위",
+      "options": [
+        [
+          "unknown",
+          "판단 보류"
+        ],
+        [
+          "warning_seen",
+          "범위 검토란 수신·열람"
+        ],
+        [
+          "full_intent",
+          "전체 외부 전달을 기획"
+        ],
+        [
+          "unaware",
+          "범위 초과를 인식하지 못함"
+        ]
+      ]
+    },
+    {
+      "id": "purpose",
+      "label": "요청 목적",
+      "options": [
+        [
+          "unknown",
+          "판단 보류"
+        ],
+        [
+          "contract_support",
+          "계약 실적 대조 자료 확보"
+        ],
+        [
+          "personal_sale",
+          "개인 판매 목적"
+        ]
+      ]
+    },
+    {
+      "id": "transfer",
+      "label": "예약 작업 처리",
+      "options": [
+        [
+          "unknown",
+          "판단 보류"
+        ],
+        [
+          "scheduled",
+          "예약 상태"
+        ],
+        [
+          "not_run",
+          "미실행"
+        ],
+        [
+          "blocked",
+          "발송 전 차단"
+        ],
+        [
+          "sent",
+          "발송 확인·접수 불명"
+        ],
+        [
+          "received",
+          "외부 접수 확인"
+        ]
+      ]
+    },
+    {
+      "id": "material",
+      "label": "보관 위치 상태",
+      "options": [
+        [
+          "unknown",
+          "판단 보류"
+        ],
+        [
+          "isolated",
+          "격리"
+        ],
+        [
+          "present",
+          "자료 잔존"
+        ],
+        [
+          "empty",
+          "전송 대상 없음"
+        ]
+      ]
+    }
   ]
 }

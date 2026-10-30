@@ -38,6 +38,14 @@ func run():
 	host.store.directory = "user://qa/beta-services/"+nonce
 	check(host.save_now(),"Investigation saves before service checks")
 	var before = FileAccess.get_file_as_string(host.store.directory.path_join("save.json"))
+	var valid_state = host.state.duplicate(true)
+	host.state.casework.receipt = "confirmed"
+	check(not host.save_now(),"An invalid new state is rejected before replacing the save")
+	check(FileAccess.get_file_as_string(host.store.directory.path_join("save.json")) == before,"A failed validation preserves the last readable save")
+	var export_path = host.store.directory.path_join("existing-export.json")
+	write(export_path,"existing export")
+	check(not host.store.export_file(export_path,host.state,host.content) and FileAccess.get_file_as_string(export_path) == "existing export","An invalid export does not overwrite an existing file")
+	host.state = valid_state
 	var diagnostics = TestDiagnostics.new(); host.add_child(diagnostics); diagnostics.setup(host); diagnostics.mark_ready()
 	check(diagnostics.save_validation()["save.json"].status=="valid","Investigation codec validates its own save")
 	check(diagnostics.save_validation()["save.backup.json"].status=="missing","Missing investigation backup is explicit")
@@ -63,6 +71,25 @@ func run():
 	var culled = InvestigationEnvironment.without_region(cull_mesh,Transform3D(),AABB(Vector3(4,-1,-1),Vector3(3,3,2)))
 	check(culled.surface_get_arrays(0)[Mesh.ARRAY_INDEX].size() == 3,"Culling removes only the triangles inside the box")
 	check(InvestigationEnvironment.without_region(cull_mesh,Transform3D(),AABB(Vector3(-1,-1,-1),Vector3(20,3,2))).get_surface_count() == 0,"Culling can empty a surface")
+	var tile = ArrayMesh.new()
+	var tile_arrays = []
+	tile_arrays.resize(Mesh.ARRAY_MAX)
+	tile_arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array([Vector3(0,0,0),Vector3(1,0,0),Vector3(0,0,1),Vector3(1,0,1)])
+	tile_arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array([Vector3.RIGHT,Vector3.RIGHT,Vector3.RIGHT,Vector3.RIGHT])
+	tile_arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0,1,2,1,3,2])
+	tile.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,tile_arrays)
+	var flat_normals = LabWorld.flat_shaded(tile).surface_get_arrays(0)[Mesh.ARRAY_NORMAL]
+	check(flat_normals.size() == 6 and Array(flat_normals).all(func(normal): return absf(absf(normal.y)-1.0) < .001),"Flat-shaded meshes get one face normal per triangle")
+	var override_target = "user://qa/override-test.cfg"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(override_target))
+	check(LabSettings.write_override(override_target,1) == "" and FileAccess.get_file_as_string(override_target).contains("forward_plus") and FileAccess.get_file_as_string(override_target).begins_with(LabSettings.OVERRIDE_HEADER),"Advanced renderer is stored in an override file")
+	check(LabSettings.write_override(override_target,0) == "" and not FileAccess.file_exists(override_target),"Choosing the compatible renderer removes that file")
+	write(override_target,"[rendering]
+something=else
+")
+	check(LabSettings.write_override(override_target,1) != "" and FileAccess.get_file_as_string(override_target).begins_with("[rendering]"),"A foreign override file is never overwritten")
+	check(LabSettings.write_override(override_target,0) != "" and FileAccess.file_exists(override_target),"A foreign override file is never deleted")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(override_target))
 	var reset_root = "user://qa/reset-test"
 	write(reset_root.path_join("investigation/save.json"),"progress")
 	write(reset_root.path_join("investigation/nested/save.backup.json"),"backup")

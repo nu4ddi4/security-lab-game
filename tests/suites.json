@@ -2,7 +2,9 @@
   "rules": [
     "godot/prototype/tests/unit.gd",
     "godot/prototype/tests/scenarios.json",
-    "godot/prototype/tests/save.schema.json"
+    "godot/prototype/tests/save.schema.json",
+    "godot/prototype/tests/legacy-save.json",
+    "godot/prototype/tests/casework-v1-save.json"
   ],
   "services": [
     "godot/prototype/tests/services.gd",
@@ -14,7 +16,8 @@
   "scene": [
     "godot/tests/input_bindings_test.gd",
     "godot/tests/input_review.gd",
-    "godot/prototype/tests/smoke.gd"
+    "godot/prototype/tests/smoke.gd",
+    "godot/prototype/tests/stages_smoke.gd"
   ],
   "assets": [
     "godot/tests/fixtures/office-geometry.json"
