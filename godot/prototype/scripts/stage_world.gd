@@ -109,6 +109,7 @@ func break_computer(id: String):
 	restore_computers()
 	var point = game.targets[id].global_position
 	if game.detailed_world and game.investigation_environment.anchors.has("APPROACH_"+id):
+		game.player.camera.reparent(game)
 		game.player.camera.global_position = game.investigation_environment.anchors["APPROACH_"+id].global_position+Vector3(0,1.65,0)
 		game.player.camera.look_at(point)
 	var sources: Array[Node] = []
@@ -117,6 +118,7 @@ func break_computer(id: String):
 	else: sources = game.find_children("*","MeshInstance3D",true,false)
 	if id == "shutdown_pc": sources = [course.get_node("ShutdownMonitor")]
 	for node in sources:
+		if not node.is_visible_in_tree(): continue
 		var name_lower = str(node.name).to_lower()
 		if not ("screen" in name_lower or "computer" in name_lower or "housing" in name_lower or "monitor" in name_lower): continue
 		var center = node.global_transform*node.get_aabb().get_center()

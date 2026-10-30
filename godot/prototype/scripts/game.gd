@@ -251,7 +251,7 @@ func _process(delta):
 	if ui == null or objective_marker == null: return
 	marker_phase += delta
 	marker_target = ui.guide_info().get("target","")
-	objective_marker.visible = targets.has(marker_target) and not state.ended
+	objective_marker.visible = targets.has(marker_target) and not state.ended and (not stage_mode or ui.mode == "field")
 	if not objective_marker.visible: return
 	var point = targets[marker_target].global_position
 	objective_marker.global_position = point

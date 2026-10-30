@@ -357,7 +357,9 @@ func clear_effects():
 	if is_instance_valid(effects): effects.queue_free()
 	if shock != null: shock.kill()
 	if flash != null: flash.color.a = 0
-	game.player.camera.transform = Transform3D.IDENTITY if game.player.third_person else game.player.camera.transform
+	if game.player.third_person:
+		if game.player.camera.get_parent() != game.player.camera_arm: game.player.camera.reparent(game.player.camera_arm,false)
+		game.player.camera.transform = Transform3D.IDENTITY
 	game.player.camera.h_offset = 0
 	game.player.camera.v_offset = 0
 
@@ -377,7 +379,7 @@ func fit_screen():
 		settings_screen.position = Vector2i(safe.position)
 	for popup in root.find_children("*","AcceptDialog",true,false):
 		if popup.visible and popup.has_meta("scroll_notice"): fit_notice.call_deferred(popup)
-	for window in [terminal_panel,result_panel,stage_picker]:
+	for window in [terminal_panel,result_panel,stage_picker,modal]:
 		window.offset_left = safe.position.x
 		window.offset_right = safe.end.x-get_viewport().get_visible_rect().size.x
 		window.offset_top = safe.position.y
