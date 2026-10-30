@@ -24,6 +24,10 @@ var fields = {}
 var background: TextureRect
 var footer_tip: Label
 var content: VBoxContainer
+var surface_margin: MarginContainer
+var controls_intro: Label
+var keys_heading: Label
+var keys_intro: Label
 var current_action = "tool"
 const CATEGORIES = [["general","일반","업데이트 · 진단 / 지원"],["display","화면","디스플레이 · 그래픽"],["sound","사운드","전체 소리 · 효과음"],["controls","조작","키 설정 · 마우스 · 터치"]]
 
@@ -70,6 +74,7 @@ func _ready():
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	background.material = InvestigationTheme.backdrop_material()
 	var margin = MarginContainer.new()
+	surface_margin = margin
 	surface.add_child(margin)
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for edge in ["left","right","top","bottom"]: margin.add_theme_constant_override("margin_"+edge,24)
@@ -82,7 +87,8 @@ func _ready():
 	close_button.custom_minimum_size.y = 48 if game.controls.mobile else 34
 	close_button.add_theme_font_size_override("font_size",16 if game.controls.mobile else 14)
 	close_button.pressed.connect(func(): close_editor())
-	var header = InvestigationTheme.shell_header(body,[["노트",0],["메신저",1],["발생 보고",2,assigned],["업무",3],["설정",4]],4,func(id): if id != 4: leave_for(id),running_version(),game.controls.mobile,[close_button])
+	var entries = [["설정",4]] if game.ui.mode == "main_menu" else [["노트",0],["메신저",1],["발생 보고",2,assigned],["업무",3],["설정",4]]
+	var header = InvestigationTheme.shell_header(body,entries,4,func(id): if id != 4: leave_for(id),running_version(),game.controls.mobile,[close_button])
 	header.buttons[4].mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel = PanelContainer.new()
 	panel.theme_type_variation = "ShellPanel"
@@ -104,7 +110,7 @@ func _ready():
 		navigation[entry[0]] = b
 	var divider = VSeparator.new()
 	sidebar.add_child(divider)
-	text(sidebar,"LOCAL SIMULATION\n설정 변경은 조사 진행에 영향을 주지 않습니다.",12,InvestigationTheme.TEXT_FAINT)
+	text(sidebar,"변경한 설정은 이 기기에 저장됩니다.",12,InvestigationTheme.TEXT_FAINT)
 	content = VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation",12)
@@ -141,7 +147,7 @@ func _ready():
 	refresh_buttons()
 
 func build_controls(page: VBoxContainer):
-	text(page,"키보드와 마우스 등 입력 장치를 설정합니다.",14,InvestigationTheme.TEXT_DIM)
+	controls_intro = text(page,"키보드와 마우스 등 입력 장치를 설정합니다.",14,InvestigationTheme.TEXT_DIM)
 	var modes = HBoxContainer.new()
 	page.add_child(modes)
 	action_button(modes,"키 설정",func(): keys_options.show(); mouse_options.hide(),true)
@@ -152,8 +158,8 @@ func build_controls(page: VBoxContainer):
 	keys_options = VBoxContainer.new()
 	keys_options.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(keys_options)
-	text(keys_options,"주요 조작 키",20)
-	text(keys_options,"재설정을 누르고 새 키 하나를 입력하세요.",13,InvestigationTheme.TEXT_DIM)
+	keys_heading = text(keys_options,"주요 조작 키",20)
+	keys_intro = text(keys_options,"재설정을 누르고 새 키 하나를 입력하세요.",13,InvestigationTheme.TEXT_DIM)
 	var rows = card(keys_options)
 	rows.add_theme_constant_override("separation",2)
 	for definition in LabInputBindings.ACTIONS:
@@ -223,7 +229,6 @@ func build_general(page: VBoxContainer):
 	var session_row = HBoxContainer.new()
 	session_row.add_theme_constant_override("separation",10)
 	session.add_child(session_row)
-	action_button(session_row,"게임 종료…",func(): game.ui.confirm("지금까지의 진행을 저장하고 게임을 종료할까요?",game.quit_game))
 	action_button(session_row,"게임 초기화…",func(): InvestigationDataReset.confirm(game)).theme_type_variation = "DangerButton"
 	var updates = card(page)
 	text(updates,"업데이트",20)
@@ -318,9 +323,14 @@ func select_category(id: String):
 
 func fit():
 	if sidebar == null: return
-	var narrow = size.x < 760
+	# Popup's initial minimum-size layout can leave offsets from the old binding
+	# editor's 690x660 window. Reset them after the popup has its final viewport.
+	surface_margin.set_anchors_and_offsets_preset.call_deferred(Control.PRESET_FULL_RECT)
+	var narrow = size.x < 760 or size.y < 640
 	sidebar.visible = not narrow
 	compact_navigation.visible = narrow
+	subtitle.visible = not narrow
+	for caption in [controls_intro,keys_heading,keys_intro]: caption.visible = size.y >= 640
 	preview_column.visible = size.x >= 1200
 	sidebar.custom_minimum_size.x = 180 if size.x < 1100 else 218
 	for key in buttons:
@@ -397,7 +407,7 @@ func close_editor(keep_tablet := false):
 	game.ui.settings_screen = null
 	for key in original_controls: game.ui.set(key,original_controls[key])
 	game.ui.refresh_settings()
-	if not keep_tablet: game.ui.close()
+	if not keep_tablet and game.ui.mode not in ["main_menu","pause"]: game.ui.close()
 	queue_free()
 
 func leave_for(index: int):

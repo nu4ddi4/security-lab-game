@@ -19,6 +19,7 @@ var investigation_environment: InvestigationEnvironment
 var detailed_world = false
 var context = ""
 var blocked_save = false
+var session_available = false
 var save_timer: Timer
 var saving = false
 var targets = {}
@@ -56,6 +57,7 @@ func _ready():
 	qa_mode = testing
 	if testing: store.directory = "user://investigation-qa"
 	var loaded = {"new":true} if testing else store.load_state(content)
+	session_available = loaded.has("state")
 	blocked_save = loaded.has("error")
 	state = loaded.get("state",engine.create_state())
 	_setup_input()
@@ -337,6 +339,8 @@ func new_game():
 	var candidate = engine.create_state()
 	if not save_state(candidate): return
 	state = candidate
+	session_available = true
+	reset_player_pose()
 	if investigation_environment != null: investigation_environment.sync(state)
 	blocked_save = false
 	context = ""
@@ -349,6 +353,14 @@ func quit_game():
 	if not blocked_save and not save_now(): return
 	get_tree().quit()
 
+func reset_player_pose():
+	release_speaker()
+	player.velocity = Vector3.ZERO
+	player.rotation = Vector3.ZERO
+	player.camera.rotation = Vector3.ZERO
+	if investigation_environment != null: investigation_environment.spawn(player)
+	else: player.global_position = Vector3(-6,.01,5.6)
+
 func preserve_current() -> bool:
 	if not blocked_save and not save_now(): return false
 	if not store.preserve(): ui.notice(store.error); return false
@@ -358,6 +370,8 @@ func preserve_current() -> bool:
 func reset_all_data() -> int:
 	var removed = InvestigationDataReset.wipe(InvestigationDataReset.targets(self))
 	state = engine.create_state()
+	session_available = true
+	reset_player_pose()
 	blocked_save = false
 	context = ""
 	controls.reset()
@@ -383,6 +397,7 @@ func transfer_file(path: String, exporting: bool):
 	if not preserve_current(): return
 	if not save_state(candidate.state): return
 	state = candidate.state
+	session_available = true
 	if investigation_environment != null: investigation_environment.sync(state)
 	blocked_save = false
 	ui.reset_session()

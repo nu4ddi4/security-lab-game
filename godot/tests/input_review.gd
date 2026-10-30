@@ -58,6 +58,9 @@ func run(root: Node):
 	game.player.inspect_requested.connect(func(_target): activity.inspect += 1)
 	game.player.tool_requested.connect(func(_target): activity.tool += 1)
 	game.player.pause_requested.connect(func(): activity.pause += 1)
+	game.session_available = true
+	game.ui.entry.intro_seen = true
+	game.ui.resume_session()
 	await close_ui()
 	check(game.player.enabled,"Gameplay enabled before review")
 	game.ui.open_tablet(4)

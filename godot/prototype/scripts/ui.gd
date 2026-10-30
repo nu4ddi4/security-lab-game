@@ -28,14 +28,12 @@ var message: Label
 var source: Label
 var terminal: RichTextLabel
 var terminal_objective: Label
-var case_work_button: Button
 var case_desk = InvestigationCaseDesk.new()
 var clock_button: Button
 var command_input: LineEdit
-var command_list: VBoxContainer
-var command_sidebar: VBoxContainer
-var terminal_tools: HBoxContainer
-var help_sessions = {}
+var terminal_sidebar: VBoxContainer
+var terminal_compact_objective: Label
+var entry = InvestigationEntryScreen.new()
 var messenger_contacts: VBoxContainer
 var contact_picker: OptionButton
 var field_objective: PanelContainer
@@ -150,13 +148,31 @@ func setup(controller: InvestigationPrototype):
 	_build_terminal()
 	_build_dialogue()
 	_build_briefing()
+	entry.build(self)
 	fit_screen()
 	refresh_settings()
 	sync_memo()
 	refresh()
-	if game.blocked_save: open_tablet(3)
-	elif game.state.day == 1 and "oh_intro" not in game.state.statements: open_briefing()
-	else: close()
+	entry.show_menu(false)
+
+func button_node(text: String, callback: Callable) -> Button:
+	var node = Button.new()
+	node.text = text
+	node.pressed.connect(callback)
+	return node
+
+func open_pause():
+	entry.show_menu(true)
+
+func return_to_main_menu():
+	if not game.blocked_save and not game.save_now(): return
+	entry.show_menu(false)
+
+func resume_session():
+	if game.blocked_save or not game.session_available: return
+	if not entry.intro_seen and game.state.day == 1 and "oh_intro" not in game.state.statements:
+		entry.show_intro()
+	else: enter_field()
 
 func panel(left: float, top: float, right: float, bottom: float) -> PanelContainer:
 	var node = PanelContainer.new()
@@ -206,7 +222,7 @@ func _build_tablet():
 	close_button.custom_minimum_size.y = 48 if game.controls.mobile else 34
 	close_button.add_theme_font_size_override("font_size",16 if game.controls.mobile else 14)
 	close_button.pressed.connect(close)
-	var header = InvestigationTheme.shell_header(body,[["노트",0],["메신저",1],["발생 보고",2],["업무",3],["설정",4]],3,func(id): tabs.current_tab = id,ContentVersion.running(),game.controls.mobile,[close_button])
+	var header = InvestigationTheme.shell_header(body,[["노트",0],["메신저",1],["발생 보고",2],["업무",3],["설정",4]],3,func(id): tabs.current_tab = id,ContentVersion.running(),game.controls.mobile,[button_node("메뉴",open_pause),close_button])
 	tablet_nav = header.buttons
 	tablet_version = header.version
 	var shell = PanelContainer.new()
@@ -326,20 +342,17 @@ func _build_tablet():
 	button(tab(4),"설정 열기",open_rebinding,"PrimaryButton")
 
 func _build_terminal():
-	terminal_panel = panel(.08,.09,.92,.91)
+	terminal_panel = panel(.04,.06,.96,.94)
 	terminal_panel.name = "Terminal"
-	if game.controls.mobile:
-		terminal_panel.anchor_left = .02
-		terminal_panel.anchor_right = .98
-		terminal_panel.anchor_top = .02
-		terminal_panel.anchor_bottom = .98
 	var body = VBoxContainer.new()
+	body.add_theme_constant_override("separation",12)
 	terminal_panel.add_child(body)
-	source = heading(body,"")
-	terminal_objective = label(body,"","CaptionLabel")
-	case_work_button = button(body,"관제 업무",func(): case_desk.open(self,true))
-	if game.controls.mobile:
-		button(source.get_parent(),"키보드 닫기",func(): command_input.release_focus(); hide_keyboard())
+	var header = HBoxContainer.new()
+	body.add_child(header)
+	source = label(header,"","CaptionLabel")
+	source.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button(header,"닫기" if game.controls.mobile else "닫기 · Esc",close)
+	terminal_compact_objective = label(body,"","CaptionLabel")
 	var layout = HBoxContainer.new()
 	layout.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	layout.add_theme_constant_override("separation",20)
@@ -353,46 +366,31 @@ func _build_terminal():
 	terminal.selection_enabled = not game.controls.mobile
 	terminal.bbcode_enabled = true
 	terminal.add_theme_color_override("default_color",Color(.8,.92,.88))
-	terminal.add_theme_stylebox_override("normal",InvestigationTheme.box(InvestigationTheme.INSET,InvestigationTheme.BORDER,8,12))
+	terminal.add_theme_stylebox_override("normal",InvestigationTheme.box(InvestigationTheme.INSET,InvestigationTheme.BORDER,4,14))
+	var mono = SystemFont.new()
+	mono.font_names = PackedStringArray(["Consolas","Noto Sans Mono","DejaVu Sans Mono","monospace"])
+	mono.fallbacks.append(InvestigationTheme.font())
+	terminal.add_theme_font_override("normal_font",mono)
 	session.add_child(terminal)
 	var row = HBoxContainer.new()
 	session.add_child(row)
-	var shell_prompt = label(row,"sec.ops >","SectionLabel")
+	var shell_prompt = label(row,"sec.ops $","CaptionLabel")
 	shell_prompt.autowrap_mode = TextServer.AUTOWRAP_OFF
 	shell_prompt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	shell_prompt.custom_minimum_size.x = 115 if game.controls.mobile else 100
 	command_input = LineEdit.new()
-	command_input.placeholder_text = "명령 입력 · help로 도움말"
+	command_input.add_theme_font_override("font",mono)
+	command_input.placeholder_text = "help"
 	command_input.max_length = 200
 	command_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(command_input)
 	command_input.text_submitted.connect(func(_text): execute_command())
 	command_input.gui_input.connect(_terminal_input)
-	button(row,"실행",execute_command,"PrimaryButton")
-	var tools = HBoxContainer.new()
-	terminal_tools = tools
-	session.add_child(tools)
-	button(tools,"복사",func(): DisplayServer.clipboard_set(terminal.get_parsed_text()))
-	button(tools,"지우기",clear_terminal)
-	if not game.controls.mobile:
-		var hint = label(tools,"↑↓ 이력 · Tab 자동완성 · Ctrl+L 지우기","CaptionLabel")
-		hint.autowrap_mode = TextServer.AUTOWRAP_OFF
-		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	button(tools,"이전",func(): recall_command(-1))
-	button(tools,"다음",func(): recall_command(1))
-	command_sidebar = VBoxContainer.new()
-	command_sidebar.custom_minimum_size.x = 340
-	layout.add_child(command_sidebar)
-	label(command_sidebar,"이 장비의 명령","HeadingLabel")
-	label(command_sidebar,"선택하면 입력됩니다. Enter로 실행하세요.","CaptionLabel")
-	var scroll = ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	command_sidebar.add_child(scroll)
-	command_list = VBoxContainer.new()
-	command_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	command_list.add_theme_constant_override("separation",4)
-	scroll.add_child(command_list)
+	terminal_sidebar = VBoxContainer.new()
+	terminal_sidebar.custom_minimum_size.x = 230
+	terminal_sidebar.size_flags_horizontal = Control.SIZE_FILL
+	layout.add_child(terminal_sidebar)
+	label(terminal_sidebar,"현재 업무","SectionLabel")
+	terminal_objective = label(terminal_sidebar,"")
 
 func _build_dialogue():
 	dialogue_panel = panel(.16,.505,.84,.96)
@@ -535,7 +533,7 @@ func quote_note(record: Dictionary):
 
 func reset_session():
 	case_desk.reset()
-	help_sessions.clear()
+	if is_instance_valid(settings_screen): settings_screen.close_editor(true)
 	terminal_buffers.clear()
 	terminal_drafts.clear()
 	terminal_context = ""
@@ -545,8 +543,8 @@ func reset_session():
 	claim.select(0)
 	for option in attachments.values(): option.select(0)
 	contact = "oh"
-	close()
-	if game.state.day == 1 and "oh_intro" not in game.state.statements: open_briefing()
+	enter_field()
+	if game.state.day == 1 and "oh_intro" not in game.state.statements: entry.intro_seen = false; entry.show_intro()
 
 func guide_info() -> Dictionary:
 	var state = game.state
@@ -567,7 +565,7 @@ func guide_info() -> Dictionary:
 	if "oh_intro" not in state.statements: return {"title":"1 / 8 · 담당 업무 인계","text":"보안팀장 오세진에게 오늘 업무를 인계받으세요.","target":"oh"}
 	if "park_intro" not in state.statements: return {"title":"2 / 8 · 서버 담당자","text":"서버 담당 박도윤에게 운영 업무를 인계받으세요.","target":"park"}
 	for key in ["service","account","tasks"]:
-		if key not in state.baseline: return {"title":"3 / 8 · 서버 기준 상태","text":"서버 단말에서 서비스·계정·등록 작업을 확인하세요. 조작 방법은 명령어 책에 있습니다.","target":"server_console"}
+		if key not in state.baseline: return {"title":"3 / 8 · 서버 기준 상태","text":"서버 단말에서 서비스·계정·등록 작업을 확인하세요. 사용할 수 있는 명령은 help로 확인하세요.","target":"server_console"}
 	if "han_intro" not in state.statements: return {"title":"4 / 8 · 업무 담당자","text":"한지우에게 담당 업무를 인계받으세요.","target":"han"}
 	if "files" not in state.baseline: return {"title":"5 / 8 · 업무 자료","text":"업무 PC에서 원본 목록을 확인하세요.","target":"project_pc"}
 	if "seo_intro" not in state.statements: return {"title":"6 / 8 · 정비 담당자","text":"서유진에게 정비 업무를 인계받으세요.","target":"seo"}
@@ -620,10 +618,10 @@ func refresh():
 	hud.text = objective.title if objective.title.begins_with("%d일차" % view.day) else "%d일차 · %s" % [view.day,objective.title]
 	guide.text = LabInputBindings.hint(objective.text)
 	field_objective.reset_size.call_deferred()
-	case_work_button.visible = game.context == "control_console"
 	clock_button.visible = view.day == 7 and not view.ended
 	source.text = view.device.get("label","현장 단말")+" · 운영 점검 세션"
-	terminal_objective.text = LabInputBindings.hint(objective.title+" · "+objective.text)
+	terminal_objective.text = LabInputBindings.hint(objective.title+"\n\n"+objective.text)
+	terminal_compact_objective.text = LabInputBindings.hint(objective.title+" · "+objective.text)
 	clear(notes)
 	if view.notes.is_empty(): label(notes,"아직 확보한 원본이 없습니다. 현장 장비에서 원본을 조회하거나 메신저의 첨부를 확인하세요.")
 	for record in view.notes:
@@ -658,7 +656,6 @@ func refresh():
 	end_day_button.text = "업무 종결됨" if view.ended else "조사 종결" if view.day == 7 else "오늘 업무 종료"
 	refresh_dialogue()
 	refresh_messenger()
-	refresh_commands()
 	var assigned = game.state.day >= 2 or investigation_assigned()
 	tabs.set_tab_hidden(2,not assigned)
 	tablet_nav[2].visible = assigned
@@ -769,25 +766,6 @@ func available_commands() -> Array:
 		if game.context in row.devices and game.engine.command_visible(game.state,row): rows.append(row)
 	return rows
 
-func refresh_commands():
-	clear(command_list)
-	command_sidebar.visible = help_sessions.get(game.context,false) and get_viewport().get_visible_rect().size.x >= 1100
-	if not help_sessions.get(game.context,false): return
-	var category = ""
-	for row in available_commands():
-		if row.get("category","조회") != category:
-			category = row.get("category","조회")
-			label(command_list,category,"SectionLabel")
-		var pick = button(command_list,row.get("description","장비 조작"),fill_command.bind(row.text),"TileButton")
-		pick.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		var detail = label(command_list,row.text,"CaptionLabel")
-		detail.custom_minimum_size.x = 300
-
-func fill_command(text: String):
-	command_input.text = text
-	command_input.caret_column = text.length()
-	if not game.controls.mobile: command_input.grab_focus()
-
 func execute_command():
 	if mode != "terminal": return
 	var text = command_input.text.strip_edges()
@@ -799,10 +777,14 @@ func execute_command():
 	if history.is_empty() or history[-1] != text: history.append(text)
 	if history.size() > 80: history.pop_front()
 	history_index = history.size()
-	if text.to_lower() == "help":
-		help_sessions[game.context] = true
-		refresh_commands()
 	match text.to_lower():
+		"exit", "logout": close()
+		"desk":
+			if game.context == "control_console": case_desk.open(self,true)
+			else: print_output(text,"desk: command not found","error")
+		"help":
+			game.command(text)
+			append_terminal_output("\nclear  —  화면 지우기\nhistory  —  명령 이력\nexit  —  세션 종료"+("\ndesk  —  관제 업무" if game.context == "control_console" else ""))
 		"clear", "cls": clear_terminal()
 		"history":
 			var rows = []
@@ -817,16 +799,12 @@ func _terminal_input(event: InputEvent):
 		recall_command(-1 if event.keycode == KEY_UP else 1)
 		command_input.accept_event()
 	elif event.keycode == KEY_TAB:
-		if not help_sessions.get(game.context,false):
-			print_output("도움말","help를 입력하면 장비 명령을 확인할 수 있습니다.")
-			command_input.accept_event()
-			return
 		var prefix = command_input.text.to_lower()
 		var options = available_commands().filter(func(row): return row.text.to_lower().begins_with(prefix))
 		if options.size() == 1:
 			command_input.text = options[0].text
 			command_input.caret_column = command_input.text.length()
-		elif not options.is_empty(): print_output("자동완성","\n".join(options.map(func(row): return row.text)))
+		elif not options.is_empty(): append_terminal_output("\n".join(options.map(func(row): return row.text)))
 		command_input.accept_event()
 	elif event.ctrl_pressed and event.keycode == KEY_L:
 		clear_terminal()
@@ -855,6 +833,15 @@ func print_output(command: String, text: String, kind = "output"):
 	terminal_buffers[game.context] = log
 	render_terminal()
 
+func append_terminal_output(text: String):
+	var log = terminal_buffers.get(game.context,[])
+	log.append({"kind":"output","text":text})
+	var length = 0
+	for entry in log: length += entry.text.length()
+	while length > 24000 and log.size() > 2: length -= log.pop_front().text.length()
+	terminal_buffers[game.context] = log
+	render_terminal()
+
 func render_terminal():
 	terminal.text = terminal_markup(terminal_buffers.get(game.context,[]))
 	# Wrapping and scrollbar bounds are updated during the next layout pass.
@@ -868,7 +855,7 @@ static func terminal_markup(log: Array) -> String:
 	var blocks = []
 	for entry in log:
 		var text = str(entry.text).replace("[","[lb]")
-		blocks.append("sec.ops > "+text if entry.kind == "command" else text)
+		blocks.append("sec.ops $ "+text if entry.kind == "command" else text)
 	return "\n".join(blocks)
 
 static func style_line(line: String, _heading: bool) -> String:
@@ -883,7 +870,7 @@ func _show(next_mode: String, window: Control):
 	touch_scroll = null
 	hide_keyboard()
 	game.release_speaker()
-	for item in [modal,terminal_panel,dialogue_panel,briefing_panel]: item.hide()
+	for item in [modal,terminal_panel,dialogue_panel,briefing_panel,entry.panel]: item.hide()
 	mode = next_mode
 	modal_open = true
 	window.show()
@@ -916,7 +903,7 @@ func open_terminal():
 	refresh()
 	if not terminal_buffers.has(game.context):
 		var device = game.content.case.devices[game.context]
-		terminal_buffers[game.context] = [{"kind":"banner","text":"SECURITY OPERATIONS / "+device.label+"\n접속 사용자: sec.ops · "+device.zone+"\n\n"+device.description+"\n\n명령을 입력하세요. help를 입력하면 이 장비의 도움말이 표시됩니다."}]
+		terminal_buffers[game.context] = [{"kind":"banner","text":"SECURITY OPERATIONS / "+device.label+"\n접속 사용자: sec.ops · "+device.zone+"\nType help for available commands."}]
 	render_terminal()
 	history_index = command_history.get(game.context,[]).size()
 	if not game.controls.mobile: command_input.grab_focus()
@@ -938,14 +925,19 @@ func close():
 	if is_instance_valid(settings_screen) and settings_screen.visible:
 		settings_screen.close_editor()
 		return
+	if mode == "main_menu": return
+	if mode == "intro": entry.show_menu(false); return
 	if game.blocked_save: return
+	enter_field()
+
+func enter_field():
 	remember_terminal_draft()
 	var focused = get_viewport().gui_get_focus_owner()
 	if focused != null: focused.release_focus()
 	hide_keyboard()
 	scroll_finger = -1
 	touch_scroll = null
-	for item in [modal,terminal_panel,dialogue_panel,briefing_panel]: item.hide()
+	for item in [modal,terminal_panel,dialogue_panel,briefing_panel,entry.panel]: item.hide()
 	game.release_speaker()
 	mode = "field"
 	modal_open = false
@@ -975,7 +967,7 @@ func toggle():
 			dialog.canceled.emit()
 			return
 	if modal_open: close()
-	else: open_tablet()
+	else: open_pause()
 
 # Built-in dialogs would say "Please Confirm…" and "OK"; keep them in the game's language and size.
 func localize_dialog(dialog: AcceptDialog, title: String, ok = "확인", cancel = "취소"):
@@ -1107,7 +1099,6 @@ func _process(_delta):
 		var keyboard = DisplayServer.virtual_keyboard_get_height()
 		var height = maxf(1,DisplayServer.window_get_size().y)
 		terminal.custom_minimum_size.y = 24 if keyboard > 0 else 80
-		terminal_tools.visible = keyboard == 0
 		terminal_panel.anchor_bottom = clampf(.98-keyboard/height,.2,.98)
 	if modal_open:
 		set_prompt_visible(false)
@@ -1164,10 +1155,11 @@ func question_visible(id: String) -> bool:
 	return true
 
 func fit_screen():
-	if root == null or command_sidebar == null: return
+	if root == null or terminal_sidebar == null: return
 	var size = get_viewport().get_visible_rect().size
 	var safe = game.safe_rect()
 	var compact = size.x < 1100
+	if entry.panel != null: entry.fit()
 	field_objective.position = safe.position+Vector2(16,16)
 	var objective_width = minf(420,safe.size.x-200 if game.controls.touch_enabled else safe.size.x-32)
 	guide.custom_minimum_size.x = maxf(160,objective_width-36)
@@ -1178,7 +1170,8 @@ func fit_screen():
 	toast.reset_size.call_deferred()
 	messenger_contacts.visible = not compact
 	contact_picker.visible = compact
-	command_sidebar.visible = not compact and help_sessions.get(game.context,false)
+	terminal_sidebar.visible = not compact
+	terminal_compact_objective.visible = compact
 	command_input.custom_minimum_size.y = 48 if game.controls.mobile else 0
 	for control in [touch_setting,update_setting,claim,contact_picker]+attachments.values():
 		if is_instance_valid(control): control.custom_minimum_size.y = 48 if game.controls.mobile else 0

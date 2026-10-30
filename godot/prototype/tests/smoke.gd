@@ -46,7 +46,8 @@ func run(game: InvestigationPrototype):
 			DirAccess.make_dir_recursive_absolute(capture_directory)
 	await get_tree().physics_frame
 	var failures = []
-	if game.player.enabled or game.ui.mode != "briefing": failures.append("New investigation starts with assignment briefing")
+	await entry_checks(game,failures)
+	if game.player.enabled or game.ui.mode != "briefing": failures.append("Introduction leads to the assignment briefing")
 	if game.content.case.briefing.assignment.is_empty(): failures.append("Assignment explains the player's job")
 	if not game.ui.tabs.is_tab_hidden(2) or game.ui.work.text.contains("발생 보고") or game.ui.work.text.contains("수집 문서"):
 		failures.append("Investigation UI stays absent before the team-lead assignment")
@@ -103,11 +104,11 @@ func run(game: InvestigationPrototype):
 	if game.state.known != initial: failures.append("External inspection never awards evidence")
 	game._use("server_console","device",true)
 	if game.context != "server_console" or game.player.enabled or game.ui.mode != "terminal": failures.append("F opens only the current device terminal")
-	if game.ui.command_sidebar.visible or game.ui.command_list.get_child_count() != 0 or game.ui.terminal.text.contains("pwd / ls"):
+	if game.ui.terminal.text.contains("pwd / ls") or game.ui.terminal_panel.find_children("*","Button",true,false).size() != 1:
 		failures.append("Device opening does not reveal command lists")
 	game.ui.command_input.text = "help"
 	game.ui.execute_command()
-	if not game.ui.terminal.text.contains("inspect account") or game.ui.command_list.get_child_count() == 0: failures.append("Typing help reveals current-device commands")
+	if not game.ui.terminal.text.contains("inspect account") or game.ui.terminal_panel.find_children("*","Button",true,false).size() != 1: failures.append("Typing help prints commands without expanding a command book")
 	if game.ui.terminal.text.contains("inspect staging"): failures.append("Help does not expose unassigned investigation work")
 	game.ui.command_input.text = "status"
 	game.ui.execute_command()
@@ -131,7 +132,7 @@ func run(game: InvestigationPrototype):
 	game.ui.execute_command()
 	if not game.ui.guide_info().title.begins_with("4 / 8"): failures.append("Server baseline advances the tutorial")
 	var server_output = game.ui.terminal.get_parsed_text()
-	if not server_output.contains("sec.ops > status"): failures.append("Terminal shows the session transcript")
+	if not server_output.contains("sec.ops $ status"): failures.append("Terminal shows the session transcript")
 	await capture(game,"03-terminal")
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -340,13 +341,56 @@ func run(game: InvestigationPrototype):
 	confirm_open_dialog(game)
 	await get_tree().process_frame
 	if game.state.memo != "" or game.state.day != 1 or game.blocked_save or game.ui.memo.text != "": failures.append("Full data reset returns to a fresh investigation")
-	if game.ui.mode != "briefing": failures.append("A fresh investigation starts with the assignment briefing")
+	if game.ui.mode != "intro": failures.append("A fresh investigation starts with the background introduction")
+	game.ui.entry.finish_intro()
 	game.ui.close()
 	var summary = {"passed":failures.is_empty(),"failures":failures,"platform":OS.get_name(),"mobile":game.controls.mobile,"touchDefault":original_touch,"keyboardDetected":game.controls.keyboard_seen}
 	var report = FileAccess.open("user://prototype-smoke-result.json",FileAccess.WRITE)
 	if report != null: report.store_string(JSON.stringify(summary))
 	print("INVESTIGATION_SMOKE ",JSON.stringify(summary))
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+func entry_checks(game, failures: Array):
+	var entry = game.ui.entry
+	if game.ui.mode != "main_menu" or game.player.enabled or not entry.resume.disabled:
+		failures.append("First launch shows a main menu with no unavailable Continue action")
+	await capture(game,"00-main-menu")
+	game.ui.toggle()
+	if game.ui.mode != "main_menu" or game.player.enabled: failures.append("Back cannot drop a new player directly into the office")
+	press_text(entry.menu,"설정")
+	await get_tree().process_frame
+	game.ui.settings_screen.close_editor()
+	if game.ui.mode != "main_menu" or game.player.enabled: failures.append("Settings return to the main menu before a game starts")
+	entry.new_game.pressed.emit()
+	if game.ui.mode != "intro" or game.player.enabled: failures.append("New game introduces the background before entering the office")
+	for i in range(game.content.case.introduction.size()):
+		if entry.intro_index != i or entry.intro_body.text.is_empty(): failures.append("Introduction pages show their background in order")
+		await capture(game,"00-intro-%d" % (i+1))
+		entry.intro_next.pressed.emit()
+	if game.ui.mode != "briefing" or game.player.enabled or not entry.intro_seen: failures.append("Introduction finishes at the first assignment with movement blocked")
+	game.ui.close()
+	game.ui.toggle()
+	if game.ui.mode != "pause" or game.player.enabled: failures.append("Pause opens a menu with accessible exit and resume actions")
+	await capture(game,"00-pause-menu")
+	press_text(entry.menu,"게임 종료")
+	if not game.ui.root.get_children().any(func(node): return node is ConfirmationDialog and node.visible): failures.append("Game exit is directly available from the pause menu")
+	game.ui.toggle()
+	press_text(entry.menu,"설정")
+	await get_tree().process_frame
+	game.ui.settings_screen.close_editor()
+	if game.ui.mode != "pause" or game.player.enabled: failures.append("Closing settings returns to the pause menu")
+	var before = game.state.duplicate(true)
+	var original_store = game.store
+	game.store = FailedStore.new()
+	game.ui.return_to_main_menu()
+	if game.ui.mode != "pause" or game.state != before: failures.append("Failed save keeps the active session at the pause menu")
+	game.ui.toggle()
+	game.store = original_store
+	entry.main_menu.pressed.emit()
+	if game.ui.mode != "main_menu" or entry.resume.disabled or game.state != before: failures.append("Returning to the main menu preserves the active session")
+	entry.resume.pressed.emit()
+	if game.ui.mode != "field" or not game.player.enabled or game.state != before: failures.append("Continue restores the session without replaying the introduction")
+	game.ui.open_briefing()
 
 func note_and_terminal_checks(game, failures: Array):
 	var original_memo = game.state.memo
@@ -466,7 +510,8 @@ func progression_checks(game, failures: Array):
 	var links = {"C06":["submissions","application","package"],"C07":["metadata","message","submissions"],"C08":["request","message","approval"],"C09":["purpose","package","metadata"],"C10":["application","transfer"]}
 	for claim in links: game.dispatch({"type":"inference","payload":{"claim":claim,"records":links[claim]}})
 	game._use("control_console","device",true)
-	game.ui.case_work_button.pressed.emit()
+	game.ui.command_input.text = "desk"
+	game.ui.execute_command()
 	desk.view = 2; desk.build()
 	if not desk.final_submit.disabled: failures.append("Final submission is unavailable while the scheduled job is still pending")
 	select_record(desk.final_picks.scope,"violation")
@@ -501,7 +546,8 @@ func progression_checks(game, failures: Array):
 	game.dispatch(game.engine.parse("logs dispatch","control_console",game.state))
 	game.dispatch(game.engine.parse("logs receipts","control_console",game.state))
 	game._use("control_console","device",true)
-	game.ui.case_work_button.pressed.emit()
+	game.ui.command_input.text = "desk"
+	game.ui.execute_command()
 	desk.view = 2; desk.build()
 	for key in desk.final_picks:
 		var picker = desk.final_picks[key]
@@ -648,7 +694,7 @@ func settings_checks(game, failures: Array):
 func settings_dialog_checks(game, failures: Array):
 	var editor = game.ui.settings_screen
 	var before = game.state.duplicate(true)
-	press_text(editor,"게임 종료…")
+	game.ui.confirm("설정 확인",func(): pass)
 	var confirmation: ConfirmationDialog
 	for item in editor.get_children():
 		if item is ConfirmationDialog and item.visible: confirmation = item
@@ -822,6 +868,18 @@ func responsive_checks(game, failures: Array):
 		game._fit_screen()
 		await get_tree().process_frame
 		game.ui.fit_screen()
+		game.ui.entry.show_menu(false)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var entry = game.ui.entry
+		var entry_viewport = get_viewport().get_visible_rect().grow(1)
+		if not entry_viewport.encloses(entry.quit.get_global_rect()): failures.append("Main menu keeps game exit visible at "+str(dimensions))
+		await capture(game,"menu-%dx%d" % [dimensions.x,dimensions.y])
+		entry.show_intro()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		if entry.intro_body.get_global_rect().end.x > entry_viewport.end.x or entry.intro_next.get_global_rect().end.x > entry_viewport.end.x: failures.append("Introduction text and navigation fit the screen width at "+str(dimensions))
+		await capture(game,"intro-%dx%d" % [dimensions.x,dimensions.y])
 		game.ui.open_tablet(4)
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -829,6 +887,9 @@ func responsive_checks(game, failures: Array):
 		var settings = game.ui.settings_screen
 		if not is_instance_valid(settings) or not settings.visible or not viewport.grow(1).encloses(Rect2(Vector2(settings.position),Vector2(settings.size))): failures.append("Embedded settings fit the viewport at "+str(dimensions))
 		if viewport.size.x < viewport.size.y and settings.layout.get_global_rect().position.y > viewport.size.y*.3: failures.append("Portrait settings leave room for the content below navigation")
+		var inner = settings.get_visible_rect().grow(1)
+		if not inner.encloses(settings.save_button.get_global_rect()) or not inner.encloses(settings.layout.get_global_rect()): failures.append("Settings content and save action fit inside the window at "+str(dimensions))
+		if settings.buttons.forward.get_parent().get_child(0).size.y > 60: failures.append("Settings action names keep a readable row instead of wrapping vertically")
 		await capture(game,"settings-%dx%d" % [dimensions.x,dimensions.y])
 		game.ui.open_tablet(1)
 		await get_tree().process_frame
@@ -852,7 +913,8 @@ func responsive_checks(game, failures: Array):
 			if dimensions == Vector2i(540,960): await capture(game,"long-record-540x960")
 		close_notices(game)
 		game._use("control_console","device",true)
-		game.ui.case_work_button.pressed.emit()
+		game.ui.command_input.text = "desk"
+		game.ui.execute_command()
 		await get_tree().process_frame
 		await get_tree().process_frame
 		var desk = game.ui.case_desk
@@ -879,7 +941,8 @@ func responsive_checks(game, failures: Array):
 			game._use("server_console","device",true)
 			await capture(game,"09-terminal-%dx%d" % [dimensions.x,dimensions.y])
 	game._use("control_console","device",true)
-	game.ui.case_work_button.pressed.emit()
+	game.ui.command_input.text = "desk"
+	game.ui.execute_command()
 	game.get_window().size = Vector2i(960,540)
 	game._fit_screen()
 	await get_tree().process_frame
