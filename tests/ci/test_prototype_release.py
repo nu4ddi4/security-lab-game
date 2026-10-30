@@ -139,6 +139,7 @@ class PrototypeReleaseTests(unittest.TestCase):
                 release.append_android({'assets': [{'name': 'SecurityLab-0.2.0.exe'}]}, directory, self.repo, '0.2.0', self.sha, self.sha, '42')
             uploads = [call.args[0] for call in mutate.call_args_list if call.args[0][1:3] == ['release', 'upload']]
             self.assertEqual(len(uploads), 2)
+            self.assertIn('.apk.sha256#Codex pipeline ', uploads[0][-1])
             self.assertTrue(any('.apk#Codex pipeline ' in command[-1] for command in uploads))
             self.assertTrue(all('--clobber' not in command and '.exe' not in command[-1] for command in uploads))
 
