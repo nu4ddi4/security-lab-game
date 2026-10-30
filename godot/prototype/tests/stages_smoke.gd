@@ -84,7 +84,9 @@ func run(game: InvestigationPrototype):
 	check(not game.detailed_world or game.stage_world.originals.size() > 0,"Explosion breaks the actual equipment mesh")
 	await capture(game,"05-explosion")
 	await get_tree().create_timer(.85).timeout
-	ui.result_retry.pressed.emit()
+	ui.open_stage_picker()
+	ui.picks.get_child(2).pressed.emit()
+	check(game.stage_world.originals.is_empty(),"Selecting the failed stage restores its broken equipment")
 	check(ui.mode == "field" and game.state.stage.index == 3 and game.state.stage.cleared == [1,2],"Retry immediately restores only the failed stage")
 	enter(game,"hlpe")
 	check(game.state.stage.phase == "exploded" and game.state.stage.blasts == 2,"A typo also explodes a dangerous PC")

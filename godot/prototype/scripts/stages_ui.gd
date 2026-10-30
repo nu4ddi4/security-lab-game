@@ -218,6 +218,7 @@ func open_stage_picker():
 		var b = button(picks,"%02d   %s" % [chosen,game.content.stages[i].title if chosen <= game.state.stage.get("entered",maxi(int(game.state.stage.index),game.state.stage.cleared.size())) else "???"],func():
 			game.dispatch({"type":"stage.select","payload":{"index":chosen}})
 			game.save_now()
+			game.stage_world.key = ""
 			current_attempt = ""
 			begin_stage())
 		b.disabled = chosen > game.state.stage.unlocked
