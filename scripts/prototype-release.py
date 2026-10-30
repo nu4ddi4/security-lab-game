@@ -138,7 +138,8 @@ def append_android(release, directory, repository, version, source_sha, pipeline
     checksum = apk.with_name(apk.name + '.sha256')
     shutil.copyfile(apk.with_suffix('.sha256'), checksum)
     # Append only. Existing Windows files, tags and aggregate checksums stay intact.
-    for path in [apk, checksum]:
+    # Upload the checksum first: the APK is the append-completion marker.
+    for path in [checksum, apk]:
         existing = next((asset for asset in release['assets'] if asset['name'] == path.name), None)
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         if existing:
