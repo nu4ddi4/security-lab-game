@@ -834,6 +834,7 @@ func _terminal_input(event: InputEvent):
 
 func recall_command(direction: int):
 	var history = command_history.get(game.context,[])
+	if direction > 0 and history_index >= history.size(): return
 	if history_index == history.size() and direction < 0: history_draft = command_input.text
 	history_index = clampi(history_index+direction,0,history.size())
 	command_input.text = history[history_index] if history_index < history.size() else history_draft
@@ -1009,10 +1010,7 @@ func notice(text: String):
 		var popup = AcceptDialog.new()
 		localize_dialog(popup,"조사 기록" if investigation_assigned() else "업무 알림")
 		popup.set_meta("scroll_notice",true)
-		var parent: Node = root
-		for candidate in root.find_children("*","AcceptDialog",true,false):
-			if candidate.visible: parent = candidate
-		parent.add_child(popup)
+		dialog_parent().add_child(popup)
 		var scroll = ScrollContainer.new()
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		popup.add_child(scroll)
@@ -1034,11 +1032,17 @@ func fit_notice(popup: Window):
 	popup.size = Vector2i(mini(600,int(area.size.x)-32),mini(520,int(area.size.y)-88))
 	popup.position = Vector2i(area.position+(area.size-Vector2(popup.size))*.5)
 
+func dialog_parent() -> Node:
+	var parent: Node = root
+	for candidate in root.find_children("*","Window",true,false):
+		if candidate.visible and not candidate.is_queued_for_deletion() and (candidate is AcceptDialog or candidate == settings_screen): parent = candidate
+	return parent
+
 func confirm(text: String, callback: Callable):
 	var dialog = ConfirmationDialog.new()
 	localize_dialog(dialog,"확인")
 	dialog.dialog_text = text
-	root.add_child(dialog)
+	dialog_parent().add_child(dialog)
 	dialog.confirmed.connect(func(): dialog.hide(); callback.call(); dialog.queue_free())
 	dialog.canceled.connect(dialog.queue_free)
 	open_dialog(dialog,520)

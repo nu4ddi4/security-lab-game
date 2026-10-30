@@ -171,6 +171,13 @@ func build_final():
 	if state.casework.phase in ["morning","dispatching"]: ui.label(body,"정시 작업 확인 후 보고를 접수할 수 있습니다.","CaptionLabel")
 	elif not state.casework.final.is_empty() and not InvestigationResolution.final_is_current(state): ui.label(body,"접수 후 업무 상태가 변경되었습니다. 보고 내용을 검토하고 다시 접수해 주세요.","CaptionLabel")
 	var required = {"scope":["C01"],"collection":["C02"],"submission":["C05"],"authorship":["C07"],"awareness":["C08"],"purpose":["C09"],"transfer":["C10","C11","C12"],"material":["C02"]}
+	var dispatch_observed = false
+	var no_source_observed = false
+	for id in state.known:
+		var record = state.records[id]
+		if record.template == "dispatch_audit":
+			dispatch_observed = true
+			if record.facts.get("reason") == "NO_SOURCE": no_source_observed = true
 	for row in ui.game.content.rules.finalFields:
 		ui.label(body,row.label,"SectionLabel")
 		var picker = OptionButton.new()
@@ -179,7 +186,8 @@ func build_final():
 		for option in row.options:
 			picker.add_item(option[1])
 			picker.set_item_metadata(picker.item_count-1,option[0])
-			picker.set_item_disabled(picker.item_count-1,option[0] != "unknown" and not unlocked)
+			var operational = row.id == "transfer" and dispatch_observed and option[0] != "received" or row.id == "material" and no_source_observed
+			picker.set_item_disabled(picker.item_count-1,option[0] != "unknown" and not unlocked and not operational)
 			if final_draft.get(row.id,state.casework.final.get("fields",{}).get(row.id,"unknown")) == option[0]: picker.select(picker.item_count-1)
 		picker.disabled = state.ended
 		picker.item_selected.connect(func(_index):

@@ -398,11 +398,14 @@ func _unhandled_input(event):
 		get_viewport().set_input_as_handled()
 
 func _notification(what):
-	if what == NOTIFICATION_WM_GO_BACK_REQUEST and ui != null: ui.toggle()
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if ui != null: ui.toggle()
+		else: get_tree().quit()
 	if what in [NOTIFICATION_APPLICATION_PAUSED,NOTIFICATION_APPLICATION_FOCUS_OUT] and ui != null:
 		save_now()
-	if what == NOTIFICATION_WM_CLOSE_REQUEST and ui != null:
-		quit_game()
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if ui != null: quit_game()
+		else: get_tree().quit()
 
 func _box(position: Vector3, size: Vector3, color: Color, collision = true):
 	var mesh = MeshInstance3D.new()

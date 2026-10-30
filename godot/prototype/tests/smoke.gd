@@ -19,6 +19,17 @@ class ReplacementFailedStore extends InvestigationStore:
 		error = "교체 저장 실패"
 		return false
 
+class DialogTestUpdater extends InvestigationInstallerUpdates:
+	var preparing_parent: Node
+	var preparing_visible = false
+	func installed_identity_valid() -> bool: return true
+	func installer_verified() -> bool: return true
+	func fail(message: String):
+		if is_instance_valid(preparing_dialog):
+			preparing_parent = preparing_dialog.get_parent()
+			preparing_visible = preparing_dialog.visible
+		super.fail(message)
+
 func capture(game: InvestigationPrototype, name: String):
 	if capture_directory.is_empty() or DisplayServer.get_name() == "headless": return
 	await get_tree().process_frame
@@ -158,6 +169,7 @@ func run(game: InvestigationPrototype):
 	if not game.player.enabled: failures.append("Closing the UI restores movement")
 	var original_touch = game.controls.touch_enabled
 	game.ui.open_tablet(4)
+	await settings_dialog_checks(game,failures)
 	game.ui.touch_setting.button_pressed = true
 	if not game.controls.touch_enabled: failures.append("Settings enable touch without disabling keyboard")
 	await capture(game,"07-settings")
@@ -299,6 +311,7 @@ func run(game: InvestigationPrototype):
 	game.state = previous_state
 	game.ui.refresh()
 	await progression_checks(game,failures)
+	operational_final_checks(game,failures)
 	await focus_checks(game,failures)
 	await interaction_checks(game,failures)
 	await responsive_checks(game,failures)
@@ -321,7 +334,11 @@ func run(game: InvestigationPrototype):
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png(argument.trim_prefix("--prototype-capture="))
 	game.dispatch({"type":"memo","payload":{"text":"temporary note"}})
-	game.reset_all_data()
+	game.ui.open_tablet(4)
+	InvestigationDataReset.confirm(game)
+	await get_tree().create_timer(3.1).timeout
+	confirm_open_dialog(game)
+	await get_tree().process_frame
 	if game.state.memo != "" or game.state.day != 1 or game.blocked_save or game.ui.memo.text != "": failures.append("Full data reset returns to a fresh investigation")
 	if game.ui.mode != "briefing": failures.append("A fresh investigation starts with the assignment briefing")
 	game.ui.close()
@@ -354,6 +371,9 @@ func note_and_terminal_checks(game, failures: Array):
 	game.ui.command_input.text = "inspect files"
 	game._use("server_console","device",true)
 	if game.ui.command_input.text != "inspect account": failures.append("Returning to a device restores its pending command")
+	game.ui.command_input.text = "new command draft"
+	game.ui.recall_command(1)
+	if game.ui.command_input.text != "new command draft": failures.append("Down at the end of command history preserves the current draft")
 	game.ui.command_input.text = "logs t"
 	game.ui.recall_command(-1)
 	game.ui.recall_command(1)
@@ -361,6 +381,14 @@ func note_and_terminal_checks(game, failures: Array):
 	game.ui.close()
 	game._use("server_console","device",true)
 	if game.ui.command_input.text != "logs t": failures.append("Closing and reopening a terminal preserves its pending input")
+	game.ui.command_input.clear()
+	var saved_history = game.ui.command_history.get(game.context,[])
+	game.ui.command_history[game.context] = []
+	game.ui.history_index = 0
+	game.ui.command_input.text = "first command draft"
+	game.ui.recall_command(1)
+	if game.ui.command_input.text != "first command draft": failures.append("Down with empty command history preserves the current draft")
+	game.ui.command_history[game.context] = saved_history
 	game.ui.command_input.clear()
 	game.ui.close()
 
@@ -516,6 +544,71 @@ func select_record(picker: OptionButton, id: String):
 			picker.item_selected.emit(i)
 			return
 
+func option_disabled(picker: OptionButton, id: String) -> bool:
+	for i in range(picker.item_count):
+		if picker.get_item_metadata(i) == id: return picker.is_item_disabled(i)
+	return true
+
+func unaudited_day_seven(game, empty: bool) -> Dictionary:
+	var engine = game.engine
+	var s = engine.create_state()
+	# This case configuration is the existing no-source scenario, with ordinary daily actions.
+	if empty: s.maintenanceAllowed = false
+	for command in ["status","inspect account","logs tasks","logs backups"]: s = engine.step(s,engine.parse(command,"server_console",s)).state
+	s = engine.step(s,engine.parse("inspect files","project_pc",s)).state
+	s = engine.step(s,engine.parse("inspect W-218","approval_archive",s)).state
+	for id in ["oh_intro","park_intro","han_intro","seo_intro"]: s = engine.step(s,{"type":"dialogue","payload":{"id":id}}).state
+	for day in range(1,7):
+		if day == 2:
+			for command in ["backup disable B-05","verify service"]: s = engine.step(s,engine.parse(command,"server_console",s)).state
+		if day == 3:
+			s = engine.step(s,engine.parse("inspect files","project_pc",s)).state
+			if not s.ops.indexHealthy: s = engine.step(s,engine.parse("repair index","server_console",s)).state
+			s = engine.step(s,engine.parse("verify search","project_pc",s)).state
+		if day >= 4:
+			s = engine.step(s,engine.parse("verify service","server_console",s)).state
+			s = engine.step(s,engine.parse("verify search","project_pc",s)).state
+		s = engine.step(s,{"type":"day.end","payload":{"expectedDay":day,"confirmed":true}}).state
+	return s
+
+func operational_final_checks(game, failures: Array):
+	var original = game.state.duplicate(true)
+	var desk = game.ui.case_desk
+	for empty in [false,true]:
+		var s = unaudited_day_seven(game,empty)
+		if s.day != 7 or s.report.approved or not s.casework.links.is_empty(): failures.append("Operational final fixture reaches day seven without audit permission or inferred case claims")
+		s = game.engine.step(s,{"type":"time.advance"}).state
+		if not empty: s = game.engine.step(s,{"type":"time.advance"}).state
+		game.state = s
+		game._use("control_console","device",true)
+		desk.reset()
+		desk.open(game.ui,true)
+		desk.view = 2; desk.build()
+		if not option_disabled(desk.final_picks.transfer,"sent") or not option_disabled(desk.final_picks.material,"empty"): failures.append("Unqueried operational originals never unlock final findings")
+		game.dispatch(game.engine.parse("logs dispatch","control_console",game.state))
+		desk.build()
+		for choice in ["scheduled","not_run","blocked","sent"]:
+			if option_disabled(desk.final_picks.transfer,choice): failures.append("An observed dispatch original opens the operational category without audit permission: "+choice)
+		if not option_disabled(desk.final_picks.transfer,"received"): failures.append("A dispatch original alone does not open an external-receipt claim")
+		if empty:
+			for choice in ["isolated","present","empty"]:
+				if option_disabled(desk.final_picks.material,choice): failures.append("The observed no-source record opens the material category without selecting a matching answer: "+choice)
+		elif not option_disabled(desk.final_picks.material,"empty"): failures.append("A sent dispatch does not invent a material-state observation")
+		for picker in desk.final_picks.values():
+			if picker.get_item_metadata(picker.selected) != "unknown": failures.append("Observed operational categories still start with the player's judgment deferred")
+		select_record(desk.final_picks.transfer,"not_run" if empty else "sent")
+		if empty: select_record(desk.final_picks.material,"empty")
+		press_text(desk.body,"종결 보고 접수")
+		var report = game.state.casework.final
+		if report.is_empty() or report.evaluation.unsupported.has("transfer") or empty and report.evaluation.unsupported.has("material"): failures.append("An unaudited final report accepts the player's observed operational findings")
+		if not InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(game.state,game.content),game.content).has("state"): failures.append("Unaudited operational reports remain valid saved progress")
+		desk.reset()
+	game.state = original
+	game.ui.reset_session()
+	game.ui.sync_memo()
+	game.ui.refresh()
+	game.ui.close()
+
 func press_text(parent: Node, text: String):
 	for node in parent.find_children("*","Button",true,false):
 		if node.text == text: node.pressed.emit(); return
@@ -551,6 +644,73 @@ func settings_checks(game, failures: Array):
 	if not game.settings.save_values(original).ok: failures.append("Original settings can be restored after the review")
 	viewport.scaling_3d_scale = original_scale
 	viewport.msaa_3d = original_msaa
+
+func settings_dialog_checks(game, failures: Array):
+	var editor = game.ui.settings_screen
+	var before = game.state.duplicate(true)
+	press_text(editor,"게임 종료…")
+	var confirmation: ConfirmationDialog
+	for item in editor.get_children():
+		if item is ConfirmationDialog and item.visible: confirmation = item
+	if confirmation == null: failures.append("Settings exit confirmation is a child of the active settings window"); return
+	game.ui.notice("확인 중인 업무 알림")
+	var nested_notice = confirmation.find_children("*","AcceptDialog",true,false)
+	if nested_notice.is_empty(): failures.append("Notices stay above an active settings confirmation")
+	game.ui.toggle()
+	game.ui.toggle()
+	if not editor.visible or game.player.enabled: failures.append("Canceling a settings confirmation returns to settings without enabling movement")
+	game.ui.notice("설정 업무 알림")
+	if not editor.get_children().any(func(item): return item is AcceptDialog and item.visible): failures.append("A settings notice belongs to the active settings window")
+	game.ui.toggle()
+	InvestigationDataReset.confirm(game)
+	var reset_dialog: ConfirmationDialog
+	for item in editor.get_children():
+		if item is ConfirmationDialog and item.visible: reset_dialog = item
+	if reset_dialog == null or not reset_dialog.get_ok_button().disabled: failures.append("Settings data reset opens above settings and retains its countdown")
+	game.ui.toggle()
+	await get_tree().process_frame
+	if game.state != before or not editor.visible: failures.append("Canceling data reset leaves investigation and settings intact")
+	await updater_dialog_checks(game,failures)
+
+func updater_dialog_checks(game, failures: Array):
+	var updater = DialogTestUpdater.new()
+	game.add_child(updater)
+	updater.game = game
+	updater.enabled = true
+	updater.info = {"version":"0.0.1","channel":"beta"}
+	updater.manifest = {"version":"0.0.2","channel":"beta"}
+	updater.state = "available"
+	updater.request_install()
+	if not is_instance_valid(updater.consent_dialog) or updater.consent_dialog.get_parent() != game.ui.settings_screen: failures.append("Updater consent opens above the investigation settings window")
+	updater.defer_update()
+	if game.player.enabled or not game.ui.settings_screen.visible or updater.consent_granted: failures.append("Deferring an update keeps settings active and never authorizes installation")
+	# An existing regular file cannot contain a transaction file on any platform.
+	updater.stage = ProjectSettings.globalize_path(game.store.directory.path_join("stage-blocker-"+str(Time.get_ticks_usec())))
+	var blocker = FileAccess.open(updater.stage,FileAccess.WRITE)
+	if blocker == null:
+		failures.append("Updater preparation fixture creates its regular-file blocker")
+		updater.queue_free()
+		return
+	blocker.store_string("regular file, not a preparation directory")
+	blocker.close()
+	if not FileAccess.file_exists(updater.stage) or DirAccess.dir_exists_absolute(updater.stage):
+		failures.append("Updater preparation fixture is a file rather than a directory")
+		updater.queue_free()
+		return
+	var transaction = FileAccess.open(updater.stage.path_join("transaction.json"),FileAccess.WRITE)
+	if transaction != null:
+		transaction.close()
+		failures.append("Updater preparation fixture rejects transaction writes before exercising installation")
+		updater.queue_free()
+		return
+	updater.state = "ready"
+	updater.consent_granted = true
+	await updater.install()
+	if updater.preparing_parent != game.ui.settings_screen or not updater.preparing_visible: failures.append("Verified installer preparation opens above the investigation settings window")
+	if updater.state != "failed" or updater.helper_pid != -1 or updater.preparing_dialog != null: failures.append("A preparation write failure closes its dialog before any process starts: "+JSON.stringify({"state":updater.state,"helper_pid":updater.helper_pid,"dialog":is_instance_valid(updater.preparing_dialog),"stage_is_file":FileAccess.file_exists(updater.stage),"stage_is_directory":DirAccess.dir_exists_absolute(updater.stage)}))
+	if game.player.enabled or not game.ui.settings_screen.visible: failures.append("Failed update preparation leaves investigation settings usable")
+	DirAccess.remove_absolute(updater.stage)
+	updater.queue_free()
 
 func _dummy_server_pose(game):
 	game.player.global_position = Vector3(0,.01,-2)

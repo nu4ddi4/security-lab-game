@@ -22,15 +22,18 @@ static func supports(s: Dictionary, content: Dictionary, claim: String, ids: Arr
 			for action_id in ids:
 				if effective_control(s.records[action_id],dispatch): return true
 		return false
-	var used = []
-	for group in rule.requires:
-		var found = ""
-		for id in ids:
-			if not id is String or id not in s.known or not s.records.has(id): return false
-			if id not in used and s.records[id].template in group: found = id; break
-		if found.is_empty(): return false
-		used.append(found)
-	if ids.any(func(id): return not id is String or id not in s.known): return false
+	return match_groups(s,claim,ids,rule.requires,0,[])
+
+static func match_groups(s: Dictionary, claim: String, ids: Array, groups: Array, index: int, used: Array) -> bool:
+	if index == groups.size(): return supports_selected(s,claim,used)
+	for id in ids:
+		if id in used or s.records[id].template not in groups[index]: continue
+		var selected = used.duplicate()
+		selected.append(id)
+		if match_groups(s,claim,ids,groups,index+1,selected): return true
+	return false
+
+static func supports_selected(s: Dictionary, claim: String, used: Array) -> bool:
 	if claim in ["C05","C06","C07","C09"]:
 		for id in used:
 			if s.records[id].facts.get("package","PKG-218-R2") != "PKG-218-R2": return false
@@ -152,7 +155,7 @@ static func advance(engine, s: Dictionary) -> Dictionary:
 		"replies": return engine._result(s,"ALREADY_DONE")
 	return engine._result(s,"TIME_ADVANCED")
 
-static func evaluate(s: Dictionary, content: Dictionary, fields: Dictionary) -> Dictionary:
+static func evaluate(s: Dictionary, content: Dictionary, fields: Dictionary, legacy_transfer = false) -> Dictionary:
 	var required = {"scope":"C01","collection":"C02","submission":"C05","authorship":"C07","awareness":"C08","purpose":"C09"}
 	var expected = {"scope":"violation","collection":"collected","submission":"seo","authorship":"vendor","awareness":"warning_seen","purpose":"contract_support"}
 	var unsupported = []
@@ -165,7 +168,8 @@ static func evaluate(s: Dictionary, content: Dictionary, fields: Dictionary) -> 
 		if r.template == "dispatch_audit": observed_dispatch = r.facts.dispatch
 		if r.template == "receipt_audit": observed_receipt = r.facts.receipt
 	var transfer = fields.transfer
-	var correct_transfer = transfer == observed_dispatch and transfer in ["not_run","blocked"] or transfer == "sent" and observed_dispatch == "sent" and observed_receipt == "unconfirmed" or transfer == "received" and observed_dispatch == "sent" and observed_receipt == "confirmed" and linked(s,content,"C12")
+	var receipt_unknown = observed_receipt == "unconfirmed" if legacy_transfer else observed_receipt != "confirmed"
+	var correct_transfer = transfer == observed_dispatch and transfer in ["not_run","blocked"] or transfer == "sent" and observed_dispatch == "sent" and receipt_unknown or transfer == "received" and observed_dispatch == "sent" and observed_receipt == "confirmed" and linked(s,content,"C12")
 	if transfer != "unknown" and not correct_transfer: unsupported.append("transfer")
 	var material = fields.material
 	if material != "unknown":
@@ -221,7 +225,12 @@ static func evaluate_report(s: Dictionary, content: Dictionary) -> Dictionary:
 	var context = s.casework.final.get("context",report_context(s))
 	for key in ["phase","minute","dispatch","receipt","stagingIsolated"]: snapshot.casework[key] = context[key]
 	snapshot.casework.control.mode = context.controlMode
-	return evaluate(snapshot,content,s.casework.final.fields)
+	var evaluation = evaluate(snapshot,content,s.casework.final.fields)
+	# Keep a previously accepted assessment until the player explicitly resubmits.
+	if s.casework.final.evaluation != evaluation:
+		var previous = evaluate(snapshot,content,s.casework.final.fields,true)
+		if s.casework.final.evaluation == previous: return previous
+	return evaluation
 
 static func public_ending(s: Dictionary) -> String:
 	if s.casework.ending.is_empty(): return "조사 종결"

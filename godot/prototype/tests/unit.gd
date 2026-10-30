@@ -272,6 +272,19 @@ func with_open_report(s: Dictionary) -> Dictionary:
 
 func review_checks(engine, content):
 	var base = story_base(engine)
+	var delayed = query(engine,base,"backup enable B-05")
+	delayed = query(engine,delayed,"status")
+	check(not InvestigationResolution.supports(delayed,content,"C03",["backup","status-1-0"]),"A normal response alone does not support a service delay")
+	for originals in [["backup","status-1-0","status-7-1"],["status-7-1","status-1-0","backup"]]:
+		delayed = transition(engine,delayed,"inference",{"claim":"C03","records":originals})
+		check(delayed.casework.links.get("C03") == originals,"Earlier normal responses do not hide a selected delay observation")
+	var damaged = story_base(engine,true,false)
+	damaged = query(engine,damaged,"logs tasks")
+	damaged = query(engine,damaged,"logs indexing","project_pc")
+	check(not InvestigationResolution.supports(damaged,content,"C04",["run-night-2","index-night-2","files-1-1"]),"Healthy file observations alone do not establish an observed index fault")
+	for originals in [["run-night-2","index-night-2","files-1-1","files-3-0"],["files-3-0","files-1-1","index-night-2","run-night-2"]]:
+		damaged = transition(engine,damaged,"inference",{"claim":"C04","records":originals})
+		check(damaged.casework.links.get("C04") == originals,"Earlier healthy files do not hide a selected index fault observation")
 	var isolated = transition(engine,base,"control.request",{"records":["application","transfer"]})
 	isolated = transition(engine,isolated,"staging.isolate")
 	isolated = transition(engine,isolated,"time.advance")
@@ -285,6 +298,33 @@ func review_checks(engine, content):
 	var sent = transition(engine,base,"time.advance")
 	sent = transition(engine,sent,"time.advance")
 	sent = query(engine,sent,"logs dispatch","control_console")
+	var bounded = InvestigationResolution.evaluate(sent,content,report_fields("sent"))
+	check(bounded.attribution_quality != "overclaimed" and bounded.id == "E" and bounded.truth_level == "partial","Observed dispatch supports sent with receipt unknown even without a receipt query")
+	check(InvestigationResolution.evaluate(sent,content,report_fields("received")).attribution_quality == "overclaimed","Dispatch alone never supports a received finding")
+	var pending_report = transition(engine,sent,"final.report",{"fields":report_fields("sent")})
+	check(pending_report.casework.final.evaluation.id == "E","A bounded dispatch report is accepted and saved without a receipt original")
+	var historical = pending_report.duplicate(true)
+	var previous = pending_report.casework.final.evaluation.duplicate(true)
+	previous.attribution_quality = "overclaimed"
+	previous.unsupported = ["transfer"]
+	previous.id = "F"
+	previous.name = InvestigationResolution.ENDINGS.F
+	historical.casework.final.evaluation = previous
+	var restored = InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(historical,content),content)
+	check(restored.has("state") and restored.state.casework.final.evaluation == previous,"An older accepted v2 assessment remains readable with its exact historical evaluation")
+	var historical_closed = transition(engine,historical,"day.end",{"expectedDay":7,"confirmed":true})
+	check(historical_closed.ended and historical_closed.casework.ending == previous,"Closing an old accepted report preserves its historical assessment")
+	var closing_text = historical_closed.records["final-report"].body
+	restored = InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(historical_closed,content),content)
+	check(restored.has("state") and restored.state.records["final-report"].body == closing_text and restored.state.casework.ending == previous,"An older closed v2 save retains its ending and original closing document")
+	var invalid_assessment = historical.duplicate(true)
+	invalid_assessment.casework.final.evaluation.unsupported = ["scope"]
+	check(InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(invalid_assessment,content),content).has("error"),"Historical assessment compatibility rejects a dictionary that matches neither evaluator")
+	var reviewed = transition(engine,historical,"final.report",{"fields":report_fields("sent")})
+	check(reviewed.casework.final.evaluation.id == "E","Explicit resubmission applies the corrected bounded-finding rule to an old accepted report")
+	var unobserved_reply = transition(engine,sent,"time.advance")
+	bounded = InvestigationResolution.evaluate(unobserved_reply,content,report_fields("sent"))
+	check(bounded.attribution_quality != "overclaimed" and bounded.truth_level == "partial","An unqueried later receipt does not make the player's bounded finding an overclaim")
 	sent = query(engine,sent,"logs receipts","control_console")
 	sent = transition(engine,sent,"final.report",{"fields":report_fields("sent")})
 	var submitted = sent.casework.final.duplicate(true)
@@ -294,7 +334,10 @@ func review_checks(engine, content):
 	check(engine.step(later,{"type":"day.end","payload":{"expectedDay":7,"confirmed":true}}).code == "FINAL_STALE","An outdated accepted report cannot silently close the new business state")
 	check(InvestigationResolution.evaluate_report(later,content).id == "E","A frozen report retains the physical context it was submitted with")
 	later = query(engine,later,"logs receipts","control_console")
-	later = transition(engine,later,"inference",{"claim":"C12","records":["dispatch-7","receipt-confirmed"]})
+	for originals in [["dispatch-7","receipt-unconfirmed","receipt-confirmed"],["receipt-confirmed","receipt-unconfirmed","dispatch-7"]]:
+		later = transition(engine,later,"inference",{"claim":"C12","records":originals})
+		check(later.casework.links.get("C12") == originals,"An earlier missing response does not hide a selected confirmed receipt")
+	check(InvestigationResolution.evaluate(later,content,report_fields("sent")).attribution_quality == "overclaimed","Receipt unknown contradicts a confirmation the player has already observed")
 	close_story(engine,later,report_fields("received"),"C")
 	var toggled = engine.create_state()
 	for i in range(200): toggled = engine.step(toggled,engine.parse("backup disable B-05" if i%2 == 0 else "backup enable B-05","server_console",toggled)).state

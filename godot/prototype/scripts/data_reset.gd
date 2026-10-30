@@ -39,11 +39,12 @@ static func confirm(game: InvestigationPrototype):
 	var dialog = ConfirmationDialog.new()
 	game.ui.localize_dialog(dialog,"게임 초기화","모두 삭제")
 	dialog.dialog_text = summary()
-	game.ui.root.add_child(dialog)
+	game.ui.dialog_parent().add_child(dialog)
 	var ok = dialog.get_ok_button()
 	ok.theme_type_variation = "DangerButton"
 	ok.disabled = true
 	dialog.confirmed.connect(func():
+		dialog.hide()
 		game.ui.notice("%d개 파일을 지우고 처음 상태로 돌아갔습니다." % game.reset_all_data())
 		dialog.queue_free())
 	dialog.canceled.connect(dialog.queue_free)
