@@ -129,8 +129,8 @@ def main():
     result = wait_for('INVESTIGATION_SMOKE', timeout=360)
     captures = directory / 'ui'
     captures.mkdir(exist_ok=True)
-    for name in ['00-main-menu','00-intro-1','00-intro-2','00-intro-3','00-pause-menu',
-                 '01-briefing','02-dialogue','03-terminal','04-messenger','05-notes','06-field','07-settings']:
+    for name in ['00-main-menu','01-intro','02-practice','03-terminal','04-clear',
+                 '05-explosion','06-stages','07-settings','08-finish']:
         data = app_file('files/qa-ui/' + name + '.png', binary=True)
         if not data.startswith(b'\x89PNG\r\n\x1a\n'):
             raise ValueError('Missing Android rendered UI capture: ' + name)

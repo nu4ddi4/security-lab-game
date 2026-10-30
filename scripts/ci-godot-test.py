@@ -16,6 +16,7 @@ SUITES = {
                  (['--script', 'res://tests/content_pack_test.gd'], 'CONTENT_PACK_TEST')],
     'scene': [(['--script', 'res://tests/input_bindings_test.gd'], 'INPUT_BINDINGS_TEST'),
               (['--', '--prototype-smoke', '--prototype-dummy'], 'INVESTIGATION_SMOKE'),
+              (['--', '--prototype-smoke', '--prototype-dummy', '--legacy-investigation'], 'INVESTIGATION_SMOKE'),
               (['--', '--prototype-smoke', '--prototype-dummy', '--prototype-input-review'], 'INPUT_REVIEW')],
 }
 

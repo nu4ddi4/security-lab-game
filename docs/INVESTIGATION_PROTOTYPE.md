@@ -1,4 +1,6 @@
-# 잔여 권한 · 조사 게임
+# 잔여 권한 · 이전 조사 게임
+
+현재 기본 실행은 [퇴근.exe 스테이지 게임](TERMINAL_STAGES.md)입니다. 아래 문서는 기존 조사 진행과 저장 호환 검증을 위한 구조를 기록합니다. 개발 중 이전 모드는 `--legacy-investigation`으로 실행합니다.
 
 브랜치: `beta` · 게임 기반: `codex/godot-investigation-prototype` · 맵·배치: 검증한 `godot-port`.
 

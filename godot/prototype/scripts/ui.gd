@@ -1210,7 +1210,7 @@ func open_rebinding():
 	settings_screen = editor
 	root.add_child(editor)
 	editor.background.texture = settings_backdrop
-	editor.preview_image.texture = settings_backdrop
+	if editor.preview_image != null: editor.preview_image.texture = settings_backdrop
 	modal.hide()
 	editor.popup()
 	editor.size = Vector2i(game.safe_rect().size)

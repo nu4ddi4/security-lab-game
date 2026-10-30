@@ -21,6 +21,9 @@ static func decode(raw: String, content: Dictionary) -> Dictionary:
 		if not valid(state,content,true): return {"error":"기존 조사 상태가 올바르지 않습니다. 원본은 보존됩니다."}
 		state = upgrade_casework(state,content)
 	if not state is Dictionary or not valid(state,content): return {"error":"진행 상태·기록 참조가 올바르지 않습니다. 원본은 보존됩니다."}
+	if state.has("stage"):
+		for key in ["version","index","unlocked","mistakes","blasts","attempt"]: state.stage[key] = int(state.stage[key])
+		state.stage.cleared = state.stage.cleared.map(func(value): return int(value))
 	return {"state":state}
 
 static func whole(value, low: int, high: int) -> bool:
@@ -120,6 +123,7 @@ static func classic_valid(s: Dictionary, content: Dictionary, legacy = false) ->
 
 static func valid(s: Dictionary, content: Dictionary, legacy = false) -> bool:
 	if not classic_valid(s,content,legacy) or not InvestigationResolution.valid(s,content,legacy): return false
+	if s.has("stage") and not TerminalStagesEngine.valid_progress(s.stage): return false
 	for id in s.known:
 		var r = s.records[id]
 		var base = content.records[r.template]

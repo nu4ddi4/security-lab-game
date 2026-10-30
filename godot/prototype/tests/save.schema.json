@@ -149,6 +149,68 @@
               "type": "object"
             }
           }
+        },
+        "stage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "index",
+            "unlocked",
+            "phase",
+            "cleared",
+            "mistakes",
+            "blasts",
+            "attempt"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "unlocked": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "phase": {
+              "enum": [
+                "playing",
+                "clear",
+                "exploded",
+                "complete"
+              ]
+            },
+            "cleared": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 6
+              },
+              "uniqueItems": true,
+              "maxItems": 6
+            },
+            "mistakes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "blasts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            },
+            "attempt": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            }
+          }
         }
       }
     }
