@@ -376,7 +376,7 @@ func stage_checks(content: Dictionary):
 	check(InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(state,content),content).has("state"),"A fresh stage session uses the existing save envelope")
 	for index in range(1,7):
 		var before = state.duplicate(true)
-		var wrong = engine.step(state,engine.parse("oops", "",state))
+		var wrong = engine.step(state,{"type":"stage.talk","payload":{"choice":0}} if index == 5 else {"type":"stage.fall"} if index == 6 else engine.parse("oops", "",state))
 		check(state == before,"Stage commands do not mutate the input state")
 		check(wrong.state.stage.phase == ("playing" if index < 3 else "exploded"),"Practice ends and one-hit failures start at stage three")
 		state = wrong.state
@@ -388,14 +388,24 @@ func stage_checks(content: Dictionary):
 		var stage = content.stages[index-1]
 		var help = engine.step(state,engine.parse("help","",state))
 		check(help.code == "STAGE_OUTPUT" and help.state == state,"Help is always a safe read-only command")
-		var command = stage.solutions.keys()[0]
-		state = engine.step(state,engine.parse(command,"",state)).state
+		var command = stage.solutions.keys()[0] if index < 5 else ""
+		state = engine.step(state,{"type":"stage.talk","payload":{"choice":1}} if index == 5 else {"type":"stage.power","payload":{"arrived":true}} if index == 6 else engine.parse(command,"",state)).state
 		check(state.stage.phase == "clear" and state.stage.cleared.size() == index,"The intended puzzle solution clears its stage")
 		var loaded = InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(state,content),content)
 		check(loaded.has("state"),"Stage clears roundtrip through save validation")
 		if loaded.has("state"): state = loaded.state
 		state = engine.step(state,{"type":"stage.next"}).state
 	check(state.stage.phase == "complete" and state.stage.blasts == 4,"All six stages finish with their explosion count intact")
+	var old = state.duplicate(true)
+	old.stage.erase("entered")
+	check(InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(old,content),content).has("state"),"Stage saves from before exploration still load")
+	var bypass = old.duplicate(true)
+	bypass.stage.index = 5
+	bypass.stage.phase = "playing"
+	check(engine.step(bypass,engine.parse("archive payroll_final.xlsx","",bypass)).state == bypass,"Terminal commands cannot bypass the NPC stage")
+	check(engine.step(bypass,{"type":"stage.talk","payload":{"choice":99}}).state == bypass,"Malformed dialogue choices are rejected")
+	bypass.stage.index = 6
+	check(engine.step(bypass,{"type":"stage.power","payload":{"arrived":false}}).state == bypass,"The power switch requires reaching the final PC")
 	var loaded = InvestigationSaveCodec.decode(InvestigationSaveCodec.encode(state,content),content)
 	check(loaded.has("state") and loaded.state.stage == state.stage,"Stage save normalizes numeric IDs for replay")
 	if loaded.has("state"):

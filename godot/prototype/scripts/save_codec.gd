@@ -23,6 +23,7 @@ static func decode(raw: String, content: Dictionary) -> Dictionary:
 	if not state is Dictionary or not valid(state,content): return {"error":"진행 상태·기록 참조가 올바르지 않습니다. 원본은 보존됩니다."}
 	if state.has("stage"):
 		for key in ["version","index","unlocked","mistakes","blasts","attempt"]: state.stage[key] = int(state.stage[key])
+		if state.stage.has("entered"): state.stage.entered = int(state.stage.entered)
 		state.stage.cleared = state.stage.cleared.map(func(value): return int(value))
 	return {"state":state}
 

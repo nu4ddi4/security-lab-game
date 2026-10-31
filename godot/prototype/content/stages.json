@@ -5,7 +5,7 @@
     "device": "server_console",
     "help": "help          명령 목록\nstatus        상태 확인\nls            파일 목록\ncat <file>    파일 읽기",
     "files": {
-      "welcome.txt": "신입사원용 PC / 파손 면책 기간: 2대\n담당자: 오늘은 아무것도 누르지 마세요.\n추신: 상태 확인은 해도 됩니다."
+      "welcome.txt": "신입사원용 PC\n담당자: 상태부터 확인해 주세요."
     },
     "outputs": {},
     "solutions": {
@@ -23,11 +23,11 @@
       "print.log": "09:12  lunch.txt    COMPLETED\n09:48  memo.txt     COMPLETED\n09:31  budget.txt   COMPLETED",
       "lunch.txt": "금일 점심: 미정\n결재 상태: 전원 반대",
       "budget.txt": "소모품 예산: 300원\n희망 구매: 데이터센터",
-      "memo.txt": "인수인계 메모\n첫 두 대는 연습용입니다.\n세 번째 컴퓨터부터는 인사팀도 책임지지 않습니다."
+      "memo.txt": "인수인계 메모\n프린터 담당자는 서버실로 이동했습니다."
     },
     "outputs": {},
     "solutions": {
-      "cat memo.txt": "인수인계 메모\n첫 두 대는 연습용입니다.\n세 번째 컴퓨터부터는 인사팀도 책임지지 않습니다."
+      "cat memo.txt": "인수인계 메모\n프린터 담당자는 서버실로 이동했습니다."
     },
     "clear": "종이를 읽었습니다. 이제 경력직입니다.",
     "failure": ""
@@ -68,35 +68,32 @@
     "failure": "수리는 실패했고 노릇함은 성공했습니다."
   },
   {
-    "title": "진짜 최종 최최종",
-    "goal": "승인 대장에 등록된 급여 파일 하나를 금고에 보관하세요.",
+    "title": "결재는 입으로",
+    "goal": "보안팀장 오세진에게 퇴근 결재를 받으세요.",
     "device": "control_console",
-    "help": "help              명령 목록\nls                파일 목록\ncat <file>        파일 읽기\narchive <file>    금고 보관",
-    "files": {
-      "approvals.log": "DOC-07  sha256=ac91  decision=APPROVED\nDOC-08  sha256=be52  decision=REJECTED",
-      "inventory.log": "payroll.xlsx              sha256=ef20\npayroll_final.xlsx        sha256=ac91\npayroll_final_real.xlsx   sha256=be52"
-    },
+    "help": "",
+    "files": {},
     "outputs": {},
-    "solutions": {
-      "archive payroll_final.xlsx": "ARCHIVE=SEALED\nsha256=ac91\nFILES=1"
-    },
-    "clear": "최종 파일이 정말 최종인 드문 날입니다.",
-    "failure": "금고는 멀쩡합니다. 컴퓨터만 퇴사했습니다."
+    "solutions": {},
+    "clear": "결재는 났습니다. 마지막 컴퓨터만 끄면 됩니다.",
+    "failure": "금고는 멀쩡합니다. 컴퓨터만 퇴사했습니다.",
+    "npc": "oh",
+    "dialogue": "오세진: 퇴근 신청 세 건이 왔네요.\n김 대리: 25시 70분에 퇴근\n이 사원: 오늘 업무 완료, 장비 전원은 확인 중\n박 과장: 출근한 적 없음\n\n누구 신청부터 접수할까요?",
+    "choices": [
+      "김 대리 건부터 처리하죠.",
+      "이 사원 건부터 접수해 주세요.",
+      "출근 안 한 박 과장님이 급합니다."
+    ]
   },
   {
-    "title": "퇴근.exe",
-    "goal": "최종 승인된 두 요청의 코드를 슬롯 순서로 연결해 게이트를 여세요.",
-    "device": "project_pc",
-    "help": "help             명령 목록\nls               파일 목록\ncat <file>       파일 읽기\nunlock <code>    퇴근 게이트",
-    "files": {
-      "requests.log": "id=R17 slot=1 code=73\nid=R18 slot=2 code=26\nid=R19 slot=1 code=41",
-      "receipts.log": "id=R17 result=DENIED\nid=R18 result=ACCEPTED\nid=R19 result=ACCEPTED"
-    },
+    "title": "저 컴퓨터를 꺼야 해",
+    "goal": "옥상의 발판을 건너 마지막 PC의 전원 스위치를 누르세요.",
+    "device": "shutdown_pc",
+    "help": "",
+    "files": {},
     "outputs": {},
-    "solutions": {
-      "unlock 4126": "ACCESS=GRANTED\nCLOCK_OUT=APPROVED\n오늘도 회사의 자산 가치를 낮추셨습니다."
-    },
-    "clear": "퇴근 성공. 내일은 계산기를 드립니다.",
-    "failure": "게이트는 잠겼고 케이스만 활짝 열렸습니다."
+    "solutions": {},
+    "clear": "POWER OFF. 이제 정말 퇴근입니다.",
+    "failure": "발판은 멀쩡합니다. 사원의 체면만 떨어졌습니다."
   }
 ]
