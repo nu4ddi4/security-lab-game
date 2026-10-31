@@ -6,7 +6,7 @@ const PHASES = ["playing","clear","exploded","complete"]
 
 func create_state() -> Dictionary:
 	var s = super.create_state()
-	s["stage"] = {"version":1,"index":1,"unlocked":1,"phase":"playing","cleared":[],"mistakes":0,"blasts":0,"attempt":1}
+	s["stage"] = {"version":1,"index":1,"unlocked":1,"phase":"playing","cleared":[],"mistakes":0,"blasts":0,"attempt":1,"entered":1}
 	return s
 
 func definition(s: Dictionary) -> Dictionary:
@@ -32,6 +32,7 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 				a.phase = "complete"
 				return changed(s,"STAGES_COMPLETE","CLOCK_OUT=APPROVED")
 			a.index += 1
+			a.entered = maxi(int(a.get("entered",a.cleared.size())),int(a.index))
 			a.phase = "playing"
 			a.attempt = 1
 			return changed(s,"STAGE_STARTED","BOOT OK")
@@ -39,9 +40,21 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 			var selected = p.get("index")
 			if not InvestigationSaveCodec.whole(selected,1,int(a.unlocked)): return _result(original,"INVALID_ACTION")
 			a.index = int(selected)
+			a.entered = maxi(int(a.get("entered",a.cleared.size())),int(a.index))
 			a.phase = "playing"
 			a.attempt = 1
 			return changed(s,"STAGE_STARTED","BOOT OK")
+		"stage.talk":
+			if a.index != 5 or a.phase != "playing": return _result(original,"STAGE_BUSY")
+			if not InvestigationSaveCodec.whole(p.get("choice"),0,2): return _result(original,"INVALID_ACTION")
+			if p.choice != 1: return mistake(s,"보안팀장: 그걸 지금 승인하겠다고요?")
+			return finish(s,"보안팀장이 퇴근 요청을 접수했습니다.")
+		"stage.power":
+			if a.index != 6 or a.phase != "playing" or p.get("arrived") != true: return _result(original,"INVALID_ACTION")
+			return finish(s,"POWER=OFF")
+		"stage.fall":
+			if a.index != 6 or a.phase != "playing": return _result(original,"STAGE_BUSY")
+			return mistake(s,"안전교육을 수강하지 않았습니다.")
 		"stage.command":
 			if a.phase != "playing": return _result(original,"STAGE_BUSY","terminal: session closed")
 			var raw = p.get("command","")
@@ -52,17 +65,21 @@ func step(original: Dictionary, action: Dictionary) -> Dictionary:
 			if command == "help": return _result(original,"STAGE_OUTPUT",stage.help+"\nclear  history  exit")
 			if command == "ls": return _result(original,"STAGE_OUTPUT","\n".join(stage.files.keys()))
 			if command == "pwd": return _result(original,"STAGE_OUTPUT","/office/pc-%02d" % a.index)
+			if a.index >= 5: return _result(original,"STAGE_OUTPUT","이 업무는 현장에서 처리하세요.")
 			if stage.solutions.has(command):
-				if a.index not in a.cleared:
-					a.cleared.append(int(a.index))
-					a.unlocked = mini(COUNT,int(a.index)+1)
-				a.phase = "clear"
-				return changed(s,"STAGE_CLEAR",stage.solutions[command])
+				return finish(s,stage.solutions[command])
 			if stage.outputs.has(command): return _result(original,"STAGE_OUTPUT",stage.outputs[command])
 			if command.begins_with("cat ") and stage.files.has(command.substr(4)):
 				return _result(original,"STAGE_OUTPUT",stage.files[command.substr(4)])
 			return mistake(s,"%s: command or target not found" % command)
 	return _result(original,"INVALID_ACTION")
+
+func finish(s: Dictionary, output: String) -> Dictionary:
+	if s.stage.index not in s.stage.cleared:
+		s.stage.cleared.append(int(s.stage.index))
+		s.stage.unlocked = mini(COUNT,int(s.stage.index)+1)
+	s.stage.phase = "clear"
+	return changed(s,"STAGE_CLEAR",output)
 
 func changed(s: Dictionary, code: String, output: String) -> Dictionary:
 	s.revision += 1
@@ -76,8 +93,11 @@ func mistake(s: Dictionary, output: String) -> Dictionary:
 	return changed(s,"STAGE_EXPLODED",output+"\nKERNEL PANIC\nWARRANTY=VOID")
 
 static func valid_progress(a) -> bool:
-	if not a is Dictionary or a.keys().size() != 8 or a.get("version") != 1: return false
+	if not a is Dictionary or a.keys().size() not in [8,9] or a.get("version") != 1: return false
+	for key in a:
+		if key not in ["version","index","unlocked","phase","cleared","mistakes","blasts","attempt","entered"]: return false
 	if not InvestigationSaveCodec.whole(a.get("index"),1,COUNT) or not InvestigationSaveCodec.whole(a.get("unlocked"),1,COUNT) or a.index > a.unlocked: return false
+	if a.has("entered") and (not InvestigationSaveCodec.whole(a.entered,1,COUNT) or a.entered < maxi(int(a.index),a.cleared.size()) or a.entered > a.unlocked): return false
 	if a.get("phase") not in PHASES: return false
 	for key in ["mistakes","blasts"]:
 		if not InvestigationSaveCodec.whole(a.get(key),0,1000000): return false

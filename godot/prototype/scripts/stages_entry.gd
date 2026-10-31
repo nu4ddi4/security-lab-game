@@ -22,10 +22,10 @@ func show_intro():
 
 func refresh_intro():
 	intro_progress.text = "신입사원 PC 적응 과정"
-	intro_title.text = "6대를 고치면 퇴근"
-	intro_body.text = "명령어를 입력해 각 컴퓨터의 문제를 해결하세요.\n\n첫 두 대는 연습용입니다.\n세 번째부터 잘못 입력하면 컴퓨터가 터집니다."
+	intro_title.text = "오늘 안에 퇴근할 수 있을까"
+	intro_body.text = "신입사원 첫날. 사무실에는 처리할 일이 여섯 개 남았습니다.\n컴퓨터를 고치고, 동료를 만나고, 어떻게든 퇴근하세요.\n\nWASD 이동 · 마우스 시점 · F 상호작용 · Space 점프\n터미널에서는 help로 시작하세요."
 	intro_previous.text = "메인 화면"
-	intro_next.text = "첫 PC 켜기"
+	intro_next.text = "출근하기"
 
 func previous_intro(): show_menu(false)
 func next_intro(): finish_intro()
